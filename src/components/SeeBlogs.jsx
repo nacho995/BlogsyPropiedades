@@ -1,27 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Button } from "@headlessui/react";  // Para los botones si usas Headless UI
+import { Dialog } from "@headlessui/react"; // Headless UI para el modal
+import { Link } from 'react-router-dom';
+import { deleteBlogPost, getBlogPosts } from '../services/api';
 
-// Función para obtener los blogs desde el backend
-const getBlogPosts = async () => {
-  const response = await fetch('http://localhost:3000/blog');
-  const data = await response.json();
-  return data;
-};
 
-// Función para eliminar un blog
-const deleteBlogPost = async (id) => {
-  const response = await fetch(`http://localhost:3000/blog/${id}`, {
-    method: 'DELETE',
-  });
-  if (response.ok) {
-    return id;  // Si la eliminación fue exitosa, devolver el ID del blog eliminado
-  }
-  throw new Error('Error al eliminar el blog');
-};
 
 export default function SeeBlogs() {
   const [blogs, setBlogs] = useState([]);
-  
+  const [isOpen, setIsOpen] = useState(false); // Estado para mostrar el modal
+  const [blogToDelete, setBlogToDelete] = useState(null); // Blog que se eliminará
+
   useEffect(() => {
     const fetchBlogs = async () => {
       try {
@@ -34,14 +22,21 @@ export default function SeeBlogs() {
     fetchBlogs();
   }, []);
 
-  const handleDelete = async (id) => {
+  const openDeleteModal = (blog) => {
+    setBlogToDelete(blog);
+    setIsOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!blogToDelete) return;
     try {
-      const deletedId = await deleteBlogPost(id);
-      setBlogs(blogs.filter(blog => blog._id !== deletedId));  // Eliminar el blog de la lista localmente
-      alert('Blog eliminado correctamente');
+      const deletedId = await deleteBlogPost(blogToDelete._id);
+      setBlogs(blogs.filter(blog => blog._id !== deletedId));
     } catch (error) {
       console.error('Error al eliminar el blog:', error);
-      alert('Hubo un error al eliminar el blog');
+    } finally {
+      setIsOpen(false); // Cerrar modal
+      setBlogToDelete(null);
     }
   };
 
@@ -70,25 +65,58 @@ export default function SeeBlogs() {
               {blog.image && blog.image.src && (
                 <div className="mt-4">
                   <img
-                    src={blog.image.src} // Usamos la propiedad src para mostrar la imagen
+                    src={blog.image.src}
                     alt={blog.image.alt || 'Imagen del blog'}
                     className="w-[30vh] h-[10vh] object-cover rounded-md"
                   />
                 </div>
               )}
 
-              <div className="mt-4">
-                <Button
-                  onClick={() => handleDelete(blog._id)}
+              <div className="m-4 flex justify-between">
+                <button
+                  onClick={() => openDeleteModal(blog)}
                   className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700"
                 >
                   Eliminar
-                </Button>
-              </div>
+                </button>
+            
+              
+                <Link
+                    to={`/blog/${blog._id}`}
+                  className="bg-red-500 text-white px-4  py-2 rounded hover:bg-red-700"
+                >
+                  Ver completo
+                </Link>
+                </div>
             </div>
           ))
         )}
       </div>
+
+      {/* MODAL DE CONFIRMACIÓN */}
+      <Dialog open={isOpen} onClose={() => setIsOpen(false)} className="fixed inset-0 flex items-center justify-center p-4">
+        <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+          <Dialog.Title className="text-lg font-semibold">Confirmar eliminación</Dialog.Title>
+          <Dialog.Description className="mt-2">
+            ¿Estás seguro de que quieres eliminar este blog?
+          </Dialog.Description>
+
+          <div className="mt-4 flex justify-end gap-2">
+            <button 
+              onClick={() => setIsOpen(false)}
+              className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+            >
+              Cancelar
+            </button>
+            <button 
+              onClick={confirmDelete}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              Eliminar
+            </button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

@@ -1,36 +1,43 @@
 export async function postBlogPosts(data) {
     const response = await fetch('http://localhost:3000/blog', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
     })
-  
+
     return response.json()
-  }
-  
-  export async function getBlogPosts() {  
+}
+
+export async function getBlogPosts() {
     const response = await fetch('http://localhost:3000/blog')
     return response.json()
-  }
-  
-  export async function deleteBlogPost(id) {
+}
+
+export async function deleteBlogPost(id) {
     const response = await fetch(`http://localhost:3000/blog/${id}`, {
-      method: 'DELETE',
+        method: 'DELETE',
     })
-  
+
     return response.json()
-  }
-  
-  export async function updateBlogPost(id, data) {
+}
+
+export async function updateBlogPost(id, data) {
     const response = await fetch(`http://localhost:3000/blog/${id}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
     })
-  
+
     return response.json()
-  }
+}
+
+
+export async function getBlogById(id) {
+    const response = await fetch(`http://localhost:3000/blog/${id}`);
+    const data = await response.json();
+    return data;
+};
