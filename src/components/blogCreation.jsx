@@ -13,6 +13,7 @@ export default function BlogCreation() {
     const [imageSrc, setImageSrc] = useState("");
     const [imageAlt, setImageAlt] = useState("");
     const [readTime, setReadTime] = useState("");
+    const [template, setTemplate] = useState("");
 
     // Función para generar una URL amigable (slug) basada en el título
     const generateSlug = (title) => {
@@ -52,6 +53,7 @@ export default function BlogCreation() {
             setImageSrc("");
             setImageAlt("");
             setReadTime("");
+            setTemplate("");
         } catch (error) {
             console.error("Error al publicar el blog:", error);
         }
@@ -121,6 +123,14 @@ export default function BlogCreation() {
                     onChange={(e) => setReadTime(e.target.value)}
                     className="w-full p-2 mb-4 rounded-md border-2 border-gray-300"
                 />
+                <input
+                    type="text"
+                    placeholder="Plantilla"
+                    value={template}
+                    onChange={(e) => setReadTime(e.target.value)}
+                    className="w-full p-2 mb-4 rounded-md border-2 border-gray-300"
+                />
+                
 
                 {/* Botón de publicación */}
                 <Link to="/ver-blogs">

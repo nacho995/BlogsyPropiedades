@@ -1,5 +1,6 @@
+"use client";
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom"; // Si usas react-router-dom; si usas Next.js, se utiliza Next/Link y useRouter.
 import { Dialog } from "@headlessui/react";
 import { getBlogById, updateBlogPost } from "../services/api";
 
@@ -45,11 +46,10 @@ export default function BlogDetail() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-
     if (name === "image") {
       setEditedBlog({
         ...editedBlog,
-        image: { src: value }, // Ajustar si la API espera { image: { src: "URL" } }
+        image: { src: value },
       });
     } else {
       setEditedBlog({ ...editedBlog, [name]: value });
@@ -123,7 +123,7 @@ export default function BlogDetail() {
         />
       </div>
 
-      {/* CAMPO PARA EDITAR LA IMAGEN */}
+      {/* Campo para editar la URL de la imagen */}
       <div className="mb-4">
         <label className="block font-semibold">URL de la Imagen:</label>
         <input
@@ -136,7 +136,23 @@ export default function BlogDetail() {
         />
       </div>
 
-      {/* PREVISUALIZACIÓN DE LA IMAGEN */}
+      {/* Dropdown para seleccionar el template */}
+      <div className="mb-4">
+        <label className="block font-semibold">Template:</label>
+        <select
+          name="template"
+          value={editedBlog.template || "default"}
+          onChange={handleChange}
+          className="w-full border p-2 rounded"
+          disabled={!isEditing}
+        >
+          <option value="default">Default</option>
+          <option value="estiloA">Estilo A</option>
+          <option value="estiloB">Estilo B</option>
+        </select>
+      </div>
+
+      {/* Previsualización de la imagen */}
       {editedBlog.image?.src && (
         <div className="mt-4">
           <img
@@ -165,10 +181,16 @@ export default function BlogDetail() {
         )}
       </div>
 
-      {/* MODAL */}
-      <Dialog open={isOpen} onClose={() => setIsOpen(false)} className="fixed inset-0 flex items-center justify-center p-4">
+      {/* Modal de confirmación */}
+      <Dialog
+        open={isOpen}
+        onClose={() => setIsOpen(false)}
+        className="fixed inset-0 flex items-center justify-center p-4"
+      >
         <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
-          <Dialog.Title className="text-lg font-semibold">Confirmar modificación</Dialog.Title>
+          <Dialog.Title className="text-lg font-semibold">
+            Confirmar modificación
+          </Dialog.Title>
           <Dialog.Description className="mt-2">
             ¿Estás seguro de que quieres guardar los cambios?
           </Dialog.Description>
@@ -180,7 +202,8 @@ export default function BlogDetail() {
             >
               Cancelar
             </button>
-            <Link to={"/blog"}
+            <Link
+              to={"/blog"}
               onClick={handleSave}
               className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
             >
@@ -192,3 +215,5 @@ export default function BlogDetail() {
     </div>
   );
 }
+
+
