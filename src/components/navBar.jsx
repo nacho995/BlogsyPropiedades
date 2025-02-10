@@ -113,8 +113,8 @@ export default function Navbar() {
                     <img
                       alt="Profile"
                       src={profilePic}
-                      width={32}
-                      height={32}
+                      width={52}
+                      height={52}
                       className="rounded-full"
                     />
                   </MenuButton>

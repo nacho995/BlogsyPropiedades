@@ -9,6 +9,7 @@ import { SignInPage } from './pages/signInPage';
 
 import { RegisterPage } from './pages/registerForm';
 import ChangeProfile from './pages/changeProfilePage';
+import { UserProvider } from './components/UserContext';
 
 
 
@@ -20,6 +21,7 @@ export default function App() {
 
   return (
     <>
+      <UserProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -31,6 +33,7 @@ export default function App() {
           <Route path="/profile" element={<ChangeProfile />} />
         </Routes>
       </BrowserRouter>
+      </UserProvider>
     </>
   )
 }

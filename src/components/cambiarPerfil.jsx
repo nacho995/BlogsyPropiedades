@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { updateProfile } from '../services/api';
+import React, { useState, useEffect, useContext } from 'react';
+import { updateProfile } from '../services/api'; // Asegúrate de que este endpoint esté configurado para recibir FormData
+import { UserContext } from './UserContext';
+
 
 export default function CambiarPerfil() {
-  const [name, setName] = useState('');
+  const { user, setUser } = useContext(UserContext);
+  const [name, setName] = useState(user.name || '');
   const [profilePic, setProfilePic] = useState(null);
-  const [preview, setPreview] = useState(null);
+  const [preview, setPreview] = useState(user.profilePic || '');
   const [message, setMessage] = useState('');
 
   // Maneja el cambio del input de archivo y genera una vista previa
@@ -22,7 +25,7 @@ export default function CambiarPerfil() {
   // Limpieza de URL de objeto cuando cambia o se desmonta
   useEffect(() => {
     return () => {
-      if (preview) {
+      if (preview && preview.startsWith("blob:")) {
         URL.revokeObjectURL(preview);
       }
     };
@@ -52,11 +55,12 @@ export default function CambiarPerfil() {
       // Llamamos a la API para actualizar el perfil
       const result = await updateProfile(formData);
       console.log("Perfil actualizado:", result);
-      // Si la respuesta incluye una nueva URL para la foto, actualízala
-      if (result.profilePic) {
-        setPreview(result.profilePic);
-        localStorage.setItem('profilePic', result.profilePic);
-      }
+      // Actualiza el contexto global con los nuevos datos
+      setUser((prevUser) => ({
+        ...prevUser,
+        name: result.name || prevUser.name,
+        profilePic: result.profilePic || prevUser.profilePic,
+      }));
       setMessage('Perfil actualizado correctamente');
     } catch (error) {
       console.error("Error al actualizar el perfil:", error);

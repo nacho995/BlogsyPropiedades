@@ -20,20 +20,22 @@ export default function SignIn() {
         e.preventDefault()
 
         try {
-            console.log(email, password)
-            const loginResponse = await loginUser({ email, password })
-            console.log('loginResponse', loginResponse)
-            window.localStorage.setItem('token', loginResponse.token)
-
-            if (loginResponse.token) {
-                setDisplayError(true)
-                navigate('/')
+            const loginResponse = await loginUser({ email, password });
+            console.log("Respuesta de login:", loginResponse);
+        
+            if (loginResponse.token && loginResponse.name) {
+              localStorage.setItem("token", loginResponse.token);
+              localStorage.setItem("name", loginResponse.name); // Guarda el nombre
+              // Redirige al usuario o actualiza el estado de autenticación
+              navigate('/');
             } else {
-                setDisplayError("Email o contraseña son incorrectos")
+              setDisplayError("Email o contraseña incorrectos");
             }
-        } catch (err) {
-            console.error('Error: Email o contraseña incorrectos', err.message)
-        }
+          } catch (err) {
+            console.error('Error al iniciar sesión:', err.message);
+            setDisplayError("Hubo un error al iniciar sesión.");
+          }
+        
 
 
 
