@@ -285,3 +285,91 @@ export const uploadImageCallBack = (file) => {
       })
   })
 }
+/** 
+* @param {Object} data - Datos del blog post.
+* @returns {Promise<Object>}
+*/
+export async function postProperties(data) {
+ const response = await fetch(`${API_BASE_URL}/property`, {
+   method: 'POST',
+   headers: {
+     'Content-Type': 'application/json'
+   },
+   body: JSON.stringify(data)
+ })
+
+ if (!response.ok) {
+   const errorData = await response.json()
+   throw new Error(errorData.message || 'Error al crear la propiedad')
+ }
+
+ return response.json()
+}
+
+export async function getPropertyPosts() {
+    const response = await fetch(`${API_BASE_URL}/property`)
+  
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.message || 'Error al obtener los property posts')
+    }
+  
+    return response.json()
+  }
+  
+  /**
+   * Elimina un property post por su id.
+   * @param {string} id - Identificador del property post.
+   * @returns {Promise<Object>}
+   */
+  export async function deletePropertyPost(id) {
+    const response = await fetch(`${API_BASE_URL}/property/${id}`, {
+      method: 'DELETE'
+    })
+  
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.message || 'Error al eliminar el property post')
+    }
+  
+    return response.json()
+  }
+  
+  /**
+   * Actualiza un property post.
+   * @param {string} id - Identificador del property post.
+   * @param {Object} data - Datos actualizados del property post.
+   * @returns {Promise<Object>}
+   */
+  export async function updatePropertyPost(id, data) {
+    const response = await fetch(`${API_BASE_URL}/property/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    })
+  
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.message || 'Error al actualizar el property post')
+    }
+  
+    return response.json()
+  }
+  
+  /**
+   * Obtiene un blog post por su id.
+   * @param {string} id - Identificador del blog post.
+   * @returns {Promise<Object>}
+   */
+  export async function getPropertyById(id) {
+    const response = await fetch(`${API_BASE_URL}/property/${id}`)
+  
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.message || 'Error al obtener el property post')
+    }
+  
+    return response.json()
+  }

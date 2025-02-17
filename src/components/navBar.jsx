@@ -8,6 +8,7 @@ const navigation = [
   { name: 'Añadir Blog', href: '/blog', current: false },
   { name: 'Añadir Propiedades', href: '/propiedades', current: false },
   { name: 'Ver Blogs', href: '/ver-blogs', current: false },
+  { name: 'Ver Propiedades', href: '/ver-propiedades', current: false },
 ];
 
 function clases(...classes) {

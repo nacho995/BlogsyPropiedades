@@ -1,27 +1,27 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom"; // Si usas react-router-dom; si usas Next.js, se utiliza Next/Link y useRouter.
+import { Link, useParams } from "react-router-dom";
 import { Dialog } from "@headlessui/react";
-import { getBlogById, updateBlogPost } from "../services/api";
+import { getPropertyById, updatePropertyPost } from "../services/api";
 
-export default function BlogDetail() {
+export default function PropertyDetail() {
     const { id } = useParams();
-    const [blog, setBlog] = useState(null);
+    const [property, setProperty] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
-    const [editedBlog, setEditedBlog] = useState({});
+    const [editedProperty, setEditedProperty] = useState({});
     const [isOpen, setIsOpen] = useState(false);
 
     useEffect(() => {
-        const fetchBlog = async () => {
+        const fetchProperty = async () => {
             try {
-                const data = await getBlogById(id);
-                setBlog(data);
-                setEditedBlog(data);
+                const data = await getPropertyById(id);
+                setProperty(data);
+                setEditedProperty(data);
             } catch (error) {
-                console.error("Error al obtener el blog:", error);
+                console.error("Error al obtener la propiedad:", error);
             }
         };
-        fetchBlog();
+        fetchProperty();
     }, [id]);
 
     const handleEdit = () => {
@@ -34,9 +34,9 @@ export default function BlogDetail() {
 
     const handleSave = async () => {
         try {
-            console.log("Datos que se enviarán a la API:", editedBlog);
-            await updateBlogPost(id, editedBlog);
-            setBlog(editedBlog);
+            console.log("Datos que se enviarán a la API:", editedProperty);
+            await updatePropertyPost(id, editedProperty);
+            setProperty(editedProperty);
             setIsEditing(false);
             setIsOpen(false);
         } catch (error) {
@@ -46,91 +46,148 @@ export default function BlogDetail() {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+        // Si se edita la imagen, actualizamos el primer elemento del array images
         if (name === "image") {
-            setEditedBlog({
-                ...editedBlog,
-                image: { src: value },
+            const images = editedProperty.images && Array.isArray(editedProperty.images)
+                ? [...editedProperty.images]
+                : [];
+            if (images.length > 0) {
+                images[0] = { src: value, alt: "Imagen de previsualización" };
+            } else {
+                images.push({ src: value, alt: "Imagen de previsualización" });
+            }
+            setEditedProperty({
+                ...editedProperty,
+                images,
             });
         } else {
-            setEditedBlog({ ...editedBlog, [name]: value });
+            setEditedProperty({ ...editedProperty, [name]: value });
         }
     };
 
-    if (!blog) {
+    if (!property) {
         return <p className="text-center text-gray-500">Cargando...</p>;
     }
 
     return (
         <div className=" bg-gradient-to-br from-blue-900 to-black bg-fixed">
-            <div className="max-w-2xl mx-auto p-6 bg-gradient-to-bl from-blue-900 to-white rounded-lg shadow-md">
+            <div className="max-w-2xl mx-auto p-6 bg-gradient-to-bl from-white to-blue-900 rounded-lg shadow-md">
+                {/* Tipo de Propiedad */}
                 <h1 className="text-3xl font-bold mb-4">
                     {isEditing ? (
                         <input
                             type="text"
-                            name="title"
-                            value={editedBlog.title}
+                            name="typeProperty"
+                            value={editedProperty.typeProperty || ""}
                             onChange={handleChange}
                             className="w-full border p-2 rounded"
                         />
                     ) : (
-                        blog.title
+                        property.typeProperty
                     )}
                 </h1>
 
+                {/* Descripción */}
                 <div className="mb-4">
                     <label className="block font-semibold">Descripción:</label>
                     <textarea
                         name="description"
-                        value={editedBlog.description}
+                        value={editedProperty.description || ""}
                         onChange={handleChange}
                         className="w-full border p-2 rounded"
                         readOnly={!isEditing}
                     />
                 </div>
 
+                {/* Dirección */}
                 <div className="mb-4">
-                    <label className="block font-semibold">Autor:</label>
+                    <label className="block font-semibold">Dirección:</label>
                     <input
                         type="text"
-                        name="author"
-                        value={editedBlog.author}
+                        name="address"
+                        value={editedProperty.address || ""}
                         onChange={handleChange}
                         className="w-full border p-2 rounded"
                         readOnly={!isEditing}
                     />
                 </div>
 
+                {/* Precio */}
                 <div className="mb-4">
-                    <label className="block font-semibold">Categoría:</label>
+                    <label className="block font-semibold">Precio:</label>
                     <input
                         type="text"
-                        name="category"
-                        value={editedBlog.category}
+                        name="price"
+                        value={editedProperty.price || ""}
                         onChange={handleChange}
                         className="w-full border p-2 rounded"
                         readOnly={!isEditing}
                     />
                 </div>
 
+                {/* Metros Cuadrados */}
                 <div className="mb-4">
-                    <label className="block font-semibold">Tiempo de lectura:</label>
+                    <label className="block font-semibold">Metros Cuadrados:</label>
                     <input
                         type="text"
-                        name="readTime"
-                        value={editedBlog.readTime}
+                        name="m2"
+                        value={editedProperty.m2 || ""}
                         onChange={handleChange}
                         className="w-full border p-2 rounded"
                         readOnly={!isEditing}
                     />
                 </div>
 
-                {/* Campo para editar la URL de la imagen */}
+                {/* Planta */}
+                <div className="mb-4">
+                    <label className="block font-semibold">Planta:</label>
+                    <input
+                        type="text"
+                        name="piso"
+                        value={editedProperty.piso || ""}
+                        onChange={handleChange}
+                        className="w-full border p-2 rounded"
+                        readOnly={!isEditing}
+                    />
+                </div>
+
+                {/* Habitaciones */}
+                <div className="mb-4">
+                    <label className="block font-semibold">Habitaciones:</label>
+                    <input
+                        type="text"
+                        name="rooms"
+                        value={editedProperty.rooms || ""}
+                        onChange={handleChange}
+                        className="w-full border p-2 rounded"
+                        readOnly={!isEditing}
+                    />
+                </div>
+
+                {/* Baños */}
+                <div className="mb-4">
+                    <label className="block font-semibold">Baños:</label>
+                    <input
+                        type="text"
+                        name="wc"
+                        value={editedProperty.wc || ""}
+                        onChange={handleChange}
+                        className="w-full border p-2 rounded"
+                        readOnly={!isEditing}
+                    />
+                </div>
+
+                {/* Campo para editar la URL de la imagen (primera imagen) */}
                 <div className="mb-4">
                     <label className="block font-semibold">URL de la Imagen:</label>
                     <input
                         type="text"
                         name="image"
-                        value={editedBlog.image?.src || ""}
+                        value={
+                            editedProperty.images && editedProperty.images[0]
+                                ? editedProperty.images[0].src
+                                : ""
+                        }
                         onChange={handleChange}
                         className="w-full border p-2 rounded"
                         readOnly={!isEditing}
@@ -142,27 +199,29 @@ export default function BlogDetail() {
                     <label className="block font-semibold">Template:</label>
                     <select
                         name="template"
-                        value={editedBlog.template || "default"}
+                        value={editedProperty.template || "default"}
                         onChange={handleChange}
                         className="w-full border p-2 rounded"
                         disabled={!isEditing}
                     >
-                        <option value="default">Default</option>
+                        <option value="default">Por defecto</option>
                         <option value="estiloA">Estilo A</option>
                         <option value="estiloB">Estilo B</option>
                     </select>
                 </div>
 
                 {/* Previsualización de la imagen */}
-                {editedBlog.image?.src && (
-                    <div className="mt-4">
-                        <img
-                            src={editedBlog.image.src}
-                            alt="Vista previa de la imagen"
-                            className="w-[20vh] h-[20vh] rounded-md object-cover"
-                        />
-                    </div>
-                )}
+                {editedProperty.images &&
+                    editedProperty.images[0] &&
+                    editedProperty.images[0].src && (
+                        <div className="mt-4">
+                            <img
+                                src={editedProperty.images[0].src}
+                                alt="Vista previa de la imagen"
+                                className="w-[20vh] h-[20vh] rounded-md object-cover"
+                            />
+                        </div>
+                    )}
 
                 <div className="mt-6 flex gap-4">
                     {!isEditing ? (
@@ -204,7 +263,7 @@ export default function BlogDetail() {
                                 Cancelar
                             </button>
                             <Link
-                                to={"/ver-blogs"}
+                                to={"/ver-propiedades"}
                                 onClick={handleSave}
                                 className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
                             >
@@ -217,5 +276,3 @@ export default function BlogDetail() {
         </div>
     );
 }
-
-

@@ -10,6 +10,9 @@ import { SignInPage } from './pages/signInPage';
 import { RegisterPage } from './pages/registerForm';
 import ChangeProfile from './pages/changeProfilePage';
 import { UserProvider } from './components/UserContext';
+import PropertyPost from './pages/PropertiesPost';
+import GetProperty from './pages/GetProperties';
+import PropertyData from './pages/detalProperty';
 
 
 
@@ -31,6 +34,9 @@ export default function App() {
           <Route path="/signin" element={<SignInPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/profile" element={<ChangeProfile />} />
+          <Route path='/propiedades' element={<PropertyPost />} />
+          <Route path='ver-propiedades' element={<GetProperty/>} />
+          <Route path='property/:id' element={<PropertyData/>} />
         </Routes>
       </BrowserRouter>
       </UserProvider>
