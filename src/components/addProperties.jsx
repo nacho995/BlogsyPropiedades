@@ -28,6 +28,7 @@ export default function PropertyCreation() {
   const [address, setAddress] = useState("");
   const [description, setDescription] = useState("");
   const [m2, setM2] = useState("");
+  const [priceM2, setPriceM2] = useState("");
   const [piso, setPiso] = useState("");
   const [uploadedImages, setUploadedImages] = useState([]);
   const [rooms, setRooms] = useState("");
@@ -41,6 +42,7 @@ export default function PropertyCreation() {
     address: false,
     description: false,
     m2: false,
+    priceM2: false,
     piso: false,
     rooms: false,
     wc: false,
@@ -86,6 +88,7 @@ export default function PropertyCreation() {
       address,
       description,
       m2,
+      priceM2,
       piso,
       rooms,
       wc,
@@ -99,6 +102,7 @@ export default function PropertyCreation() {
       address: false,
       description: false,
       m2: false,
+      priceM2: false,
       piso: false,
       rooms: false,
       wc: false,
@@ -125,6 +129,10 @@ export default function PropertyCreation() {
       newErrors.m2 = true;
       valid = false;
     }
+    if (!priceM2.trim()) {
+        newErrors.priceM2 = true;
+        valid = false;
+      }
     if (!piso.trim()) {
       newErrors.piso = true;
       valid = false;
@@ -165,6 +173,7 @@ export default function PropertyCreation() {
       address,
       description,
       m2,
+      priceM2,
       piso,
       images: uploadedImages.map((img) => ({ src: img.url, alt: "Imagen de previsualización" })),
       url,
@@ -183,6 +192,7 @@ export default function PropertyCreation() {
       setAddress("");
       setDescription("");
       setM2("");
+      setPriceM2("");
       setPiso("");
       setUploadedImages([]);
       setRooms("");
@@ -329,6 +339,21 @@ export default function PropertyCreation() {
           required
         />
         {errors.m2 && <p className="text-red-500 text-xs mb-2">Debe rellenar este campo.</p>}
+
+        {/* Precio por metro cuadrado */}
+        <label htmlFor="priceM2" className="w-full mb-1 font-medium">Precio por metro cuadrado</label>
+        <input
+          type="text"
+          id="priceM2"
+          name="priceM2"
+          placeholder="Precio por metro cuadrado"
+          value={priceM2}
+          onChange={(e) => setPriceM2(e.target.value)}
+          className={`w-full p-2 mb-1 rounded-md border-2 ${errors.priceM2 ? "border-red-500 animate-shake" : "border-gray-300"}`}
+          required
+        />
+        {errors.priceM2 && <p className="text-red-500 text-xs mb-2">Debe rellenar este campo.</p>}
+
 
         {/* Habitaciones */}
         <label htmlFor="rooms" className="w-full mb-1 font-medium">Habitaciones</label>

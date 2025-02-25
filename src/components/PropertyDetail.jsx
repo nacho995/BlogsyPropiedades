@@ -5,274 +5,322 @@ import { Dialog } from "@headlessui/react";
 import { getPropertyById, updatePropertyPost } from "../services/api";
 
 export default function PropertyDetail() {
-    const { id } = useParams();
-    const [property, setProperty] = useState(null);
-    const [isEditing, setIsEditing] = useState(false);
-    const [editedProperty, setEditedProperty] = useState({});
-    const [isOpen, setIsOpen] = useState(false);
+  const { id } = useParams();
+  const [property, setProperty] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedProperty, setEditedProperty] = useState({});
+  const [isOpen, setIsOpen] = useState(false);
 
-    useEffect(() => {
-        const fetchProperty = async () => {
-            try {
-                const data = await getPropertyById(id);
-                setProperty(data);
-                setEditedProperty(data);
-            } catch (error) {
-                console.error("Error al obtener la propiedad:", error);
-            }
-        };
-        fetchProperty();
-    }, [id]);
-
-    const handleEdit = () => {
-        setIsEditing(true);
+  useEffect(() => {
+    const fetchProperty = async () => {
+      try {
+        const data = await getPropertyById(id);
+        setProperty(data);
+        setEditedProperty(data);
+      } catch (error) {
+        console.error("Error al obtener la propiedad:", error);
+      }
     };
+    fetchProperty();
+  }, [id]);
 
-    const openModifiedModal = () => {
-        setIsOpen(true);
-    };
+  const handleEdit = () => {
+    setIsEditing(true);
+  };
 
-    const handleSave = async () => {
-        try {
-            console.log("Datos que se enviarán a la API:", editedProperty);
-            await updatePropertyPost(id, editedProperty);
-            setProperty(editedProperty);
-            setIsEditing(false);
-            setIsOpen(false);
-        } catch (error) {
-            console.error("Error al guardar cambios:", error);
-        }
-    };
+  const openModifiedModal = () => {
+    setIsOpen(true);
+  };
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        // Si se edita la imagen, actualizamos el primer elemento del array images
-        if (name === "image") {
-            const images = editedProperty.images && Array.isArray(editedProperty.images)
-                ? [...editedProperty.images]
-                : [];
-            if (images.length > 0) {
-                images[0] = { src: value, alt: "Imagen de previsualización" };
-            } else {
-                images.push({ src: value, alt: "Imagen de previsualización" });
-            }
-            setEditedProperty({
-                ...editedProperty,
-                images,
-            });
-        } else {
-            setEditedProperty({ ...editedProperty, [name]: value });
-        }
-    };
-
-    if (!property) {
-        return <p className="text-center text-gray-500">Cargando...</p>;
+  const handleSave = async () => {
+    try {
+      console.log("Datos que se enviarán a la API:", editedProperty);
+      await updatePropertyPost(id, editedProperty);
+      setProperty(editedProperty);
+      setIsEditing(false);
+      setIsOpen(false);
+    } catch (error) {
+      console.error("Error al guardar cambios:", error);
     }
+  };
 
-    return (
-        <div className=" bg-gradient-to-br from-blue-900 to-black bg-fixed">
-            <div className="max-w-2xl mx-auto p-6 bg-gradient-to-bl from-white to-blue-900 rounded-lg shadow-md">
-                {/* Tipo de Propiedad */}
-                <h1 className="text-3xl font-bold mb-4">
-                    {isEditing ? (
-                        <input
-                            type="text"
-                            name="typeProperty"
-                            value={editedProperty.typeProperty || ""}
-                            onChange={handleChange}
-                            className="w-full border p-2 rounded"
-                        />
-                    ) : (
-                        property.typeProperty
-                    )}
-                </h1>
+  // Manejo de campos de texto (para los campos "normales")
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setEditedProperty({ ...editedProperty, [name]: value });
+  };
 
-                {/* Descripción */}
-                <div className="mb-4">
-                    <label className="block font-semibold">Descripción:</label>
-                    <textarea
-                        name="description"
-                        value={editedProperty.description || ""}
-                        onChange={handleChange}
-                        className="w-full border p-2 rounded"
-                        readOnly={!isEditing}
-                    />
-                </div>
+  // Manejo del array de imágenes
+  const handleImageChange = (index, newValue) => {
+    const newImages = editedProperty.images ? [...editedProperty.images] : [];
+    newImages[index].src = newValue;
+    setEditedProperty({ ...editedProperty, images: newImages });
+  };
 
-                {/* Dirección */}
-                <div className="mb-4">
-                    <label className="block font-semibold">Dirección:</label>
-                    <input
-                        type="text"
-                        name="address"
-                        value={editedProperty.address || ""}
-                        onChange={handleChange}
-                        className="w-full border p-2 rounded"
-                        readOnly={!isEditing}
-                    />
-                </div>
+  const handleDeleteImage = (index) => {
+    const newImages = editedProperty.images ? [...editedProperty.images] : [];
+    newImages.splice(index, 1);
+    setEditedProperty({ ...editedProperty, images: newImages });
+  };
 
-                {/* Precio */}
-                <div className="mb-4">
-                    <label className="block font-semibold">Precio:</label>
-                    <input
-                        type="text"
-                        name="price"
-                        value={editedProperty.price || ""}
-                        onChange={handleChange}
-                        className="w-full border p-2 rounded"
-                        readOnly={!isEditing}
-                    />
-                </div>
+  const handleAddImage = () => {
+    const newImages = editedProperty.images ? [...editedProperty.images] : [];
+    newImages.push({ src: "", alt: "" });
+    setEditedProperty({ ...editedProperty, images: newImages });
+  };
 
-                {/* Metros Cuadrados */}
-                <div className="mb-4">
-                    <label className="block font-semibold">Metros Cuadrados:</label>
-                    <input
-                        type="text"
-                        name="m2"
-                        value={editedProperty.m2 || ""}
-                        onChange={handleChange}
-                        className="w-full border p-2 rounded"
-                        readOnly={!isEditing}
-                    />
-                </div>
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-                {/* Planta */}
-                <div className="mb-4">
-                    <label className="block font-semibold">Planta:</label>
-                    <input
-                        type="text"
-                        name="piso"
-                        value={editedProperty.piso || ""}
-                        onChange={handleChange}
-                        className="w-full border p-2 rounded"
-                        readOnly={!isEditing}
-                    />
-                </div>
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
 
-                {/* Habitaciones */}
-                <div className="mb-4">
-                    <label className="block font-semibold">Habitaciones:</label>
-                    <input
-                        type="text"
-                        name="rooms"
-                        value={editedProperty.rooms || ""}
-                        onChange={handleChange}
-                        className="w-full border p-2 rounded"
-                        readOnly={!isEditing}
-                    />
-                </div>
+      console.log('Enviando archivo a:', `${import.meta.env.VITE_BACKEND_URL}/property/upload`);
 
-                {/* Baños */}
-                <div className="mb-4">
-                    <label className="block font-semibold">Baños:</label>
-                    <input
-                        type="text"
-                        name="wc"
-                        value={editedProperty.wc || ""}
-                        onChange={handleChange}
-                        className="w-full border p-2 rounded"
-                        readOnly={!isEditing}
-                    />
-                </div>
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/property/upload`, {
+        method: 'POST',
+        body: formData,
+      });
 
-                {/* Campo para editar la URL de la imagen (primera imagen) */}
-                <div className="mb-4">
-                    <label className="block font-semibold">URL de la Imagen:</label>
-                    <input
-                        type="text"
-                        name="image"
-                        value={
-                            editedProperty.images && editedProperty.images[0]
-                                ? editedProperty.images[0].src
-                                : ""
-                        }
-                        onChange={handleChange}
-                        className="w-full border p-2 rounded"
-                        readOnly={!isEditing}
-                    />
-                </div>
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Respuesta del servidor:', errorText);
+        throw new Error(`Error del servidor: ${response.status}`);
+      }
 
-                {/* Dropdown para seleccionar el template */}
-                <div className="mb-4">
-                    <label className="block font-semibold">Template:</label>
-                    <select
-                        name="template"
-                        value={editedProperty.template || "default"}
-                        onChange={handleChange}
-                        className="w-full border p-2 rounded"
-                        disabled={!isEditing}
-                    >
-                        <option value="default">Por defecto</option>
-                        <option value="estiloA">Estilo A</option>
-                        <option value="estiloB">Estilo B</option>
-                    </select>
-                </div>
+      const data = await response.json();
+      console.log('Respuesta exitosa:', data);
 
-                {/* Previsualización de la imagen */}
-                {editedProperty.images &&
-                    editedProperty.images[0] &&
-                    editedProperty.images[0].src && (
-                        <div className="mt-4">
-                            <img
-                                src={editedProperty.images[0].src}
-                                alt="Vista previa de la imagen"
-                                className="w-[20vh] h-[20vh] rounded-md object-cover"
-                            />
-                        </div>
-                    )}
+      const newImages = editedProperty.images ? [...editedProperty.images] : [];
+      newImages.push({
+        src: data.imageUrl,
+        alt: file.name
+      });
+      
+      setEditedProperty({ ...editedProperty, images: newImages });
+    } catch (error) {
+      console.error('Error detallado:', error);
+      alert('Error al subir la imagen: ' + error.message);
+    }
+  };
 
-                <div className="mt-6 flex gap-4">
-                    {!isEditing ? (
-                        <button
-                            onClick={handleEdit}
-                            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
-                        >
-                            Modificar
-                        </button>
-                    ) : (
-                        <button
-                            onClick={openModifiedModal}
-                            className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700"
-                        >
-                            Guardar cambios
-                        </button>
-                    )}
-                </div>
+  if (!property) {
+    return <p className="text-center text-gray-500">Cargando...</p>;
+  }
 
-                {/* Modal de confirmación */}
-                <Dialog
-                    open={isOpen}
-                    onClose={() => setIsOpen(false)}
-                    className="fixed inset-0 flex items-center justify-center p-4"
-                >
-                    <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
-                        <Dialog.Title className="text-lg font-semibold">
-                            Confirmar modificación
-                        </Dialog.Title>
-                        <Dialog.Description className="mt-2">
-                            ¿Estás seguro de que quieres guardar los cambios?
-                        </Dialog.Description>
+  return (
+    <div className="bg-gradient-to-br from-blue-900 to-black bg-fixed p-6">
+      <div className="max-w-2xl mx-auto p-6 bg-gradient-to-bl from-white to-blue-900 rounded-lg shadow-md">
+        {/* Tipo de Propiedad */}
+        <h1 className="text-3xl font-bold mb-4">
+          {isEditing ? (
+            <input
+              type="text"
+              name="typeProperty"
+              value={editedProperty.typeProperty || ""}
+              onChange={handleChange}
+              className="w-full border p-2 rounded"
+            />
+          ) : (
+            property.typeProperty
+          )}
+        </h1>
 
-                        <div className="mt-4 flex justify-end gap-2">
-                            <button
-                                onClick={() => setIsOpen(false)}
-                                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-                            >
-                                Cancelar
-                            </button>
-                            <Link
-                                to={"/ver-propiedades"}
-                                onClick={handleSave}
-                                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                            >
-                                Guardar cambios
-                            </Link>
-                        </div>
-                    </div>
-                </Dialog>
-            </div>
+        {/* Descripción */}
+        <div className="mb-4">
+          <label className="block font-semibold">Descripción:</label>
+          <textarea
+            name="description"
+            value={editedProperty.description || ""}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+            readOnly={!isEditing}
+          />
         </div>
-    );
+
+        {/* Dirección */}
+        <div className="mb-4">
+          <label className="block font-semibold">Dirección:</label>
+          <input
+            type="text"
+            name="address"
+            value={editedProperty.address || ""}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+            readOnly={!isEditing}
+          />
+        </div>
+
+        {/* Precio */}
+        <div className="mb-4">
+          <label className="block font-semibold">Precio:</label>
+          <input
+            type="text"
+            name="price"
+            value={editedProperty.price || ""}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+            readOnly={!isEditing}
+          />
+        </div>
+
+        {/* Metros Cuadrados */}
+        <div className="mb-4">
+          <label className="block font-semibold">Metros Cuadrados:</label>
+          <input
+            type="text"
+            name="m2"
+            value={editedProperty.m2 || ""}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+            readOnly={!isEditing}
+          />
+        </div>
+
+        {/* Planta */}
+        <div className="mb-4">
+          <label className="block font-semibold">Planta:</label>
+          <input
+            type="text"
+            name="piso"
+            value={editedProperty.piso || ""}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+            readOnly={!isEditing}
+          />
+        </div>
+
+        {/* Habitaciones */}
+        <div className="mb-4">
+          <label className="block font-semibold">Habitaciones:</label>
+          <input
+            type="text"
+            name="rooms"
+            value={editedProperty.rooms || ""}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+            readOnly={!isEditing}
+          />
+        </div>
+
+        {/* Baños */}
+        <div className="mb-4">
+          <label className="block font-semibold">Baños:</label>
+          <input
+            type="text"
+            name="wc"
+            value={editedProperty.wc || ""}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+            readOnly={!isEditing}
+          />
+        </div>
+
+        {/* Sección de imágenes actualizada */}
+        <div className="mb-4">
+          <label className="block font-semibold mb-2">Imágenes subidas:</label>
+          {editedProperty.images && editedProperty.images.length > 0 ? (
+            <div className="grid grid-cols-2 gap-4">
+              {editedProperty.images.map((img, idx) => (
+                <div key={idx} className="relative border p-2 rounded">
+                  <img
+                    src={img.src || "/placeholder.png"}
+                    alt={img.alt || "Imagen"}
+                    className="w-full h-auto rounded"
+                  />
+                  {isEditing && (
+                    <>
+                      <input
+                        type="text"
+                        value={img.src}
+                        onChange={(e) => handleImageChange(idx, e.target.value)}
+                        className="mt-2 w-full border p-1 rounded"
+                        placeholder="URL de la imagen"
+                      />
+                      <button
+                        onClick={() => handleDeleteImage(idx)}
+                        className="mt-2 bg-red-600 text-white px-2 py-1 rounded w-full"
+                      >
+                        Eliminar
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500">No hay imágenes subidas.</p>
+          )}
+          {isEditing && (
+            <div className="mt-4 space-y-2">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="hidden"
+                id="file-upload"
+              />
+              <label
+                htmlFor="file-upload"
+                className="bg-blue-500 text-white px-4 py-2 rounded cursor-pointer hover:bg-blue-600 inline-block"
+              >
+                Subir imagen desde ordenador
+              </label>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-6 flex gap-4">
+          {!isEditing ? (
+            <button
+              onClick={handleEdit}
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
+            >
+              Modificar
+            </button>
+          ) : (
+            <button
+              onClick={openModifiedModal}
+              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700"
+            >
+              Guardar cambios
+            </button>
+          )}
+        </div>
+
+        {/* Modal de confirmación */}
+        <Dialog
+          open={isOpen}
+          onClose={() => setIsOpen(false)}
+          className="fixed inset-0 flex items-center justify-center p-4"
+        >
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+            <Dialog.Title className="text-lg font-semibold">
+              Confirmar modificación
+            </Dialog.Title>
+            <Dialog.Description className="mt-2">
+              ¿Estás seguro de que quieres guardar los cambios?
+            </Dialog.Description>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setIsOpen(false)}
+                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+              >
+                Cancelar
+              </button>
+              <Link
+                to={"/ver-propiedades"}
+                onClick={handleSave}
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                Guardar cambios
+              </Link>
+            </div>
+          </div>
+        </Dialog>
+      </div>
+    </div>
+  );
 }

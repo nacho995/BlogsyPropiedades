@@ -50,7 +50,7 @@ export default function SeeProperty() {
             <div className="container mx-auto p-4 flex flex-col justify-center items-start">
                 <h1 className="text-4xl font-bold text-center mb-8 relative">
                     <span className="relative text-transparent bg-clip-text bg-gradient-to-r from-white via-yellow-400 to-white">
-                        Property
+                        Propiedades
                     </span>
                 </h1>
             </div>
