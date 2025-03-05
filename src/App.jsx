@@ -15,6 +15,7 @@ import SeeProperty from './components/SeeProperties';
 import CambiarPerfil from './components/CambiarPerfil';
 import PropertyCreation from './components/addProperties';
 import PropertyDetail from './components/PropertyDetail';
+
 function App() {
     return (
         <BrowserRouter>

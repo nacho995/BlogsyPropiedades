@@ -172,7 +172,7 @@ export const createUser = async (data) => {
  */
 export const loginUser = async (credentials) => {
   try {
-    return await fetchAPI('/auth/login', {
+    return await fetchAPI('/user/login', {
       method: 'POST',
       body: JSON.stringify(credentials)
     });
