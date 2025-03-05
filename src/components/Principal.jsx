@@ -186,17 +186,15 @@ export default function Principal() {
                       className="bg-white/10 backdrop-blur-md rounded-xl overflow-hidden shadow-lg border border-white/20 transform transition hover:scale-105"
                       style={{ animationDelay: `${index * 0.1}s` }}
                     >
-                      {blog.image && (
-                        <div className="h-48 overflow-hidden">
-                          <img 
-                            src={blog.image} 
-                            alt={blog.title} 
-                            className="w-full h-full object-cover"
-                            onError={handleImageError}
-                            data-type="blog"
-                          />
-                        </div>
-                      )}
+                      <div className="h-48 overflow-hidden">
+                        <img 
+                          src={blog.image?.src || defaultBlogImage} 
+                          alt={blog.image?.alt || blog.title} 
+                          className="w-full h-full object-cover"
+                          onError={handleImageError}
+                          data-type="blog"
+                        />
+                      </div>
                       <div className="p-6">
                         <h3 className="font-bold text-xl mb-2 text-white">{blog.title}</h3>
                         <p className="text-blue-100 mb-4 line-clamp-2">{blog.description}</p>
@@ -234,8 +232,12 @@ export default function Principal() {
                     >
                       <div className="h-48 overflow-hidden">
                         <img 
-                          src={property.images && property.images[0] ? property.images[0] : defaultPropertyImage}
-                          alt={property.title}
+                          src={Array.isArray(property.images) && property.images[0]?.src 
+                            ? property.images[0].src 
+                            : Array.isArray(property.images) && property.images[0] 
+                              ? property.images[0] 
+                              : defaultPropertyImage}
+                          alt={property.title || "Propiedad"}
                           className="w-full h-full object-cover"
                           onError={handleImageError}
                           data-type="property"
