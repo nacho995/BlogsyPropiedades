@@ -14,4 +14,7 @@ export default defineConfig({
       '@tiptap/extension-image'
     ],
   },
+  build: {
+    outDir: 'dist',
+  }
 })
