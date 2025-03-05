@@ -201,7 +201,7 @@ export const getUsers = async () => {
  * @returns {Promise} - Promesa con la respuesta del servidor
  */
 export const requestPasswordRecovery = async (email) => {
-  return await fetchAPI('/reset-password/recover-password', {
+  return await fetchAPI('/user/request-reset', {
     method: 'POST',
     body: JSON.stringify({ email })
   });
@@ -215,9 +215,9 @@ export const requestPasswordRecovery = async (email) => {
  * @returns {Promise} - Promesa con la respuesta del servidor
  */
 export const resetPassword = async (token, password, passwordConfirm) => {
-  return await fetchAPI(`/reset-password/${token}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ password, passwordConfirm })
+  return await fetchAPI('/user/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, password, passwordConfirm })
   });
 };
 
@@ -246,8 +246,8 @@ export const updateProfile = async (userData, token) => {
       headers['Authorization'] = `Bearer ${token}`;
     }
     
-    const response = await fetch(`${API_URL}/user/profile`, {
-      method: 'PUT',
+    const response = await fetch(`${API_URL}/user/update-profile`, {
+      method: 'POST',
       headers,
       body: formData
     });
@@ -312,7 +312,7 @@ export const uploadImageBlog = async (file, token) => {
  */
 export const uploadFile = async (file, token) => {
   const formData = new FormData();
-  formData.append('images', file); // Cambiar 'file' a 'images' para que coincida con el middleware
+  formData.append('images', file);
   
   try {
     const headers = {};
@@ -320,10 +320,11 @@ export const uploadFile = async (file, token) => {
       headers['Authorization'] = `Bearer ${token}`;
     }
     
-    // Usar la ruta correcta para subir imágenes de propiedades
-    console.log("Subiendo archivo a:", `${API_URL}/property/upload`);
+    // No hay una ruta específica para subir archivos en propertyRouter
+    // Debe usarse la ruta principal con propiedad vacía
+    console.log("Subiendo archivo a:", `${API_URL}/property`);
     
-    const response = await fetch(`${API_URL}/property/upload`, {
+    const response = await fetch(`${API_URL}/property`, {
       method: 'POST',
       headers,
       body: formData
@@ -433,7 +434,7 @@ export const getCurrentUser = async (tokenParam) => {
   }
 
   try {
-    return await fetchAPI('/user/profile');
+    return await fetchAPI('/user/me');
   } catch (error) {
     console.error('Error en getCurrentUser:', error);
     throw error;
