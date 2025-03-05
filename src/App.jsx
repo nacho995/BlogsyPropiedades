@@ -1,46 +1,44 @@
-
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import { Home } from './pages/home';  // Importación con nombre
-
-import GetBlogs from './pages/GetBlogs';
-import BlogPost from './pages/blogPost';
-import BlogData from './pages/DetailBlogs';
-import { SignInPage } from './pages/signInPage';
-
-import { RegisterPage } from './pages/registerForm';
-import ChangeProfile from './pages/changeProfilePage';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { UserProvider } from './components/UserContext';
-import PropertyPost from './pages/PropertiesPost';
-import GetProperty from './pages/GetProperties';
-import PropertyData from './pages/detalProperty';
+import SignIn from './components/SignIn';
+import Register from './components/Register';
+import ResetPassword from './components/ResetPassword';
+import CambiarPerfil from './components/CambiarPerfil';
+import Principal from './components/Principal';
+import Navbar from './components/NavBar';
+import SeeBlogs from './components/SeeBlogs';
+import SeeProperty from './components/SeeProperties';
+import RecoverPassword from './components/RecoverPassword';
+import BlogDetail from './components/BlogDetail';
+import PropertyDetail from './components/PropertyDetail';
+import BlogCreation from './components/blogCreation';
+import PropertyCreation from './components/addProperties';
 
 
-
-
-
-
-export default function App() {
-  
-
-  return (
-    <>
-      <UserProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/blog" element={<BlogPost/>} />"
-          <Route path="/ver-blogs" element={<GetBlogs/>} />
-          <Route path="/blog/:id" element={<BlogData />} />
-          <Route path="/signin" element={<SignInPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/profile" element={<ChangeProfile />} />
-          <Route path='/propiedades' element={<PropertyPost />} />
-          <Route path='ver-propiedades' element={<GetProperty/>} />
-          <Route path='property/:id' element={<PropertyData/>} />
-        </Routes>
-      </BrowserRouter>
-      </UserProvider>
-    </>
-  )
+function App() {
+    return (
+        <UserProvider>
+            <Router>
+                <Navbar />
+                <Routes>
+                    <Route path="/" element={<Principal />} />
+                    <Route path="/signin" element={<SignIn />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/recover-password" element={<RecoverPassword />} />
+                    <Route path="/reset-password/:token" element={<ResetPassword />} />
+                    <Route path="/profile" element={<CambiarPerfil />} />
+                    <Route path="/blog" element={<BlogCreation />} />
+                    <Route path="/propiedades" element={<PropertyCreation />} />
+                    <Route path="/ver-blogs" element={<SeeBlogs />} />
+                    <Route path="/ver-propiedades" element={<SeeProperty />} />
+                    <Route path="/blog/:id" element={<BlogDetail />} />
+                    <Route path="/property/:id" element={<PropertyDetail />} />
+                </Routes>
+            </Router>
+        </UserProvider>
+    );
 }
+
+export default App;
 

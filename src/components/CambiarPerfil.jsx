@@ -36,34 +36,52 @@ export default function CambiarPerfil() {
     e.preventDefault();
     setMessage('');
 
-    // Creamos un FormData y agregamos los campos solo si tienen valor
-    const formData = new FormData();
-    if (name.trim() !== '') {
-      formData.append('name', name);
-    }
-    if (profilePic) {
-      formData.append('profilePic', profilePic);
-    }
-
-    // Si ningún campo se actualizó, mostramos un mensaje y detenemos la ejecución
     if (!name.trim() && !profilePic) {
       setMessage('Por favor ingresa al menos un valor para actualizar.');
       return;
     }
 
+    // Crear objeto con los datos a actualizar
+    const userData = {};
+    if (name.trim() !== '') {
+      userData.name = name;
+    }
+    if (profilePic) {
+      userData.profilePic = profilePic;
+    }
+
     try {
-      // Llamamos a la API para actualizar el perfil
-      const result = await updateProfile(formData);
-      console.log("Perfil actualizado:", result);
-      // Actualiza el contexto global con los nuevos datos
-      setUser((prevUser) => ({
-        ...prevUser,
-        name: result.name || prevUser.name,
-        profilePic: result.profilePic || prevUser.profilePic,
-      }));
+      // Pasar el token del usuario a la función updateProfile
+      const result = await updateProfile(userData, user.token);
+      console.log("Respuesta del servidor en CambiarPerfil:", result);
+      
+      // Verificar que los datos lleguen correctamente
+      if (!result.name && !result.profilePic) {
+        console.warn("La respuesta del servidor no incluye name ni profilePic:", result);
+      }
+
+      // En lugar de pasar una función, pasamos directamente el objeto
+      const newUserData = {
+        ...user, // Mantener el token y otros datos existentes
+        name: result.name || user.name,
+        profilePic: result.profilePic || user.profilePic
+      };
+      
+      console.log("Datos a actualizar:", newUserData);
+      setUser(newUserData);
+      
+      // Verificar el localStorage después de la actualización
+      setTimeout(() => {
+        console.log("localStorage después de actualizar:", {
+          name: localStorage.getItem('name'),
+          profilePic: localStorage.getItem('profilePic'),
+          token: localStorage.getItem('token')
+        });
+      }, 100);
+
       setMessage('Perfil actualizado correctamente');
     } catch (error) {
-      console.error("Error al actualizar el perfil:", error);
+      console.error("Error detallado al actualizar el perfil:", error);
       setMessage('Hubo un error al actualizar el perfil. Intenta de nuevo.');
     }
   };

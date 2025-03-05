@@ -1,6 +1,6 @@
 // src/services/api.js
 
-const API_BASE_URL = "http://localhost:3000"
+const API_BASE_URL = import.meta.env.VITE_API_PUBLIC_API_URL || "http://localhost:4000"
 
 /**
  * Crea un nuevo blog post.
@@ -42,19 +42,29 @@ export async function getBlogPosts() {
 /**
  * Elimina un blog post por su id.
  * @param {string} id - Identificador del blog post.
- * @returns {Promise<Object>}
+ * @returns {Promise<string>} - Retorna el ID del blog eliminado
  */
 export async function deleteBlogPost(id) {
-  const response = await fetch(`${API_BASE_URL}/blog/${id}`, {
-    method: 'DELETE'
-  })
+  try {
+    const response = await fetch(`${API_BASE_URL}/blog/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
 
-  if (!response.ok) {
-    const errorData = await response.json()
-    throw new Error(errorData.message || 'Error al eliminar el blog post')
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Error al eliminar el blog post');
+    }
+
+    const data = await response.json();
+    // Retornamos el ID del blog eliminado para poder actualizar el estado
+    return id;
+  } catch (error) {
+    console.error('Error al eliminar el blog:', error);
+    throw error;
   }
-
-  return response.json()
 }
 
 /**
@@ -125,30 +135,37 @@ export async function createUser(data) {
 
 /**
  * Inicia sesión de un usuario.
- * @param {Object} data - Datos para el login.
- * @returns {Promise<Object>}
+ * @param {Object} credentials - Credenciales del usuario (email y password).
+ * @returns {Promise<Object>} - Datos del usuario y token.
  */
-export async function loginUser(data) {
+export const loginUser = async (credentials) => {
   try {
     const response = await fetch(`${API_BASE_URL}/user/login`, {
-      method: "POST",
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json"
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify(data)
-    })
+      body: JSON.stringify(credentials)
+    });
 
+    const data = await response.json();
+    
+    // Si la respuesta no es exitosa, lanzamos un error con el mensaje del servidor
     if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.message || "Error al iniciar sesión")
+      throw new Error(data.message || 'Error al iniciar sesión');
     }
-
-    return response.json()
+    
+    console.log('Respuesta del servidor:', data);
+    return data;
   } catch (error) {
-    console.error("Error al iniciar sesión:", error)
-    throw new Error("Hubo un error al iniciar sesión.")
+    // Si el error ya tiene un mensaje personalizado, lo usamos
+    if (error.message) {
+      throw error;
+    }
+    // Si no, lanzamos un error genérico
+    throw new Error('Error de conexión con el servidor');
   }
-}
+};
 
 /**
  * Obtiene la lista de usuarios.
@@ -177,81 +194,105 @@ export async function getUsers() {
 }
 
 /**
- * Solicita el reseteo de contraseña.
- * @param {string} email - Correo del usuario.
- * @returns {Promise<Object>}
+ * Solicita el envío de un correo para recuperar la contraseña
+ * @param {string} email - Correo electrónico del usuario
+ * @returns {Promise} - Promesa con la respuesta del servidor
  */
-export const requestPasswordReset = async (email) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/user/request-reset`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email })
-    })
+export const requestPasswordRecovery = async (email) => {
+  const response = await fetch(`${API_BASE_URL}/reset-password/recover-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email })
+  });
 
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.message || "Error al solicitar reseteo")
-    }
-
-    return response.json()
-  } catch (err) {
-    throw new Error("Error al solicitar reseteo: " + err.message)
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || 'Error al solicitar recuperación de contraseña');
   }
-}
+
+  return response.json();
+};
 
 /**
- * Resetea la contraseña.
- * @param {string} token - Token de reseteo.
- * @param {string} newPassword - Nueva contraseña.
- * @returns {Promise<Object>}
+ * Restablece la contraseña utilizando el token recibido por correo
+ * @param {string} token - Token de recuperación de contraseña
+ * @param {string} password - Nueva contraseña
+ * @param {string} passwordConfirm - Confirmación de la nueva contraseña
+ * @returns {Promise} - Promesa con la respuesta del servidor
  */
-export const resetPassword = async (token, newPassword) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/user/reset-password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, newPassword })
-    })
+export const resetPassword = async (token, password, passwordConfirm) => {
+  const response = await fetch(`${API_BASE_URL}/reset-password/${token}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ password, passwordConfirm })
+  });
 
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.message || "Error al cambiar la contraseña")
-    }
-
-    return response.json()
-  } catch (err) {
-    throw new Error("Error al cambiar la contraseña: " + err.message)
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || 'Error al restablecer la contraseña');
   }
-}
+
+  return response.json();
+};
 
 /**
  * Actualiza el perfil del usuario.
  * @param {FormData} formData - Datos del formulario de actualización.
  * @returns {Promise<Object>}
  */
-export const updateProfile = async (formData) => {
+export const updateProfile = async (userData, token) => {
   try {
-    const token = localStorage.getItem("token")
-    // NOTA: Al enviar FormData no es necesario establecer el header "Content-Type"
-    const response = await fetch(`${API_BASE_URL}/user/update-profile`, {
-      method: "PATCH",
+    console.log("Enviando datos de perfil:", userData);
+    
+    // Crear FormData para enviar archivos
+    const formData = new FormData();
+    
+    // Añadir campos de texto
+    if (userData.name) {
+      formData.append('name', userData.name);
+    }
+    
+    // Añadir archivo si existe
+    if (userData.profilePic && userData.profilePic instanceof File) {
+      formData.append('profilePic', userData.profilePic);
+    }
+    
+    // Configurar opciones de fetch con el token
+    const options = {
+      method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`
+        'Authorization': `Bearer ${token}`
       },
       body: formData
-    })
-
+    };
+    
+    console.log("Opciones de fetch:", {
+      method: options.method,
+      headers: options.headers,
+      bodyType: typeof options.body
+    });
+    
+    // Realizar la petición
+    const response = await fetch(`${API_BASE_URL}/user/update-profile`, options);
+    
+    // Verificar si la respuesta es exitosa
     if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.message || "Error al actualizar el perfil")
+      const errorText = await response.text();
+      console.error("Error en la respuesta:", errorText);
+      throw new Error(`Error ${response.status}: ${errorText}`);
     }
-    return response.json()
-  } catch (err) {
-    console.error("Error al actualizar el perfil:", err)
-    throw new Error("Error al actualizar el perfil: " + err.message)
+    
+    // Devolver los datos de la respuesta
+    return await response.json();
+  } catch (error) {
+    console.error("Error al actualizar perfil:", error);
+    throw error; // Re-lanzar el error para manejarlo en el componente
   }
-}
+};
 
 /**
  * Función que sube una imagen al servidor.
@@ -323,16 +364,24 @@ export async function getPropertyPosts() {
    * @returns {Promise<Object>}
    */
   export async function deletePropertyPost(id) {
-    const response = await fetch(`${API_BASE_URL}/property/${id}`, {
-      method: 'DELETE'
-    })
-  
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.message || 'Error al eliminar el property post')
+    try {
+      const response = await fetch(`${API_BASE_URL}/property/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al eliminar el property post');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error al eliminar la propiedad:', error);
+      throw error;
     }
-  
-    return response.json()
   }
   
   /**
@@ -373,3 +422,36 @@ export async function getPropertyPosts() {
   
     return response.json()
   }
+
+/**
+ * Obtiene los datos del usuario actual
+ * @param {string} [tokenParam] - Token opcional para autenticación
+ * @returns {Promise<Object>} Datos del usuario
+ */
+export const getCurrentUser = async (tokenParam) => {
+  const token = tokenParam || localStorage.getItem('token');
+  if (!token) {
+    throw new Error('No hay token de autenticación');
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/user/profile`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error en getCurrentUser:', errorText);
+      throw new Error(`Error al obtener los datos del usuario: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('Datos recibidos del usuario:', data);
+    return data;
+  } catch (error) {
+    console.error('Error en getCurrentUser:', error);
+    throw error;
+  }
+};

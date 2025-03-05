@@ -30,8 +30,10 @@ export default function SeeBlogs() {
   const confirmDelete = async () => {
     if (!blogToDelete) return;
     try {
-      const deletedId = await deleteBlogPost(blogToDelete._id);
-      setBlogs(blogs.filter(blog => blog._id !== deletedId));
+      await deleteBlogPost(blogToDelete._id);
+      // Actualizamos el estado usando una función para asegurarnos de tener el estado más reciente
+      setBlogs(prevBlogs => prevBlogs.filter(blog => blog._id !== blogToDelete._id));
+      console.log('Blog eliminado correctamente:', blogToDelete._id);
     } catch (error) {
       console.error('Error al eliminar el blog:', error);
     } finally {

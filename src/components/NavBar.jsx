@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useContext } from 'react';
 import { Button, Disclosure, DisclosureButton, DisclosurePanel, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react';
 import { Bars3Icon, BellIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { UserContext } from './UserContext';
 
 const navigation = [
   { name: 'Dashboard', href: '/', current: false },
@@ -18,6 +19,7 @@ function clases(...classes) {
 export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useContext(UserContext);
   
   // Actualizamos la navegación según la ruta actual
   const updatedNavigation = navigation.map(item => ({
@@ -25,34 +27,35 @@ export default function Navbar() {
     current: location.pathname === item.href,
   }));
 
-  // Estado de autenticación
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
+  // Estado de autenticación basado en el token del usuario
+  const isAuthenticated = !!user.token;
 
-  // Estado para la foto de perfil: se lee de localStorage, con un valor por defecto
-  const [profilePic, setProfilePic] = useState(
-    localStorage.getItem('profilePic') ||
-    'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-  );
+  // Valor por defecto para la foto de perfil
+  const defaultProfilePic = 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80';
 
-  // Escuchar el evento personalizado que indica que la foto de perfil ha sido actualizada
-  useEffect(() => {
-    const handleProfilePicUpdated = (e) => {
-      if (e.detail && e.detail.newProfilePic) {
-        setProfilePic(e.detail.newProfilePic);
+  // Función para sanitizar la URL de la imagen
+  const getImageUrl = (url) => {
+    if (!url) return defaultProfilePic;
+    
+    try {
+      // Si la URL comienza con http://localhost:4000, asegurarnos de que la ruta sea correcta
+      if (url.startsWith('http://localhost:4000')) {
+        const path = url.split('http://localhost:4000')[1];
+        return `${import.meta.env.VITE_API_URL}${path}`;
       }
-    };
-
-    window.addEventListener('profilePicUpdated', handleProfilePicUpdated);
-    return () => {
-      window.removeEventListener('profilePicUpdated', handleProfilePicUpdated);
-    };
-  }, []);
+      return encodeURI(url);
+    } catch (error) {
+      console.error('Error procesando URL de imagen:', error);
+      return defaultProfilePic;
+    }
+  };
 
   // Función para cerrar sesión
   const handleSignOut = () => {
     localStorage.removeItem('token');
-    setIsAuthenticated(false);
-    navigate('/signin');
+    localStorage.removeItem('name');
+    localStorage.removeItem('profilePic');
+    window.location.href = '/signin'; // Forzamos un refresh completo
   };
 
   return (
@@ -113,10 +116,15 @@ export default function Navbar() {
                     <span className="sr-only">Open user menu</span>
                     <img
                       alt="Profile"
-                      src={profilePic}
+                      src={getImageUrl(user.profilePic)}
                       width={52}
                       height={52}
-                      className="rounded-full"
+                      className="rounded-full object-cover"
+                      onError={(e) => {
+                        console.log('Error cargando imagen:', e);
+                        console.log('URL que falló:', e.target.src);
+                        e.target.src = defaultProfilePic;
+                      }}
                     />
                   </MenuButton>
                 </div>
