@@ -31,34 +31,26 @@ const fetchAPI = async (endpoint, options = {}) => {
       headers
     });
     
-    // Verificar si la respuesta es exitosa
-    if (!response.ok) {
-      // Clonar la respuesta antes de leerla para evitar el error "body stream already read"
-      const clonedResponse = response.clone();
-      
-      // Intentar obtener el mensaje de error del servidor
-      let errorMessage;
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || errorData.error || `Error ${response.status}: ${response.statusText}`;
-      } catch (e) {
-        // Si no podemos obtener un JSON, intentamos obtener el texto
-        try {
-          errorMessage = await clonedResponse.text();
-        } catch (textError) {
-          // Si todo falla, usamos el status y statusText
-          errorMessage = `Error ${response.status}: ${response.statusText}`;
-        }
+    const handleResponse = async (response) => {
+      if (response.status === 401) {
+        // Token expirado o inválido
+        localStorage.removeItem('user');
+        window.dispatchEvent(new Event('logout'));
+        throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
       }
       
-      console.error(`Error en respuesta del servidor (${response.status}):`, errorMessage);
-      throw new Error(errorMessage);
-    }
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Error en la solicitud');
+      }
+      
+      return response.json();
+    };
     
     // Verificar si la respuesta está vacía
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {
-      return await response.json();
+      return await handleResponse(response);
     }
     
     return await response.text();
@@ -415,7 +407,8 @@ export const updatePropertyPost = async (id, data) => {
  */
 export const getPropertyById = async (id) => {
   try {
-    return await fetchAPI(`/property/${id}`);
+    const response = await fetch(`${API_URL}/property/${id}`);
+    return handleResponse(response);
   } catch (error) {
     console.error(`Error al obtener propiedad ${id}:`, error);
     throw error;

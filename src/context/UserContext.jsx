@@ -7,7 +7,10 @@ export const UserContext = createContext();
 // Proveedor del contexto
 export function UserProvider({ children }) {
   // Estados básicos
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const navigate = useNavigate();
   
@@ -25,6 +28,18 @@ export function UserProvider({ children }) {
       });
       setIsAuthenticated(true);
     }
+  }, []);
+  
+  useEffect(() => {
+    const handleLogout = () => {
+      setUser(null);
+    };
+
+    window.addEventListener('logout', handleLogout);
+    
+    return () => {
+      window.removeEventListener('logout', handleLogout);
+    };
   }, []);
   
   // Función de login

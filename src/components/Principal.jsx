@@ -4,28 +4,48 @@ import { useUser } from "../context/UserContext";
 import { getBlogPosts, getPropertyPosts } from "../services/api";
 import { motion } from "framer-motion";
 
-function Principal() {
-  // Estados mínimos necesarios
+export default function Principal() {
   const [blogs, setBlogs] = useState([]);
   const [properties, setProperties] = useState([]);
-  const [loading, setLoading] = useState(false);
-  
-  // Obtener datos del usuario
-  const { user, isAuthenticated } = useUser();
+  const [loading, setLoading] = useState(true);
+  const { user } = useUser();
 
-  // Cargar datos una sola vez al montar
+  // Imágenes por defecto
+  const defaultProfilePic = "https://via.placeholder.com/150";
+  const defaultPropertyImage = "https://via.placeholder.com/400x300";
+  const defaultBlogImage = "https://via.placeholder.com/400x300";
+
+  // Función para manejar errores de carga de imagen
+  const handleImageError = (e) => {
+    const type = e.target.dataset.type;
+    switch(type) {
+      case 'profile':
+        e.target.src = defaultProfilePic;
+        break;
+      case 'property':
+        e.target.src = defaultPropertyImage;
+        break;
+      case 'blog':
+        e.target.src = defaultBlogImage;
+        break;
+      default:
+        e.target.src = defaultPropertyImage;
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      
       try {
-        // Cargar datos básicos
-        const blogsData = await getBlogPosts();
-        const propertiesData = await getPropertyPosts();
-        
-        // Guardar solo los primeros 3 elementos
-        setBlogs(Array.isArray(blogsData) ? blogsData.slice(0, 3) : []);
-        setProperties(Array.isArray(propertiesData) ? propertiesData.slice(0, 3) : []);
+        // Solo cargar datos si el usuario está autenticado
+        if (user) {
+          const [blogsData, propertiesData] = await Promise.all([
+            getBlogPosts(),
+            getPropertyPosts()
+          ]);
+          setBlogs(blogsData);
+          setProperties(propertiesData);
+        }
       } catch (error) {
         console.error("Error al cargar datos:", error);
       } finally {
@@ -34,10 +54,40 @@ function Principal() {
     };
 
     fetchData();
-  }, []);
+  }, [user]); // Añadimos user como dependencia para que se ejecute cuando cambie el estado de autenticación
 
-  // Imagen de perfil por defecto
-  const defaultProfilePic = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80";
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-black bg-fixed p-6">
+        <div className="max-w-7xl mx-auto text-center text-white">
+          <h1 className="text-4xl font-bold mb-6">Bienvenido a nuestra plataforma</h1>
+          <p className="text-xl mb-8">Por favor, inicia sesión o regístrate para ver nuestro contenido</p>
+          <div className="flex justify-center gap-4">
+            <Link
+              to="/login"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold"
+            >
+              Iniciar Sesión
+            </Link>
+            <Link
+              to="/register"
+              className="bg-white hover:bg-gray-100 text-blue-900 px-6 py-3 rounded-lg font-semibold"
+            >
+              Registrarse
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-black bg-fixed p-6 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-white"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-amber-600">
@@ -57,18 +107,14 @@ function Principal() {
               {/* Texto de bienvenida */}
               <div className="text-center md:text-left">
                 <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4 tracking-tight">
-                  {isAuthenticated 
-                    ? `¡Hola, ${user?.name || "Usuario"}!` 
-                    : "Bienvenido a InmoBlog"}
+                  {user ? `¡Hola, ${user?.name || "Usuario"}!` : "Bienvenido a InmoBlog"}
                 </h1>
                 <p className="text-xl text-blue-100 mb-6 max-w-xl">
-                  {isAuthenticated 
-                    ? "Tu portal inmobiliario y de contenido personalizado" 
-                    : "Descubre propiedades exclusivas y contenido de calidad"}
+                  {user ? "Tu portal inmobiliario y de contenido personalizado" : "Descubre propiedades exclusivas y contenido de calidad"}
                 </p>
                 
                 <div className="flex flex-wrap justify-center md:justify-start gap-4">
-                  {isAuthenticated ? (
+                  {user ? (
                     <>
                       <Link to="/crear-blog" className="bg-gradient-to-r from-amber-500 to-blue-600 text-white px-6 py-3 rounded-full font-bold transform transition hover:scale-105 hover:shadow-lg">
                         Crear Blog
@@ -91,14 +137,16 @@ function Principal() {
               </div>
               
               {/* Perfil de usuario con animación */}
-              {isAuthenticated && (
+              {user && (
                 <div className="relative">
                   <div className="absolute inset-0 bg-gradient-to-r from-amber-500 to-blue-600 rounded-full animate-spin-slow opacity-70 blur-md"></div>
                   <div className="relative w-40 h-40 rounded-full overflow-hidden border-4 border-white shadow-xl">
                     <img 
-                      src={user?.profilePic || defaultProfilePic} 
-                      alt="Perfil" 
+                      src={user?.profilePic || defaultProfilePic}
+                      alt="Perfil"
                       className="w-full h-full object-cover"
+                      onError={handleImageError}
+                      data-type="profile"
                     />
                   </div>
                   <div className="absolute -bottom-2 -right-2 bg-green-500 rounded-full p-2 border-2 border-white">
@@ -144,6 +192,8 @@ function Principal() {
                             src={blog.image} 
                             alt={blog.title} 
                             className="w-full h-full object-cover"
+                            onError={handleImageError}
+                            data-type="blog"
                           />
                         </div>
                       )}
@@ -182,15 +232,15 @@ function Principal() {
                       className="bg-white/10 backdrop-blur-md rounded-xl overflow-hidden shadow-lg border border-white/20 transform transition hover:scale-105"
                       style={{ animationDelay: `${index * 0.1}s` }}
                     >
-                      {property.images && property.images[0] && (
-                        <div className="h-48 overflow-hidden">
-                          <img 
-                            src={property.images[0]} 
-                            alt={property.title} 
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
+                      <div className="h-48 overflow-hidden">
+                        <img 
+                          src={property.images && property.images[0] ? property.images[0] : defaultPropertyImage}
+                          alt={property.title}
+                          className="w-full h-full object-cover"
+                          onError={handleImageError}
+                          data-type="property"
+                        />
+                      </div>
                       <div className="p-6">
                         <div className="flex justify-between items-center mb-2">
                           <span className="bg-amber-500 text-white text-xs font-semibold px-2.5 py-0.5 rounded-full">
@@ -259,5 +309,3 @@ function Principal() {
     </div>
   );
 }
-
-export default Principal;

@@ -28,7 +28,7 @@ export default function PropertyDetail() {
           formattedImages = data.images.map(img => {
             if (typeof img === 'string') {
               return { src: img, alt: "Imagen de propiedad" };
-            }
+            }s
             return img;
           });
         }
