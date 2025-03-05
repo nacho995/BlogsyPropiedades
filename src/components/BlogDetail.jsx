@@ -2,7 +2,8 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Dialog } from "@headlessui/react";
-import { getBlogById, updateBlogPost } from "../services/api";
+import { getBlogById, updateBlogPost, deleteBlogPost, uploadImageBlog } from "../services/api";
+import { useUser } from "../context/UserContext";
 
 export default function BlogDetail() {
   const { id } = useParams();
@@ -12,20 +13,54 @@ export default function BlogDetail() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  
+  // Obtener el usuario actual
+  const { user } = useUser();
 
   useEffect(() => {
     const fetchBlog = async () => {
       try {
         const data = await getBlogById(id);
+        
+        // Mejorar el manejo de imágenes
+        let blogImages = [];
+        
+        // Si hay una imagen en formato antiguo (objeto image)
+        if (data.image && data.image.src) {
+          blogImages.push({
+            src: data.image.src,
+            alt: data.image.alt || "Imagen del blog"
+          });
+        }
+        
+        // Si hay un array de imágenes (formato nuevo)
+        if (data.images && Array.isArray(data.images) && data.images.length > 0) {
+          // Si las imágenes son strings, convertirlas a objetos
+          const formattedImages = data.images.map(img => {
+            if (typeof img === 'string') {
+              return { src: img, alt: "Imagen del blog" };
+            }
+            return img;
+          });
+          
+          blogImages = [...blogImages, ...formattedImages];
+        }
+        
         const formattedData = {
           ...data,
-          images: data.image?.src ? [{
-            src: data.image.src,
-            alt: data.image.alt
-          }] : []
+          images: blogImages
         };
+        
         setBlog(formattedData);
         setEditedBlog(formattedData);
+        
+        // Crear URLs de previsualización si existen imágenes
+        if (blogImages.length > 0) {
+          const urls = blogImages.map(img => img.src);
+          setPreviewUrls(urls);
+        }
       } catch (error) {
         console.error("Error al obtener el blog:", error);
       }
@@ -43,18 +78,33 @@ export default function BlogDetail() {
 
   const handleSave = async () => {
     try {
-      // Convertir el array de imágenes de vuelta al formato original si solo hay una imagen
+      console.log("Datos a enviar:", editedBlog);
+      
+      // Preparar los datos según la estructura esperada por el backend
       const dataToSend = {
         ...editedBlog,
-        image: editedBlog.images && editedBlog.images.length > 0 
-          ? { 
-              src: editedBlog.images[0].src,
-              alt: editedBlog.images[0].alt
-            }
-          : null
+        // Mantener la estructura original del blog
+        image: {
+          src: editedBlog.images && editedBlog.images.length > 0 
+            ? editedBlog.images[0].src 
+            : "",
+          alt: editedBlog.images && editedBlog.images.length > 0 
+            ? editedBlog.images[0].alt || "Imagen del blog"
+            : "Imagen del blog"
+        }
       };
       
-      await updateBlogPost(id, dataToSend);
+      // Eliminar campos que puedan causar problemas
+      delete dataToSend._id;  // No enviar el ID en el cuerpo
+      delete dataToSend.__v;  // No enviar la versión de MongoDB
+      delete dataToSend.createdAt;  // No enviar la fecha de creación
+      delete dataToSend.updatedAt;  // No enviar la fecha de actualización
+      
+      console.log("Datos preparados para enviar:", dataToSend);
+      
+      const result = await updateBlogPost(id, dataToSend);
+      console.log("Respuesta del servidor:", result);
+      
       setBlog(editedBlog);
       setIsEditing(false);
       setIsOpen(false);
@@ -136,36 +186,49 @@ export default function BlogDetail() {
     const file = e.target.files[0];
     if (!file) return;
 
+    setUploading(true);
+    setUploadError(null);
+
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      console.log('Enviando archivo a:', `${import.meta.env.VITE_BACKEND_URL}/blog/upload`);
-
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/blog/upload`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Respuesta del servidor:', errorText);
-        throw new Error(`Error del servidor: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('Respuesta exitosa:', data);
-
-      const newImages = editedBlog.images ? [...editedBlog.images] : [];
-      newImages.push({
-        src: data.imageUrl,
-        alt: file.name
-      });
+      console.log("Subiendo archivo...");
       
-      setEditedBlog({ ...editedBlog, images: newImages });
+      // Usar la función de la API para subir la imagen
+      const result = await uploadImageBlog(file, user?.token);
+      
+      console.log("Resultado de la subida:", result);
+      
+      // Verificar si tenemos una URL de imagen en cualquier formato posible
+      let imageUrl = null;
+      if (result.imageUrl) {
+        imageUrl = result.imageUrl;
+      } else if (result.url) {
+        imageUrl = result.url;
+      } else if (result.secure_url) {
+        imageUrl = result.secure_url;
+      } else if (result.path) {
+        imageUrl = result.path;
+      }
+      
+      if (imageUrl) {
+        // Añadir la nueva imagen al blog
+        const newImages = editedBlog.images ? [...editedBlog.images] : [];
+        newImages.push({
+          src: imageUrl,
+          alt: file.name || "Imagen subida"
+        });
+        
+        setEditedBlog({ ...editedBlog, images: newImages });
+        
+        // Añadir URL a la previsualización
+        setPreviewUrls(prev => [...prev, imageUrl]);
+      } else {
+        throw new Error("No se recibió URL de imagen del servidor");
+      }
     } catch (error) {
-      console.error('Error detallado:', error);
-      alert('Error al subir la imagen: ' + error.message);
+      console.error("Error detallado:", error);
+      setUploadError("Error al subir la imagen. Inténtalo de nuevo.");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -271,7 +334,7 @@ export default function BlogDetail() {
 
         {/* Sección de imágenes actualizada */}
         <div className="mb-4">
-          <label className="block font-semibold mb-2">Imágenes subidas:</label>
+          <label className="block font-semibold mb-2">Imágenes:</label>
           {editedBlog.images && editedBlog.images.length > 0 ? (
             <div className="grid grid-cols-2 gap-4">
               {editedBlog.images.map((img, idx) => (
@@ -279,24 +342,48 @@ export default function BlogDetail() {
                   <img
                     src={img.src || "/placeholder.png"}
                     alt={img.alt || "Imagen"}
-                    className="w-full h-auto rounded"
+                    className="w-full h-auto rounded object-cover"
+                    style={{ height: "200px" }}
+                    onError={(e) => {
+                      console.error(`Error cargando imagen: ${img.src}`);
+                      e.target.src = "/placeholder.png";
+                      e.target.alt = "Imagen no disponible";
+                    }}
                   />
                   {isEditing && (
-                    <>
-                      <button
-                        onClick={() => handleDeleteImage(idx)}
-                        className="mt-2 bg-red-600 text-white px-2 py-1 rounded w-full"
-                      >
-                        Eliminar
-                      </button>
-                    </>
+                    <button
+                      onClick={() => handleDeleteImage(idx)}
+                      className="mt-2 bg-red-600 text-white px-2 py-1 rounded w-full"
+                    >
+                      Eliminar
+                    </button>
                   )}
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-gray-500">No hay imágenes subidas.</p>
+            <p className="text-gray-500">No hay imágenes disponibles.</p>
           )}
+          
+          {/* Mostrar las imágenes de previsualización para nuevas subidas */}
+          {isEditing && previewUrls.length > 0 && (
+            <div className="mt-4">
+              <label className="block font-semibold mb-2">Previsualización de nuevas imágenes:</label>
+              <div className="grid grid-cols-2 gap-4">
+                {previewUrls.map((url, idx) => (
+                  <div key={idx} className="relative border p-2 rounded">
+                    <img
+                      src={url}
+                      alt={`Vista previa ${idx + 1}`}
+                      className="w-full h-auto rounded object-cover"
+                      style={{ height: "200px" }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
           {isEditing && (
             <div className="mt-4 space-y-2">
               <input
@@ -310,9 +397,11 @@ export default function BlogDetail() {
                 htmlFor="file-upload"
                 className="bg-blue-500 text-white px-4 py-2 rounded cursor-pointer hover:bg-blue-600 inline-block"
               >
-                Subir imagen desde ordenador
+                {uploading ? "Subiendo..." : "Subir imagen desde ordenador"}
               </label>
-             
+              {uploadError && (
+                <p className="text-red-500 mt-2">{uploadError}</p>
+              )}
             </div>
           )}
         </div>

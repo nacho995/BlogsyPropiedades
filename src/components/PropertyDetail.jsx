@@ -2,7 +2,8 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Dialog } from "@headlessui/react";
-import { getPropertyById, updatePropertyPost } from "../services/api";
+import { getPropertyById, updatePropertyPost, uploadFile } from "../services/api";
+import { useUser } from "../context/UserContext";
 
 export default function PropertyDetail() {
   const { id } = useParams();
@@ -10,13 +11,35 @@ export default function PropertyDetail() {
   const [isEditing, setIsEditing] = useState(false);
   const [editedProperty, setEditedProperty] = useState({});
   const [isOpen, setIsOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  
+  // Obtener el usuario actual para el token
+  const { user } = useUser();
 
   useEffect(() => {
     const fetchProperty = async () => {
       try {
         const data = await getPropertyById(id);
-        setProperty(data);
-        setEditedProperty(data);
+        
+        // Asegurarse de que las imágenes tengan el formato correcto
+        let formattedImages = [];
+        if (data.images && Array.isArray(data.images)) {
+          formattedImages = data.images.map(img => {
+            if (typeof img === 'string') {
+              return { src: img, alt: "Imagen de propiedad" };
+            }
+            return img;
+          });
+        }
+        
+        const formattedData = {
+          ...data,
+          images: formattedImages
+        };
+        
+        setProperty(formattedData);
+        setEditedProperty(formattedData);
       } catch (error) {
         console.error("Error al obtener la propiedad:", error);
       }
@@ -35,7 +58,23 @@ export default function PropertyDetail() {
   const handleSave = async () => {
     try {
       console.log("Datos que se enviarán a la API:", editedProperty);
-      await updatePropertyPost(id, editedProperty);
+      
+      // Preparar los datos para enviar
+      const dataToSend = {
+        ...editedProperty,
+        // Convertir el array de objetos de imágenes a un array de URLs si es necesario
+        images: editedProperty.images.map(img => img.src)
+      };
+      
+      // Eliminar campos que puedan causar problemas
+      delete dataToSend._id;
+      delete dataToSend.__v;
+      delete dataToSend.createdAt;
+      delete dataToSend.updatedAt;
+      
+      const result = await updatePropertyPost(id, dataToSend);
+      console.log("Respuesta del servidor:", result);
+      
       setProperty(editedProperty);
       setIsEditing(false);
       setIsOpen(false);
@@ -65,7 +104,7 @@ export default function PropertyDetail() {
 
   const handleAddImage = () => {
     const newImages = editedProperty.images ? [...editedProperty.images] : [];
-    newImages.push({ src: "", alt: "" });
+    newImages.push({ src: "", alt: "Imagen de propiedad" });
     setEditedProperty({ ...editedProperty, images: newImages });
   };
 
@@ -73,36 +112,75 @@ export default function PropertyDetail() {
     const file = e.target.files[0];
     if (!file) return;
 
+    setUploading(true);
+    setUploadError(null);
+    
     try {
+      console.log("Subiendo imagen para propiedad...");
+      
+      // Crear un objeto FormData
       const formData = new FormData();
-      formData.append('file', file);
-
-      console.log('Enviando archivo a:', `${import.meta.env.VITE_BACKEND_URL}/property/upload`);
-
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/property/upload`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Respuesta del servidor:', errorText);
-        throw new Error(`Error del servidor: ${response.status}`);
+      formData.append('images', file);
+      
+      // Añadir el token de autenticación
+      const headers = {};
+      if (user?.token) {
+        headers['Authorization'] = `Bearer ${user.token}`;
       }
-
-      const data = await response.json();
-      console.log('Respuesta exitosa:', data);
-
-      const newImages = editedProperty.images ? [...editedProperty.images] : [];
-      newImages.push({
-        src: data.imageUrl,
-        alt: file.name
+      
+      // Usar la ruta de actualización de propiedades
+      console.log("Subiendo archivo a:", `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/property/${id}`);
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/property/${id}`, {
+        method: 'PUT',
+        headers,
+        body: formData
       });
       
-      setEditedProperty({ ...editedProperty, images: newImages });
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Respuesta de error del servidor:", errorText);
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log("Respuesta exitosa del servidor:", data);
+      
+      // Actualizar la propiedad con los datos devueltos por el servidor
+      if (data.images && Array.isArray(data.images)) {
+        // Formatear las imágenes
+        const formattedImages = data.images.map(img => {
+          if (typeof img === 'string') {
+            return { src: img, alt: "Imagen de propiedad" };
+          }
+          return img;
+        });
+        
+        // Actualizar el estado
+        setEditedProperty({
+          ...editedProperty,
+          images: formattedImages
+        });
+      } else {
+        // Si el servidor no devuelve las imágenes, añadir la URL manualmente
+        // (esto es un fallback, idealmente el servidor debería devolver las imágenes)
+        const imageUrl = file.name; // Esto es solo un placeholder
+        const newImages = editedProperty.images ? [...editedProperty.images] : [];
+        newImages.push({
+          src: imageUrl,
+          alt: file.name || "Imagen de propiedad"
+        });
+        
+        setEditedProperty({
+          ...editedProperty,
+          images: newImages
+        });
+      }
     } catch (error) {
-      console.error('Error detallado:', error);
-      alert('Error al subir la imagen: ' + error.message);
+      console.error('Error al subir imagen:', error);
+      setUploadError("Error al subir la imagen. Inténtalo de nuevo.");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -266,8 +344,18 @@ export default function PropertyDetail() {
                 htmlFor="file-upload"
                 className="bg-blue-500 text-white px-4 py-2 rounded cursor-pointer hover:bg-blue-600 inline-block"
               >
-                Subir imagen desde ordenador
+                {uploading ? "Subiendo..." : "Subir imagen desde ordenador"}
               </label>
+              {uploadError && (
+                <p className="text-red-500 mt-2">{uploadError}</p>
+              )}
+              <button
+                type="button"
+                onClick={handleAddImage}
+                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 ml-2"
+              >
+                Añadir URL de imagen
+              </button>
             </div>
           )}
         </div>
@@ -311,7 +399,7 @@ export default function PropertyDetail() {
                 Cancelar
               </button>
               <Link
-                to={"/ver-propiedades"}
+                to={"/propiedades"}
                 onClick={handleSave}
                 className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
               >
