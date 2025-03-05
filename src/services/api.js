@@ -1,7 +1,7 @@
 // src/services/api.js
 
 // Configuración base
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_URL = import.meta.env.VITE_API_PUBLIC_API_URL || 'http://localhost:4000';
 
 /**
  * Función para realizar peticiones HTTP con fetch
