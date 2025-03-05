@@ -3,6 +3,23 @@
 // Configuración base
 const API_URL = import.meta.env.VITE_API_PUBLIC_API_URL || 'http://localhost:4000';
 
+// Mover handleResponse fuera de fetchAPI para que sea accesible por todas las funciones
+const handleResponse = async (response) => {
+  if (response.status === 401) {
+    // Token expirado o inválido
+    localStorage.removeItem('user');
+    window.dispatchEvent(new Event('logout'));
+    throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
+  }
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error en la solicitud');
+  }
+  
+  return response.json();
+};
+
 /**
  * Función para realizar peticiones HTTP con fetch
  * @param {string} endpoint - Endpoint de la API
@@ -30,22 +47,6 @@ const fetchAPI = async (endpoint, options = {}) => {
       ...options,
       headers
     });
-    
-    const handleResponse = async (response) => {
-      if (response.status === 401) {
-        // Token expirado o inválido
-        localStorage.removeItem('user');
-        window.dispatchEvent(new Event('logout'));
-        throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
-      }
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Error en la solicitud');
-      }
-      
-      return response.json();
-    };
     
     // Verificar si la respuesta está vacía
     const contentType = response.headers.get('content-type');
