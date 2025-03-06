@@ -98,10 +98,10 @@ export default function SeeBlogs() {
       {/* MODAL DE CONFIRMACIÓN */}
       <Dialog open={isOpen} onClose={() => setIsOpen(false)} className="fixed inset-0 flex items-center justify-center p-4">
         <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
-          <Dialog.Title className="text-lg font-semibold">Confirmar eliminación</Dialog.Title>
-          <Dialog.Description className="mt-2">
+          <h3 className="text-lg font-semibold">Confirmar eliminación</h3>
+          <p className="mt-2 text-sm text-gray-500">
             ¿Estás seguro de que quieres eliminar este blog?
-          </Dialog.Description>
+          </p>
 
           <div className="mt-4 flex justify-end gap-2">
             <button 
