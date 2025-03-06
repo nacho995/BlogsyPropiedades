@@ -48,6 +48,58 @@ const ProfileImageUploader = ({ currentImageUrl, onImageUpdated }) => {
     );
   };
   
+  // Función para manejar errores cuando la imagen no carga
+  const handlePreviewError = (e) => {
+    // Mostrar mensaje en consola
+    console.log("❌ No se pudo cargar la imagen de perfil");
+    console.log("�� URL que falló:", e.target.src);
+    
+    // Evitar que se repita el error infinitamente
+    e.target.onerror = null;
+    
+    // Intentar usar la copia local guardada
+    const imagenGuardadaLocal = localStorage.getItem('profilePic_local');
+    
+    // Si existe una copia local, intentar usarla
+    if (imagenGuardadaLocal) {
+      console.log("🔄 Intentando usar imagen guardada localmente");
+      console.log("📦 Longitud de imagen local:", imagenGuardadaLocal.length);
+      e.target.src = imagenGuardadaLocal;
+      return;
+    }
+    
+    console.log("⚠️ No hay imagen local disponible, mostrando avatar");
+    
+    // Si no hay copia local, mostrar avatar con iniciales
+    // Ocultar la imagen que falló
+    e.target.style.display = 'none';
+    
+    // Encontrar el div contenedor
+    const contenedor = e.target.parentNode;
+    
+    // Crear un div para el avatar
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = "rounded-full w-32 h-32 bg-gray-300 flex items-center justify-center border-4 border-indigo-600";
+    
+    // Asegurarse que el div se muestre correctamente
+    avatarDiv.style.display = 'flex';
+    avatarDiv.style.alignItems = 'center';
+    avatarDiv.style.justifyContent = 'center';
+    
+    // Añadir la inicial del nombre
+    const textoInicial = document.createElement('span');
+    textoInicial.className = "text-gray-600 font-semibold text-5xl";
+    
+    // Usar la primera letra del nombre o '?' si no hay nombre
+    const letraInicial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
+    textoInicial.textContent = letraInicial;
+    console.log("👤 Mostrando avatar con inicial:", letraInicial);
+    
+    // Añadir elementos al DOM
+    avatarDiv.appendChild(textoInicial);
+    contenedor.appendChild(avatarDiv);
+  };
+  
   return (
     <div className="profile-image-uploader">
       <div className="image-preview mx-auto">
@@ -56,11 +108,7 @@ const ProfileImageUploader = ({ currentImageUrl, onImageUpdated }) => {
             src={previewImage} 
             alt="Imagen de perfil" 
             className="rounded-full w-32 h-32 object-cover border-4 border-indigo-600"
-            onError={(e) => {
-              console.log("Error cargando vista previa");
-              e.target.onerror = null; // Evitar bucle infinito
-              renderInitialAvatar(user);
-            }}
+            onError={handlePreviewError}
           />
         ) : renderInitialAvatar(user)}
       </div>

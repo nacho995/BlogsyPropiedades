@@ -170,40 +170,90 @@ export function UserProvider({ children }) {
     setIsAuthenticated(true);
   };
   
-  // Verificación periódica de actualizaciones
+  // Comprobar si hay imágenes nuevas cada cierto tiempo
   useEffect(() => {
-    // Solo verificar si el usuario está autenticado
-    if (!isAuthenticated || !user?.token) return;
+    // Solo verificar si el usuario está conectado
+    if (!user || !isAuthenticated) {
+      console.log("👤 No hay usuario autenticado, no se verificarán actualizaciones");
+      return;
+    }
     
-    const checkForUpdates = async () => {
+    console.log("🔄 Configurando verificación periódica de actualizaciones de perfil");
+    
+    // Función para buscar actualizaciones del perfil
+    const buscarActualizaciones = async () => {
+      console.log("🔍 Verificando actualizaciones de perfil...");
+      
       try {
-        const userData = await getCurrentUser();
+        // Intentar obtener datos del servidor
+        console.log("📡 Solicitando datos actualizados con token:", user.token ? "Disponible" : "No disponible");
         
-        // Comprobar si hay cambios
-        if (userData.profilePic !== user.profilePic || userData.name !== user.name) {
-          console.log("Detectados cambios en el perfil desde otro dispositivo");
+        const datos = await fetch(`${import.meta.env.VITE_API_PUBLIC_API_URL}/user/me`, {
+          headers: {
+            'Authorization': `Bearer ${user.token}`
+          }
+        });
+        
+        console.log("📡 Respuesta al verificar actualizaciones:", datos.status, datos.statusText);
+        
+        // Si la respuesta es correcta
+        if (datos.ok) {
+          const datosUsuario = await datos.json();
+          console.log("✅ Datos actualizados recibidos:", datosUsuario);
           
-          // Actualizar estado con datos nuevos
-          setUser(prev => ({
-            ...prev,
-            name: userData.name || prev.name,
-            profilePic: userData.profilePic || prev.profilePic,
-            lastChecked: new Date().toISOString()
-          }));
+          // Mostrar estado actual para comparación
+          console.log("🔍 Comparando imágenes:");
+          console.log("  - Actual:", user.profilePic);
+          console.log("  - Nueva:", datosUsuario.profilePic);
+          
+          // Verificar si hay cambios en la imagen de perfil
+          if (datosUsuario.profilePic && datosUsuario.profilePic !== user.profilePic) {
+            console.log("🔄 ¡Nueva imagen de perfil detectada!");
+            
+            // Actualizar estado
+            setUser(prevUser => {
+              console.log("👤 Actualizando usuario con nueva imagen");
+              return {
+                ...prevUser,
+                profilePic: datosUsuario.profilePic,
+                ultimaActualizacion: new Date().toISOString()
+              };
+            });
+            
+            // Actualizar localStorage
+            localStorage.setItem('profilePic', datosUsuario.profilePic);
+            console.log("📦 Actualizado localStorage con nueva imagen");
+            
+            // Verificar si se guardó correctamente
+            setTimeout(() => {
+              console.log("🔍 Verificando localStorage después de actualizar:");
+              console.log("  - profilePic:", localStorage.getItem('profilePic'));
+            }, 100);
+          } else {
+            console.log("✓ No hay cambios en la imagen de perfil");
+          }
+        } else {
+          console.log("⚠️ Respuesta no exitosa al verificar actualizaciones:", datos.status);
         }
       } catch (error) {
-        console.warn("Error al verificar actualizaciones de perfil:", error);
+        console.log("❌ Error al comprobar actualizaciones:", error);
       }
     };
     
-    // Verificar cada 5 minutos (ajustar según necesidades)
-    const intervalId = setInterval(checkForUpdates, 5 * 60 * 1000);
+    // Verificar cambios cada 2 minutos
+    console.log("⏰ Programando verificación cada 2 minutos");
+    const intervalo = setInterval(buscarActualizaciones, 2 * 60 * 1000);
     
-    // Verificar una vez al inicio
-    checkForUpdates();
+    // También verificar al inicio
+    console.log("🚀 Verificando actualizaciones al inicio");
+    buscarActualizaciones();
     
-    return () => clearInterval(intervalId);
-  }, [isAuthenticated, user?.token]);
+    // Limpiar intervalo al desmontar
+    return () => {
+      console.log("🧹 Limpiando intervalo de verificación");
+      clearInterval(intervalo);
+    };
+  }, [user, isAuthenticated]);
   
   // Función para actualizar solo la imagen de perfil
   const updateProfileImage = (imageUrl) => {

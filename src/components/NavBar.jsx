@@ -50,8 +50,42 @@ export default function Navbar() {
     console.log("Error cargando imagen, usando imagen predeterminada");
     
     const type = e.target.dataset.type || 'fallback';
-    e.target.src = IMG_DEFAULTS[type] || IMG_DEFAULTS.fallback;
-    e.target.onerror = null; // Evitar recursión infinita
+    
+    // Verificar si la URL ya es una imagen de respaldo para evitar bucles
+    if (e.target.src.includes(IMG_DEFAULTS[type]) || e.target.retryCount >= 2) {
+      // Si ya estamos usando la imagen predeterminada y aún falla,
+      // crear un avatar con iniciales directamente en el DOM
+      e.target.style.display = 'none';
+      e.target.onload = null;
+      e.target.onerror = null;
+      
+      // Obtener el padre donde insertar el avatar alternativo
+      const parent = e.target.parentNode;
+      
+      // Crear el avatar con iniciales
+      const avatarDiv = document.createElement('div');
+      avatarDiv.className = "h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center";
+      avatarDiv.style.display = 'flex';
+      avatarDiv.style.alignItems = 'center';
+      avatarDiv.style.justifyContent = 'center';
+      
+      const initialSpan = document.createElement('span');
+      initialSpan.className = "text-gray-600 font-semibold";
+      initialSpan.textContent = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
+      
+      avatarDiv.appendChild(initialSpan);
+      parent.appendChild(avatarDiv);
+    } else {
+      // Si aún no hemos intentado con la imagen predeterminada, intentarlo ahora
+      e.target.src = IMG_DEFAULTS[type];
+      // Marcar que ya hemos intentado una vez
+      e.target.retryCount = (e.target.retryCount || 0) + 1;
+      
+      // Conservar onerror para máximo 2 intentos
+      if (e.target.retryCount >= 2) {
+        e.target.onerror = null;
+      }
+    }
   };
 
   useEffect(() => {
@@ -69,26 +103,40 @@ export default function Navbar() {
     };
   }, [navigate]);
 
-  // En el componente NavBar.jsx
-  // Agregar función auxiliar para renderizar avatar
+  // Función mejorada para renderizar avatar con diagnóstico
   const renderUserAvatar = (user) => {
+    console.log("🖼️ Renderizando avatar de usuario");
+    
     // Buscar la imagen en todas las fuentes posibles (con prioridad)
     const profileImage = user?.profileImage || user?.profilePic || localStorage.getItem('profilePic') || localStorage.getItem('profilePic_local') || null;
+    
+    // Mostrar todas las fuentes posibles para diagnóstico
+    console.log("🔍 Fuentes de imagen disponibles:");
+    console.log("  - user.profileImage:", user?.profileImage || "no disponible");
+    console.log("  - user.profilePic:", user?.profilePic || "no disponible");
+    console.log("  - localStorage.profilePic:", localStorage.getItem('profilePic') || "no disponible");
+    console.log("  - localStorage.profilePic_local:", localStorage.getItem('profilePic_local') || "no disponible");
+    console.log("  - Imagen seleccionada:", profileImage);
     
     // Añadir timestamp para evitar caché
     const imageUrl = profileImage ? `${profileImage}?t=${Date.now()}` : null;
     
     if (imageUrl) {
+      console.log("✅ Usando imagen:", imageUrl);
       return (
         <img
           className="h-8 w-8 rounded-full object-cover"
           src={imageUrl}
           alt={`${user?.name || 'Usuario'}`}
-          onError={handleImageError}
+          onError={(e) => {
+            console.log("❌ Error cargando imagen en NavBar:", e.target.src);
+            handleImageError(e);
+          }}
           data-type="profile"
         />
       );
     } else {
+      console.log("ℹ️ No hay imagen disponible, mostrando avatar con iniciales");
       return (
         <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
           <span className="text-gray-600 font-semibold">
