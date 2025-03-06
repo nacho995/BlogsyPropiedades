@@ -97,6 +97,12 @@ export default function CambiarPerfil() {
       const result = await response.json();
       console.log("Perfil actualizado:", result);
       
+      // Convertir la URL a HTTPS antes de guardarla en localStorage o mostrarla
+      if (result.profilePic && typeof result.profilePic === 'string') {
+        result.profilePic = result.profilePic.replace('http://', 'https://');
+        localStorage.setItem("profilePic", result.profilePic);
+      }
+      
       // Actualizar el contexto del usuario
       await refreshUserData();
       

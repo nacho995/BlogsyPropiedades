@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useUser } from "../context/UserContext";
 import { getBlogPosts, getPropertyPosts } from "../services/api";
 import { motion } from "framer-motion";
+import { getProfileImageUrl } from "../utils/profileUtils";
 
 // Console log para verificar si el componente se carga
 console.log("Componente Principal.jsx está siendo importado");
@@ -155,44 +156,6 @@ function Principal() {
     return typeof url === 'string' ? url.replace('http://', 'https://') : url;
   };
 
-  // Función mejorada para obtener la URL de la imagen de perfil
-  const getProfileImageUrl = (user) => {
-    if (!user) return defaultProfilePic;
-    
-    let imageUrl = null;
-    
-    // Caso 1: profilePic es un string directo
-    if (typeof user.profilePic === 'string') {
-      imageUrl = user.profilePic;
-    } 
-    // Caso 2: profilePic es un objeto con src
-    else if (user.profilePic && user.profilePic.src) {
-      imageUrl = user.profilePic.src;
-    } 
-    // Caso 3: profilePic es un objeto con url
-    else if (user.profilePic && user.profilePic.url) {
-      imageUrl = user.profilePic.url;
-    }
-    // Caso 4: existe profileImage como alternativa
-    else if (user.profileImage) {
-      if (typeof user.profileImage === 'string') {
-        imageUrl = user.profileImage;
-      } else if (user.profileImage.src) {
-        imageUrl = user.profileImage.src;
-      } else if (user.profileImage.url) {
-        imageUrl = user.profileImage.url;
-      }
-    }
-    
-    // Si no encontramos ninguna imagen, usar la predeterminada
-    if (!imageUrl) {
-      return defaultProfilePic;
-    }
-    
-    // Asegurar HTTPS
-    return ensureHttps(imageUrl);
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-amber-600">
       {/* Hero Section con efecto de vidrio esmerilado */}
@@ -249,32 +212,15 @@ function Principal() {
                 <div className="relative">
                   <div className="absolute inset-0 bg-gradient-to-r from-amber-500 to-blue-600 rounded-full animate-spin-slow opacity-70 blur-md"></div>
                   <div className="relative w-40 h-40 rounded-full overflow-hidden border-4 border-white shadow-xl">
-                    {user && user.profilePic ? (
-                      <img 
-                        src={typeof user.profilePic === 'string' 
-                          ? ensureHttps(user.profilePic)
-                          : user.profilePic.secure_url 
-                            ? user.profilePic.secure_url 
-                            : defaultProfilePic}
-                        alt="Perfil" 
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          console.log("Error cargando imagen de perfil, intentando con URL alternativa");
-                          if (user.profileImage && typeof user.profileImage === 'object' && user.profileImage.secure_url) {
-                            e.target.src = user.profileImage.secure_url;
-                          } else {
-                            console.log("Usando imagen por defecto");
-                            e.target.src = defaultProfilePic;
-                          }
-                        }}
-                      />
-                    ) : (
-                      <img 
-                        src={defaultProfilePic} 
-                        alt="Perfil" 
-                        className="w-full h-full object-cover" 
-                      />
-                    )}
+                    <img 
+                      src={getProfileImageUrl(user, defaultProfilePic)}
+                      alt="Perfil" 
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        console.log("Error cargando imagen de perfil, usando imagen por defecto");
+                        e.target.src = defaultProfilePic;
+                      }}
+                    />
                   </div>
                   <div className="absolute -bottom-2 -right-2 bg-green-500 rounded-full p-2 border-2 border-white">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" viewBox="0 0 20 20" fill="currentColor">

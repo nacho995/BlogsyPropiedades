@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { getUserProfile } from '../services/api';
+import { ensureHttps } from "../utils/profileUtils";
 
 // Crear contexto
 export const UserContext = createContext();
@@ -20,12 +21,6 @@ export function UserProvider({ children }) {
     // Verificar estructura básica de JWT (3 partes separadas por puntos)
     const parts = token.split('.');
     return parts.length === 3;
-  };
-
-  // Función auxiliar para asegurar URLs HTTPS
-  const ensureHttps = (url) => {
-    if (!url) return null;
-    return typeof url === 'string' ? url.replace('http://', 'https://') : url;
   };
 
   // Función para actualizar la información del usuario
@@ -114,24 +109,29 @@ export function UserProvider({ children }) {
       
       // Si userData.user está presente, usamos esa estructura
       if (userData.user) {
+        // Convertir la URL a HTTPS antes de guardarla
+        const profilePicUrl = ensureHttps(userData.user.profilePic);
         localStorage.setItem("name", userData.user.name || "");
-        localStorage.setItem("profilePic", userData.user.profilePic || "");
+        localStorage.setItem("profilePic", profilePicUrl || "");
         
         // Actualizar estado
         setUser({
           token: userData.token,
-          ...userData.user
+          ...userData.user,
+          profilePic: profilePicUrl // Asegurar HTTPS
         });
       } else {
         // Estructura antigua
+        // Convertir la URL a HTTPS antes de guardarla
+        const profilePicUrl = ensureHttps(userData.profilePic);
         localStorage.setItem("name", userData.name || "");
-        localStorage.setItem("profilePic", userData.profilePic || "");
+        localStorage.setItem("profilePic", profilePicUrl || "");
         
         // Actualizar estado
         setUser({
           token: userData.token,
           name: userData.name,
-          profilePic: userData.profilePic
+          profilePic: profilePicUrl // Asegurar HTTPS
         });
       }
       
