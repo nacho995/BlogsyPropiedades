@@ -75,6 +75,12 @@ function Principal() {
     fetchData();
   }, []);
 
+  // En el useEffect donde se maneja la renderización del perfil de usuario
+  useEffect(() => {
+    // Este efecto se ejecutará cuando el usuario cambie
+    console.log("Datos actualizados del usuario:", user);
+  }, [user]);
+
   // Imagen de perfil por defecto
   const defaultProfilePic = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80";
 
@@ -186,7 +192,7 @@ function Principal() {
                   <div className="absolute inset-0 bg-gradient-to-r from-amber-500 to-blue-600 rounded-full animate-spin-slow opacity-70 blur-md"></div>
                   <div className="relative w-40 h-40 rounded-full overflow-hidden border-4 border-white shadow-xl">
                     <img 
-                      src={user?.profilePic || defaultProfilePic} 
+                      src={`${user?.profilePic || defaultProfilePic}?t=${new Date().getTime()}`} 
                       alt="Perfil" 
                       className="w-full h-full object-cover"
                     />

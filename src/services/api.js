@@ -440,3 +440,25 @@ export const getCurrentUser = async (tokenParam) => {
     throw error;
   }
 };
+
+// Función para obtener el perfil del usuario
+export async function getUserProfile(token) {
+  try {
+    const response = await fetch(`${API_URL}/users/profile`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Error al obtener perfil de usuario');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error al obtener perfil:', error);
+    throw error;
+  }
+}

@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
+import { getUserProfile } from '../services/api';
 
 // Crear contexto
 export const UserContext = createContext();
@@ -9,23 +10,46 @@ export function UserProvider({ children }) {
   // Estados básicos
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   
-  // Cargar usuario al iniciar
-  useEffect(() => {
-    // Verificar si hay token en localStorage
-    const token = localStorage.getItem("token");
-    
-    if (token) {
-      // Si hay token, cargar datos del usuario
-      setUser({
-        token,
-        name: localStorage.getItem("name") || "",
-        profilePic: localStorage.getItem("profilePic") || ""
-      });
-      setIsAuthenticated(true);
+  // Función para actualizar la información del usuario
+  const refreshUserData = async () => {
+    try {
+      const storedToken = localStorage.getItem('token');
+      if (storedToken) {
+        console.log("Refrescando datos del usuario...");
+        const userData = await getUserProfile(storedToken);
+        console.log("Datos de usuario actualizados:", userData);
+        setUser(userData);
+        setIsAuthenticated(true);
+      }
+    } catch (error) {
+      console.error("Error al refrescar los datos del usuario:", error);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  // Inicializar autenticación desde localStorage al cargar
+  useEffect(() => {
+    const initAuth = async () => {
+      await refreshUserData();
+    };
+    
+    initAuth();
   }, []);
+
+  // Refrescar datos del usuario cada 5 minutos
+  useEffect(() => {
+    if (isAuthenticated) {
+      const interval = setInterval(() => {
+        refreshUserData();
+      }, 5 * 60 * 1000); // 5 minutos
+      
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]);
   
   // Función de login
   const login = (userData) => {
@@ -59,9 +83,11 @@ export function UserProvider({ children }) {
   // Valores del contexto
   const value = {
     user,
+    setUser,
     isAuthenticated,
-    login,
-    logout
+    setIsAuthenticated,
+    loading,
+    refreshUserData
   };
   
   return (
