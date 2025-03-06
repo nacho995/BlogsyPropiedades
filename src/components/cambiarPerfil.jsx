@@ -15,48 +15,14 @@ export default function CambiarPerfil() {
   
   // Manejar cambio de imagen con manejo de errores mejorado
   const handleFileChange = (e) => {
-    try {
-      const file = e.target.files[0];
-      console.log("Archivo seleccionado:", file);
-      
-      if (!file) return;
-      
+    const file = e.target.files[0];
+    
+    if (file) {
+      console.log("Archivo seleccionado:", file.name);
       setProfilePic(file);
       
-      // Usar un enfoque completamente diferente para la previsualización
-      // que evite el error de startsWith
-      try {
-        // Crear un elemento img en memoria
-        const img = document.createElement('img');
-        
-        // Crear objeto URL de manera segura
-        const objectUrl = URL.createObjectURL(file);
-        
-        // Asignar la URL al elemento img
-        img.onload = function() {
-          // La imagen se cargó correctamente
-          console.log("Vista previa creada correctamente");
-          setPreviewUrl(objectUrl);
-        };
-        
-        img.onerror = function() {
-          console.error("Error al cargar la vista previa");
-          setPreviewUrl(null);
-        };
-        
-        // Iniciar la carga
-        img.src = objectUrl;
-        
-        // Limpiar recursos
-        return () => {
-          URL.revokeObjectURL(objectUrl);
-        };
-      } catch (error) {
-        console.error("Error al crear vista previa:", error);
-        setPreviewUrl(null);
-      }
-    } catch (error) {
-      console.error("Error general en handleFileChange:", error);
+      // No mostrar vista previa para evitar el error
+      setPreviewUrl(null);
     }
   };
   
@@ -73,17 +39,12 @@ export default function CambiarPerfil() {
       setLoading(true);
       setError(null);
       
-      // Crear objeto con datos
-      const userData = new FormData(); // Usar FormData directamente
+      // Crear FormData simple
+      const userData = new FormData();
       if (name) userData.append('name', name);
       if (profilePic) userData.append('profilePic', profilePic);
       
-      console.log("Enviando datos de actualización:", {
-        name: name || "(sin cambios)",
-        profilePic: profilePic ? profilePic.name : "(sin cambios)"
-      });
-      
-      // Enviar al servidor directamente usando fetch en lugar de la función updateProfile
+      // Enviar al servidor de forma directa
       const token = localStorage.getItem("token");
       const response = await fetch(`${import.meta.env.VITE_API_PUBLIC_API_URL}/user/update-profile`, {
         method: 'POST',
@@ -94,49 +55,29 @@ export default function CambiarPerfil() {
       });
       
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Error del servidor:", errorText);
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
+        throw new Error("Error al actualizar el perfil");
       }
       
       const result = await response.json();
       console.log("Perfil actualizado:", result);
       
-      // Convertir la URL a HTTPS antes de guardarla en localStorage o mostrarla
-      if (result.profilePic) {
-        let profilePicUrl;
-        
-        if (typeof result.profilePic === 'string') {
-          profilePicUrl = result.profilePic.replace('http://', 'https://');
-        } else if (typeof result.profilePic === 'object' && result.profilePic.src) {
-          profilePicUrl = result.profilePic.src.replace('http://', 'https://');
-        } else if (typeof result.profilePic === 'object' && result.profilePic.url) {
-          profilePicUrl = result.profilePic.url.replace('http://', 'https://');
-        }
-        
-        if (profilePicUrl) {
-          console.log("Guardando URL de imagen en localStorage:", profilePicUrl);
-          localStorage.setItem("profilePic", profilePicUrl);
-          
-          // Forzar la actualización en el componente actual
-          setPreviewUrl(profilePicUrl);
-        }
+      // Guardar imagen en localStorage si existe
+      if (result.profilePic && typeof result.profilePic === 'string') {
+        // Convertir URL a HTTPS
+        const secureUrl = result.profilePic.replace('http://', 'https://');
+        localStorage.setItem("profilePic", secureUrl);
       }
       
-      // Crear un pequeño retraso antes de refrescar los datos
-      setTimeout(async () => {
-        // Actualizar el contexto del usuario
-        await refreshUserData();
-        
-        // Mostrar mensaje de éxito
-        alert("Perfil actualizado correctamente");
-        
-        // Redirigir después de mostrar el mensaje
-        navigate("/");
-      }, 1000);
+      // Actualizar datos de usuario
+      await refreshUserData();
+      
+      // Mostrar mensaje y redirigir
+      alert("Perfil actualizado correctamente");
+      navigate("/");
+      
     } catch (error) {
-      console.error("Error detallado al actualizar el perfil:", error);
-      setError("No se pudo actualizar el perfil. Intenta de nuevo.");
+      console.error("Error:", error);
+      setError("No se pudo actualizar el perfil");
     } finally {
       setLoading(false);
     }
@@ -182,19 +123,24 @@ export default function CambiarPerfil() {
         
         {previewUrl && (
           <div className="mb-4">
-            <p className="text-gray-700 mb-2">Vista previa:</p>
-            <div className="w-32 h-32 rounded-full overflow-hidden border">
-              <img 
-                key={`preview-${Date.now()}`}
-                src={previewUrl} 
-                alt="Vista previa" 
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  console.error("Error en vista previa");
-                  e.target.src = "https://via.placeholder.com/100?text=Error"; 
-                }}
-              />
-            </div>
+            <p className="text-gray-700 mb-2">
+              {previewUrl === "imagen-seleccionada" 
+                ? "✅ Imagen seleccionada correctamente" 
+                : "Vista previa:"}
+            </p>
+            {previewUrl !== "imagen-seleccionada" && (
+              <div className="w-32 h-32 rounded-full overflow-hidden border">
+                <img 
+                  src={previewUrl} 
+                  alt="Vista previa" 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    console.error("Error en vista previa");
+                    e.target.src = "https://via.placeholder.com/100?text=Error"; 
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
         
