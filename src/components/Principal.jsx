@@ -17,7 +17,7 @@ function Principal() {
   // Estado para almacenar propiedades y blogs
   const [properties, setProperties] = useState([]);
   const [blogs, setBlogs] = useState([]);
-  const [loading, setLoading] = useState(false); // Inicialmente false
+  const [loading, setLoading] = useState(true);
   
   // Obtener datos del usuario
   const { user, isAuthenticated: userAuthenticated } = useUser();
@@ -25,65 +25,35 @@ function Principal() {
   // Console log para verificar si el componente se monta
   console.log("Componente Principal está renderizando");
 
-  // Solo cargar datos si el usuario está autenticado
+  // Cargar datos reales de la API
   useEffect(() => {
-    if (isAuthenticated) {
-      // Solo iniciamos la carga si el usuario está autenticado
-      setLoading(true);
-      
-      // Función para cargar datos
-      const fetchData = async () => {
-        try {
-          setTimeout(() => {
-            setProperties([
-              { 
-                id: 1, 
-                title: 'Propiedad 1', 
-                description: 'Descripción de la propiedad 1',
-                image: { 
-                  src: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?q=80&w=1000&auto=format&fit=crop' 
-                }
-              },
-              { 
-                id: 2, 
-                title: 'Propiedad 2', 
-                description: 'Descripción de la propiedad 2',
-                image: { 
-                  src: 'https://images.unsplash.com/photo-1560185127-6ed189bf02f4?q=80&w=1000&auto=format&fit=crop' 
-                }
-              }
-            ]);
-            
-            setBlogs([
-              { 
-                id: 1, 
-                title: 'Blog 1', 
-                description: 'Contenido del blog 1',
-                image: { 
-                  src: 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?q=80&w=1000&auto=format&fit=crop' 
-                }
-              },
-              { 
-                id: 2, 
-                title: 'Blog 2', 
-                description: 'Contenido del blog 2',
-                image: { 
-                  src: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=1000&auto=format&fit=crop' 
-                }
-              }
-            ]);
-            
-            setLoading(false);
-          }, 1000);
-        } catch (error) {
-          console.error("Error cargando datos:", error);
-          setLoading(false);
-        }
-      };
-      
-      fetchData();
-    }
-  }, [isAuthenticated]); // Dependencia en el estado de autenticación
+    console.log("Renderizando el contenido principal, loading:", loading);
+    
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        // Obtener blogs y propiedades reales usando las mismas funciones que en SeeBlogs/SeeProperties
+        const [blogsData, propertiesData] = await Promise.all([
+          getBlogPosts(),
+          getPropertyPosts()
+        ]);
+        
+        console.log("Blogs obtenidos:", blogsData.length);
+        console.log("Propiedades obtenidas:", propertiesData.length);
+        
+        // Limitamos a mostrar solo los 3 primeros elementos de cada tipo
+        setBlogs(blogsData.slice(0, 3));
+        setProperties(propertiesData.slice(0, 3));
+      } catch (error) {
+        console.error("Error cargando datos:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, []);
 
   // En el useEffect donde se maneja la renderización del perfil de usuario
   useEffect(() => {
@@ -319,7 +289,7 @@ function Principal() {
                               </svg>
                               {property.bedrooms || '3'} hab.
                             </div>
-                            <Link to={`/propiedades/${property._id}`} className="text-amber-400 hover:text-amber-300 font-medium">
+                            <Link to={`/property/${property._id}`} className="text-amber-400 hover:text-amber-300 font-medium">
                               Ver detalles →
                             </Link>
                           </div>
