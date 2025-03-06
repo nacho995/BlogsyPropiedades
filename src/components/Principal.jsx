@@ -81,6 +81,20 @@ function Principal() {
     console.log("Datos actualizados del usuario:", user);
   }, [user]);
 
+  // Después de la función getProfileImageUrl
+  useEffect(() => {
+    if (user) {
+      console.log("Estructura detallada del usuario:", JSON.stringify(user, null, 2));
+      console.log("Tipo de profilePic:", typeof user.profilePic);
+      if (user.profilePic && typeof user.profilePic === 'object') {
+        console.log("Propiedades de profilePic:", Object.keys(user.profilePic));
+      }
+      if (user.profileImage && typeof user.profileImage === 'object') {
+        console.log("Propiedades de profileImage:", Object.keys(user.profileImage));
+      }
+    }
+  }, [user]);
+
   // Imagen de perfil por defecto
   const defaultProfilePic = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80";
 
@@ -235,15 +249,32 @@ function Principal() {
                 <div className="relative">
                   <div className="absolute inset-0 bg-gradient-to-r from-amber-500 to-blue-600 rounded-full animate-spin-slow opacity-70 blur-md"></div>
                   <div className="relative w-40 h-40 rounded-full overflow-hidden border-4 border-white shadow-xl">
-                    <img 
-                      src={getProfileImageUrl(user)}
-                      alt="Perfil" 
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        console.log("Error cargando imagen de perfil");
-                        e.target.src = defaultProfilePic;
-                      }}
-                    />
+                    {user && user.profilePic ? (
+                      <img 
+                        src={typeof user.profilePic === 'string' 
+                          ? ensureHttps(user.profilePic)
+                          : user.profilePic.secure_url 
+                            ? user.profilePic.secure_url 
+                            : defaultProfilePic}
+                        alt="Perfil" 
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          console.log("Error cargando imagen de perfil, intentando con URL alternativa");
+                          if (user.profileImage && typeof user.profileImage === 'object' && user.profileImage.secure_url) {
+                            e.target.src = user.profileImage.secure_url;
+                          } else {
+                            console.log("Usando imagen por defecto");
+                            e.target.src = defaultProfilePic;
+                          }
+                        }}
+                      />
+                    ) : (
+                      <img 
+                        src={defaultProfilePic} 
+                        alt="Perfil" 
+                        className="w-full h-full object-cover" 
+                      />
+                    )}
                   </div>
                   <div className="absolute -bottom-2 -right-2 bg-green-500 rounded-full p-2 border-2 border-white">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" viewBox="0 0 20 20" fill="currentColor">

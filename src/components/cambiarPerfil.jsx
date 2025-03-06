@@ -25,24 +25,30 @@ export default function CambiarPerfil() {
       
       // Crear URL segura para la vista previa
       try {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          if (event.target && typeof event.target.result === 'string') {
-            console.log("Vista previa URL generada correctamente");
-            setPreviewUrl(event.target.result);
-          } else {
-            console.error("FileReader no generó un resultado válido:", event.target.result);
-            setPreviewUrl(null);
-          }
-        };
-        reader.onerror = (error) => {
-          console.error("Error en FileReader:", error);
-          setPreviewUrl(null);
-        };
-        reader.readAsDataURL(file);
+        // Método más directo y seguro para crear una URL de vista previa
+        const objectUrl = URL.createObjectURL(file);
+        console.log("URL de objeto creada:", objectUrl);
+        setPreviewUrl(objectUrl);
+        
+        // Limpiar la URL cuando ya no se necesite
+        return () => URL.revokeObjectURL(objectUrl);
       } catch (readerError) {
-        console.error("Error al crear vista previa:", readerError);
-        setPreviewUrl(null);
+        console.error("Error al crear vista previa con URL.createObjectURL:", readerError);
+        
+        // Usar FileReader como fallback
+        try {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            if (event.target && typeof event.target.result === 'string') {
+              console.log("Vista previa generada por FileReader");
+              setPreviewUrl(event.target.result);
+            }
+          };
+          reader.readAsDataURL(file);
+        } catch (fileReaderError) {
+          console.error("Error al usar FileReader como fallback:", fileReaderError);
+          setPreviewUrl(null);
+        }
       }
     } catch (error) {
       console.error("Error general en handleFileChange:", error);
@@ -147,9 +153,14 @@ export default function CambiarPerfil() {
             <p className="text-gray-700 mb-2">Vista previa:</p>
             <div className="w-32 h-32 rounded-full overflow-hidden border">
               <img 
-                src={previewUrl}
+                key={`preview-${Date.now()}`}
+                src={previewUrl} 
                 alt="Vista previa" 
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  console.error("Error en vista previa");
+                  e.target.src = "https://via.placeholder.com/100?text=Error"; 
+                }}
               />
             </div>
           </div>
