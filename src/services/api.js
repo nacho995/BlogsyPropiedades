@@ -241,19 +241,25 @@ export const updateProfile = async (userData, token) => {
   }
   
   try {
-    const headers = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+    // Usar el token del localStorage si no se proporciona uno
+    const authToken = token || localStorage.getItem('token');
+    if (!authToken) {
+      throw new Error('No hay token de autenticación disponible');
     }
+    
+    console.log("Actualizando perfil con token:", authToken);
     
     const response = await fetch(`${API_URL}/user/update-profile`, {
       method: 'POST',
-      headers,
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      },
       body: formData
     });
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error("Error del servidor:", errorData);
       throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
     }
     
@@ -444,19 +450,12 @@ export const getCurrentUser = async (tokenParam) => {
 // Función para obtener el perfil del usuario
 export async function getUserProfile(token) {
   try {
-    const response = await fetch(`${API_URL}/users/profile`, {
-      method: 'GET',
+    // Usamos la ruta correcta de tu API y fetchAPI para mantener consistencia
+    return await fetchAPI('/user/me', {
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+        'Authorization': `Bearer ${token || localStorage.getItem('token')}`
       }
     });
-    
-    if (!response.ok) {
-      throw new Error('Error al obtener perfil de usuario');
-    }
-    
-    return await response.json();
   } catch (error) {
     console.error('Error al obtener perfil:', error);
     throw error;

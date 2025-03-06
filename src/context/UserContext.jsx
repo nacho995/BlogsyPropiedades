@@ -18,14 +18,26 @@ export function UserProvider({ children }) {
     try {
       const storedToken = localStorage.getItem('token');
       if (storedToken) {
-        console.log("Refrescando datos del usuario...");
+        console.log("Refrescando datos del usuario con token:", storedToken);
         const userData = await getUserProfile(storedToken);
         console.log("Datos de usuario actualizados:", userData);
-        setUser(userData);
+        
+        // También actualizar el localStorage con los datos más recientes
+        if (userData.name) localStorage.setItem("name", userData.name);
+        if (userData.profilePic) localStorage.setItem("profilePic", userData.profilePic);
+        
+        setUser({
+          ...userData,
+          token: storedToken, // Asegurarnos de mantener el token
+        });
         setIsAuthenticated(true);
       }
     } catch (error) {
       console.error("Error al refrescar los datos del usuario:", error);
+      // Si hay un error de autenticación, limpiamos todo
+      if (error.message.includes("inválido") || error.message.includes("expirado")) {
+        logout();
+      }
     } finally {
       setLoading(false);
     }
@@ -65,6 +77,9 @@ export function UserProvider({ children }) {
       profilePic: userData.profilePic
     });
     setIsAuthenticated(true);
+    
+    // Refrescar datos inmediatamente para asegurar tener la info más actualizada
+    refreshUserData();
   };
   
   // Función de logout
