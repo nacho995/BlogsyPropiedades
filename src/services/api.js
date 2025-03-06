@@ -485,21 +485,94 @@ export async function getUserProfile(token) {
   }
 }
 
-import axios from "axios";
+// Replace axios with native fetch API
 
+// Define base URL for API requests
+const API_BASE_URL = 'https://your-api-endpoint.com'; // Update with your actual API URL
+
+// Helper function to handle fetch responses
+const handleResponse = async (response) => {
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `Error: ${response.status}`);
+  }
+  return response.json();
+};
+
+// GET request
+export const fetchData = async (endpoint) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`);
+    return handleResponse(response);
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    throw error;
+  }
+};
+
+// POST request
+export const postData = async (endpoint, data) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  } catch (error) {
+    console.error('Error posting data:', error);
+    throw error;
+  }
+};
+
+// PUT request
+export const updateData = async (endpoint, data) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  } catch (error) {
+    console.error('Error updating data:', error);
+    throw error;
+  }
+};
+
+// DELETE request
+export const deleteData = async (endpoint) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'DELETE',
+    });
+    return handleResponse(response);
+  } catch (error) {
+    console.error('Error deleting data:', error);
+    throw error;
+  }
+};
+
+/**
+ * Sincroniza la imagen de perfil del usuario
+ * @returns {Promise<Object>} - Datos de la imagen de perfil sincronizada
+ */
 export const syncProfileImage = async () => {
   const token = localStorage.getItem('token');
   if (!token) return;
   
   try {
-    const response = await axios.post(
-      `${API_BASE_URL}/users/sync-profile`,
-      {},
-      {
-        headers: { Authorization: `Bearer ${token}` }
+    const response = await fetch(`${API_BASE_URL}/users/sync-profile`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
       }
-    );
-    return response.data;
+    });
+    return handleResponse(response);
   } catch (error) {
     console.error('Error syncing profile image:', error);
     throw error;
