@@ -23,6 +23,10 @@ function Principal() {
         const blogsData = await getBlogPosts();
         const propertiesData = await getPropertyPosts();
         
+        // Log para depuración
+        console.log("Datos de blogs cargados:", blogsData);
+        console.log("Datos de propiedades cargados:", propertiesData);
+        
         // Guardar solo los primeros 3 elementos
         setBlogs(Array.isArray(blogsData) ? blogsData.slice(0, 3) : []);
         setProperties(Array.isArray(propertiesData) ? propertiesData.slice(0, 3) : []);
@@ -138,15 +142,17 @@ function Principal() {
                       className="bg-white/10 backdrop-blur-md rounded-xl overflow-hidden shadow-lg border border-white/20 transform transition hover:scale-105"
                       style={{ animationDelay: `${index * 0.1}s` }}
                     >
-                      {blog.image && (
-                        <div className="h-48 overflow-hidden">
-                          <img 
-                            src={blog.image} 
-                            alt={blog.title} 
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
+                      <div className="h-48 overflow-hidden">
+                        <img 
+                          src={(blog.image && blog.image.src) || (blog.images && blog.images.length > 0 ? blog.images[0].src || blog.images[0] : null) || blog.image || 'https://via.placeholder.com/400x300?text=Blog+Image'} 
+                          alt={blog.title} 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'https://via.placeholder.com/400x300?text=Sin+Imagen';
+                          }}
+                        />
+                      </div>
                       <div className="p-6">
                         <h3 className="font-bold text-xl mb-2 text-white">{blog.title}</h3>
                         <p className="text-blue-100 mb-4 line-clamp-2">{blog.description}</p>
@@ -182,15 +188,19 @@ function Principal() {
                       className="bg-white/10 backdrop-blur-md rounded-xl overflow-hidden shadow-lg border border-white/20 transform transition hover:scale-105"
                       style={{ animationDelay: `${index * 0.1}s` }}
                     >
-                      {property.images && property.images[0] && (
-                        <div className="h-48 overflow-hidden">
-                          <img 
-                            src={property.images[0]} 
-                            alt={property.title} 
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
+                      <div className="h-48 overflow-hidden">
+                        <img 
+                          src={(property.images && property.images.length > 0) ? 
+                            (typeof property.images[0] === 'string' ? property.images[0] : property.images[0].src || null) : 
+                            'https://via.placeholder.com/400x300?text=Propiedad'} 
+                          alt={property.title} 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'https://via.placeholder.com/400x300?text=Sin+Imagen';
+                          }}
+                        />
+                      </div>
                       <div className="p-6">
                         <div className="flex justify-between items-center mb-2">
                           <span className="bg-amber-500 text-white text-xs font-semibold px-2.5 py-0.5 rounded-full">
