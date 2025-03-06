@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, useHistory } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom"; // Replace useHistory with useNavigate
 import { useUser } from "../context/UserContext";
 import { getBlogPosts, getPropertyPosts, syncProfileImage } from "../services/api"; // Import the new API function
 import { motion } from "framer-motion";
@@ -18,7 +18,7 @@ function Principal() {
   
   // Obtener datos del usuario
   const { user, isAuthenticated: userAuthenticated } = useUser();
-  const history = useHistory();
+  const navigate = useNavigate(); // Replace useHistory with useNavigate
 
   // Cargar datos reales de la API
   useEffect(() => {
@@ -40,7 +40,7 @@ function Principal() {
           // Token expirado o no válido, redirigir a la página de inicio de sesión
           localStorage.removeItem("token");
           localStorage.removeItem("name");
-          history.push("/login");
+          navigate("/login"); // Replace history.push with navigate
         } else {
           console.error("Error cargando datos:", error);
         }
@@ -50,7 +50,7 @@ function Principal() {
     };
     
     fetchData();
-  }, [history]);
+  }, [navigate]); // Replace history with navigate
 
   // Imagen de perfil por defecto
   const defaultProfilePic = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80";
@@ -80,7 +80,7 @@ function Principal() {
       await syncProfileImage(); // Call the new API route to sync profile image
       localStorage.removeItem("token");
       localStorage.removeItem("name");
-      history.push("/login");
+      navigate("/login"); // Replace history.push with navigate
     } catch (error) {
       console.error("Error syncing profile image:", error);
     }
