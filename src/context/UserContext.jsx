@@ -137,13 +137,23 @@ export function UserProvider({ children }) {
     };
   }, [logout]); // Ahora logout ya existe
   
-  // Función de login
+  // Función de login corregida
   const login = async (credentials) => {
     try {
-      const result = await fetchAPI('/auth/login', {
+      // Usar fetch nativo en lugar de fetchAPI que no está definido
+      const response = await fetch(`${import.meta.env.VITE_API_PUBLIC_API_URL}/auth/login`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(credentials)
       });
+      
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status}`);
+      }
+      
+      const result = await response.json();
       
       if (result.token) {
         // Guardar como JSON para objetos complejos
@@ -163,6 +173,7 @@ export function UserProvider({ children }) {
         setIsAuthenticated(true);
         return true;
       }
+      return false;
     } catch (error) {
       console.error('Error al iniciar sesión:', error);
       return false;
@@ -202,13 +213,25 @@ export function UserProvider({ children }) {
                                 (datosUsuario.profilePic?.src || '') : 
                                 (datosUsuario.profilePic || '');
           
-          console.log("🔍 Comparando URLs de imágenes:");
-          console.log("  - Actual:", urlImagenActual);
-          console.log("  - Nueva:", urlImagenNueva);
+          // Convertir HTTP a HTTPS si es necesario
+          const urlActualNormalizada = urlImagenActual.replace('http:', 'https:');
+          const urlNuevaNormalizada = urlImagenNueva.replace('http:', 'https:');
           
-          // Solo actualizar si las URLs son diferentes
-          if (datosUsuario.profilePic && urlImagenActual !== urlImagenNueva) {
+          console.log("🔍 Comparando URLs de imágenes (normalizadas):");
+          console.log("  - Actual:", urlActualNormalizada);
+          console.log("  - Nueva:", urlNuevaNormalizada);
+          
+          // Solo actualizar si las URLs son diferentes después de normalizar
+          if (datosUsuario.profilePic && urlActualNormalizada !== urlNuevaNormalizada) {
             console.log("🔄 ¡Nueva imagen de perfil detectada!");
+            
+            // Si estamos en HTTPS y la URL es HTTP, convertirla
+            if (window.location.protocol === 'https:' && 
+                typeof datosUsuario.profilePic === 'object' && 
+                datosUsuario.profilePic.src && 
+                datosUsuario.profilePic.src.startsWith('http:')) {
+              datosUsuario.profilePic.src = datosUsuario.profilePic.src.replace('http:', 'https:');
+            }
             
             setUser(prevUser => ({
               ...prevUser,
@@ -254,6 +277,22 @@ export function UserProvider({ children }) {
   
   // Función para actualizar solo la imagen de perfil
   const updateProfileImage = (imageUrl) => {
+    // Si la imagen es un objeto sin src o una URL vacía, no actualizar
+    if ((typeof imageUrl === 'object' && !imageUrl.src) || imageUrl === '') {
+      console.log("⚠️ Intentando actualizar con URL vacía o inválida");
+      return;
+    }
+    
+    // Si la URL es HTTP y estamos en HTTPS, convertirla
+    if (typeof imageUrl === 'object' && imageUrl.src) {
+      if (window.location.protocol === 'https:' && imageUrl.src.startsWith('http:')) {
+        imageUrl.src = imageUrl.src.replace('http:', 'https:');
+      }
+    } else if (typeof imageUrl === 'string' && imageUrl.startsWith('http:') && 
+               window.location.protocol === 'https:') {
+      imageUrl = imageUrl.replace('http:', 'https:');
+    }
+    
     setUser(prev => prev ? {
       ...prev,
       profilePic: imageUrl

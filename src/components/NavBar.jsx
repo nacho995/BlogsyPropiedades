@@ -27,6 +27,17 @@ function clases(...classes) {
   return classes.filter(Boolean).join(' ');
 }
 
+// Función para convertir HTTP a HTTPS si el sitio usa HTTPS
+const secureUrl = (url) => {
+  if (typeof url !== 'string') return '';
+  
+  // Si estamos en HTTPS, convertir todas las URLs a HTTPS
+  if (window.location.protocol === 'https:' && url.startsWith('http:')) {
+    return url.replace('http:', 'https:');
+  }
+  return url;
+};
+
 export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -128,6 +139,9 @@ export default function Navbar() {
         }
       }
     }
+    
+    // Asegurar que la URL sea HTTPS si estamos en HTTPS
+    imageUrl = secureUrl(imageUrl);
     
     // Agregar timestamp para evitar caché del navegador
     const finalUrl = imageUrl ? `${imageUrl}?t=${Date.now()}` : null;
