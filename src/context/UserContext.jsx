@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
+import { fetchAPI, secureUrl, getImageUrl } from '../services/api';
 
 // Crear contexto
 export const UserContext = createContext();
@@ -137,30 +138,20 @@ export function UserProvider({ children }) {
     };
   }, [logout]); // Ahora logout ya existe
   
-  // Función de login corregida
+  // Función de login corregida usando fetchAPI
   const login = async (credentials) => {
     try {
-      // Usar fetch nativo en lugar de fetchAPI que no está definido
-      const response = await fetch(`${import.meta.env.VITE_API_PUBLIC_API_URL}/auth/login`, {
+      const result = await fetchAPI('/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify(credentials)
       });
       
-      if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      
       if (result.token) {
-        // Guardar como JSON para objetos complejos
+        // Guardar datos en localStorage
         localStorage.setItem('token', result.token);
         localStorage.setItem('user', JSON.stringify(result.user));
-        
-        // Si hay profilePic como objeto, guardar serializado
+         
+        // Guardar profilePic como JSON si es objeto
         if (result.user.profilePic) {
           localStorage.setItem('profilePic', JSON.stringify(result.user.profilePic));
         }
@@ -192,68 +183,41 @@ export function UserProvider({ children }) {
     
     // Función para buscar actualizaciones del perfil
     const buscarActualizaciones = async () => {
-      console.log("🔍 Verificando actualizaciones de perfil...");
-      
       try {
-        const datos = await fetch(`${import.meta.env.VITE_API_PUBLIC_API_URL}/user/me`, {
-          headers: {
-            'Authorization': `Bearer ${user.token}`
-          }
-        });
+        const datosUsuario = await fetchAPI('/user/me');
         
-        if (datos.ok) {
-          const datosUsuario = await datos.json();
+        // Normalizar URLs para comparar correctamente
+        const urlImagenActual = getImageUrl(user.profilePic);
+        const urlImagenNueva = getImageUrl(datosUsuario.profilePic);
+        
+        // Convertir HTTP a HTTPS si es necesario para comparación
+        const urlActualNormalizada = secureUrl(urlImagenActual);
+        const urlNuevaNormalizada = secureUrl(urlImagenNueva);
+        
+        // Comparar URLs normalizadas
+        if (datosUsuario.profilePic && urlActualNormalizada !== urlNuevaNormalizada) {
+          console.log("🔄 Nueva imagen de perfil detectada");
           
-          // Comparar URLs de imágenes, no los objetos completos
-          const urlImagenActual = typeof user.profilePic === 'object' ? 
-                                 (user.profilePic?.src || '') : 
-                                 (user.profilePic || '');
-                               
-          const urlImagenNueva = typeof datosUsuario.profilePic === 'object' ? 
-                                (datosUsuario.profilePic?.src || '') : 
-                                (datosUsuario.profilePic || '');
-          
-          // Convertir HTTP a HTTPS si es necesario
-          const urlActualNormalizada = urlImagenActual.replace('http:', 'https:');
-          const urlNuevaNormalizada = urlImagenNueva.replace('http:', 'https:');
-          
-          console.log("🔍 Comparando URLs de imágenes (normalizadas):");
-          console.log("  - Actual:", urlActualNormalizada);
-          console.log("  - Nueva:", urlNuevaNormalizada);
-          
-          // Solo actualizar si las URLs son diferentes después de normalizar
-          if (datosUsuario.profilePic && urlActualNormalizada !== urlNuevaNormalizada) {
-            console.log("🔄 ¡Nueva imagen de perfil detectada!");
-            
-            // Si estamos en HTTPS y la URL es HTTP, convertirla
-            if (window.location.protocol === 'https:' && 
-                typeof datosUsuario.profilePic === 'object' && 
-                datosUsuario.profilePic.src && 
-                datosUsuario.profilePic.src.startsWith('http:')) {
-              datosUsuario.profilePic.src = datosUsuario.profilePic.src.replace('http:', 'https:');
-            }
-            
-            setUser(prevUser => ({
-              ...prevUser,
-              profilePic: datosUsuario.profilePic
-            }));
-            
-            // Guardar como JSON en localStorage
-            localStorage.setItem('profilePic', JSON.stringify(datosUsuario.profilePic));
-            
-            // Actualizar también el objeto usuario completo en localStorage
-            if (localStorage.getItem('user')) {
-              const userStored = JSON.parse(localStorage.getItem('user'));
-              userStored.profilePic = datosUsuario.profilePic;
-              localStorage.setItem('user', JSON.stringify(userStored));
-            }
-            
-            console.log("📦 Actualizado localStorage con nueva imagen");
-          } else {
-            console.log("✓ No hay cambios en la imagen de perfil");
+          // Asegurar que usamos URLs HTTPS en entorno HTTPS
+          if (typeof datosUsuario.profilePic === 'object' && datosUsuario.profilePic.src) {
+            datosUsuario.profilePic.src = secureUrl(datosUsuario.profilePic.src);
           }
-        } else {
-          console.log("⚠️ Respuesta no exitosa al verificar actualizaciones:", datos.status);
+          
+          // Actualizar estado
+          setUser(prevUser => ({
+            ...prevUser,
+            profilePic: datosUsuario.profilePic
+          }));
+          
+          // Guardar en localStorage como JSON
+          localStorage.setItem('profilePic', JSON.stringify(datosUsuario.profilePic));
+          
+          // Actualizar el objeto usuario completo
+          if (localStorage.getItem('user')) {
+            const userStored = JSON.parse(localStorage.getItem('user'));
+            userStored.profilePic = datosUsuario.profilePic;
+            localStorage.setItem('user', JSON.stringify(userStored));
+          }
         }
       } catch (error) {
         console.log("❌ Error al comprobar actualizaciones:", error);

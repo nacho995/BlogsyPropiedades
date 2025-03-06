@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useUser } from '../context/UserContext';
+import { secureUrl } from '../services/api';
 
 const ProfileImageUploader = ({ currentImageUrl, onImageUpdated }) => {
   const [isUploading, setIsUploading] = useState(false);
@@ -98,6 +99,26 @@ const ProfileImageUploader = ({ currentImageUrl, onImageUpdated }) => {
     // Añadir elementos al DOM
     avatarDiv.appendChild(textoInicial);
     contenedor.appendChild(avatarDiv);
+  };
+  
+  // Función para subir imagen
+  const handleImageUpload = async () => {
+    // ...código existente
+
+    // Después de subir la imagen
+    if (response && response.profilePic) {
+      // Normalizar URL para HTTPS cuando sea necesario
+      const secureImageUrl = typeof response.profilePic === 'string' 
+        ? secureUrl(response.profilePic)
+        : {
+            ...response.profilePic,
+            src: secureUrl(response.profilePic.src || '')
+          };
+      
+      // Actualizar con la URL segura
+      setImageUrl(secureImageUrl);
+      onImageUploaded(secureImageUrl);
+    }
   };
   
   return (

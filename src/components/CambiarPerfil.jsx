@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { updateProfile } from '../services/api';
+import { updateProfile, getImageUrl, secureUrl } from '../services/api';
 import { useUser } from "../context/UserContext";
 import ProfileImageUploader from './ProfileImageUploader';
 
@@ -114,9 +114,12 @@ export default function CambiarPerfil() {
     const profileImage = user?.profileImage || user?.profilePic || null;
     
     if (profileImage) {
+      const imageUrl = getImageUrl(profileImage) || '';
+      const secureImageUrl = secureUrl(imageUrl);
+      
       return (
         <img 
-          src={profileImage} 
+          src={secureImageUrl ? `${secureImageUrl}?t=${Date.now()}` : ''}
           alt={`${user?.name || 'Usuario'}`}
           className="rounded-full w-32 h-32 object-cover border-4 border-indigo-600 mx-auto"
           onError={(e) => e.target.src = "https://placehold.co/150"}

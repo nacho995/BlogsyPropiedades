@@ -1,7 +1,7 @@
 // src/services/api.js
 
 // Configuración base
-const API_URL = import.meta.env.VITE_API_PUBLIC_API_URL || 'http://localhost:4000';
+const API_BASE_URL = import.meta.env.VITE_API_PUBLIC_API_URL || 'https://goza-madrid.onrender.com';
 
 // Mover handleResponse fuera de fetchAPI para que sea accesible por todas las funciones
 const handleResponse = async (response) => {
@@ -29,52 +29,78 @@ const handleResponse = async (response) => {
  * @param {Object} options - Opciones de fetch (method, body, etc)
  * @returns {Promise<any>} - Respuesta de la API
  */
-const fetchAPI = async (endpoint, options = {}) => {
-  // Añadir token de autenticación si existe
-  const token = localStorage.getItem('token');
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers
-  };
+export const fetchAPI = async (endpoint, options = {}) => {
+  const url = `${API_BASE_URL}${endpoint}`;
   
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  // Asegurar que tenemos headers
+  options.headers = options.headers || {};
+  
+  // Añadir Content-Type por defecto si no está presente y hay un body
+  if (options.body && !options.headers['Content-Type']) {
+    options.headers['Content-Type'] = 'application/json';
   }
   
-  const url = `${API_URL}${endpoint}`;
+  // Añadir token si está disponible en localStorage
+  const token = localStorage.getItem('token');
+  if (token) {
+    options.headers['Authorization'] = `Bearer ${token}`;
+  }
   
   try {
-    console.log(`Realizando petición ${options.method || 'GET'} a ${url}`);
+    const response = await fetch(url, options);
     
-    const response = await fetch(url, {
-      ...options,
-      headers
-    });
-    
-    // Verificar si el token expiró (401)
-    if (response.status === 401) {
-      console.log("📢 Token posiblemente expirado");
+    // Manejar respuestas no exitosas
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ 
+        message: `Error ${response.status}: ${response.statusText}` 
+      }));
       
-      // En lugar de redireccionar directamente, emitir un evento para que el contexto decida
-      const event = new CustomEvent('session-expired', {
-        detail: { message: 'Tu sesión ha expirado' }
-      });
-      window.dispatchEvent(event);
-      
-      throw new Error('Sesión expirada');
+      throw new Error(errorData.message || `Error ${response.status}`);
     }
     
-    // Verificar si la respuesta está vacía
-    const contentType = response.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-      return await handleResponse(response);
-    }
-    
-    return await response.text();
+    // Para respuestas exitosas, intentar parsear como JSON
+    return await response.json();
   } catch (error) {
-    console.error('Error en fetchAPI:', error.message);
+    console.error(`Error en petición API a ${endpoint}:`, error);
     throw error;
   }
+};
+
+/**
+ * Función para normalizar URLs HTTP a HTTPS cuando es necesario
+ * @param {string} url - URL a normalizar
+ * @returns {string} - URL normalizada
+ */
+export const secureUrl = (url) => {
+  if (typeof url !== 'string') {
+    return '';
+  }
+  
+  // Si estamos en HTTPS y la URL es HTTP, convertirla
+  if (window.location.protocol === 'https:' && url.startsWith('http:')) {
+    return url.replace('http:', 'https:');
+  }
+  
+  return url;
+};
+
+/**
+ * Función para extraer URL real de un objeto de imagen
+ * @param {Object} imageObj - Objeto de imagen
+ * @returns {string} - URL de la imagen
+ */
+export const getImageUrl = (imageObj) => {
+  if (!imageObj) return '';
+  
+  if (typeof imageObj === 'string') {
+    return imageObj;
+  }
+  
+  if (typeof imageObj === 'object') {
+    return imageObj.src || imageObj.url || '';
+  }
+  
+  return '';
 };
 
 /**
@@ -290,7 +316,7 @@ export const updateProfile = async (userData) => {
     const timestamp = Date.now();
     console.log("🕒 Enviando petición al servidor con timestamp:", timestamp);
     
-    const response = await fetch(`${API_URL}/user/update-profile?t=${timestamp}`, {
+    const response = await fetch(`${API_BASE_URL}/user/update-profile?t=${timestamp}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -374,9 +400,9 @@ export const uploadImageBlog = async (file, token) => {
       headers['Authorization'] = `Bearer ${token}`;
     }
     
-    console.log("Subiendo imagen de blog a:", `${API_URL}/blog/upload`);
+    console.log("Subiendo imagen de blog a:", `${API_BASE_URL}/blog/upload`);
     
-    const response = await fetch(`${API_URL}/blog/upload`, {
+    const response = await fetch(`${API_BASE_URL}/blog/upload`, {
       method: 'POST',
       headers,
       body: formData
@@ -416,9 +442,9 @@ export const uploadFile = async (file, token) => {
     
     // No hay una ruta específica para subir archivos en propertyRouter
     // Debe usarse la ruta principal con propiedad vacía
-    console.log("Subiendo archivo a:", `${API_URL}/property`);
+    console.log("Subiendo archivo a:", `${API_BASE_URL}/property`);
     
-    const response = await fetch(`${API_URL}/property`, {
+    const response = await fetch(`${API_BASE_URL}/property`, {
       method: 'POST',
       headers,
       body: formData
@@ -509,7 +535,7 @@ export const updatePropertyPost = async (id, data) => {
  */
 export const getPropertyById = async (id) => {
   try {
-    const response = await fetch(`${API_URL}/property/${id}`);
+    const response = await fetch(`${API_BASE_URL}/property/${id}`);
     return handleResponse(response);
   } catch (error) {
     console.error(`Error al obtener propiedad ${id}:`, error);
@@ -536,7 +562,7 @@ export const getCurrentUser = async (tokenParam) => {
     const timestamp = Date.now();
     console.log("🕒 Obteniendo usuario con timestamp:", timestamp);
     
-    const response = await fetch(`${API_URL}/user/me?t=${timestamp}`, {
+    const response = await fetch(`${API_BASE_URL}/user/me?t=${timestamp}`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }

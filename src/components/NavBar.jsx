@@ -4,6 +4,7 @@ import { Bars3Icon, BellIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { toast } from 'react-hot-toast';
+import { secureUrl, getImageUrl } from '../services/api'; // Importar las funciones utilitarias
 
 // IMPORTANTE: Declarar las variables globales FUERA del componente
 // para evitar problemas de inicialización
@@ -120,30 +121,35 @@ export default function Navbar() {
     
     let imageUrl = '';
     
-    // Determinar la URL de la imagen según el tipo de dato
-    if (typeof user.profilePic === 'object' && user.profilePic?.src) {
-      imageUrl = user.profilePic.src;
-    } else if (typeof user.profilePic === 'string') {
-      imageUrl = user.profilePic;
-    } else {
-      // Intentar obtener del localStorage (podría ser un string JSON)
+    // Extraer URL de imagen de diferentes fuentes
+    if (user.profilePic) {
+      imageUrl = getImageUrl(user.profilePic);
+    }
+    
+    // Si no hay URL en el objeto user, intentar desde localStorage
+    if (!imageUrl) {
       const storedPic = localStorage.getItem('profilePic');
       if (storedPic) {
         try {
           // Intentar parsear como JSON
           const picObj = JSON.parse(storedPic);
-          imageUrl = picObj.src || picObj;
+          imageUrl = getImageUrl(picObj);
         } catch (e) {
-          // Si no es JSON válido, usar como string
+          // Si no es JSON válido, usar directamente
           imageUrl = storedPic;
         }
       }
     }
     
+    // Si aún no tenemos URL, intentar con imagen de respaldo
+    if (!imageUrl) {
+      imageUrl = localStorage.getItem('profilePic_local') || '';
+    }
+    
     // Asegurar que la URL sea HTTPS si estamos en HTTPS
     imageUrl = secureUrl(imageUrl);
     
-    // Agregar timestamp para evitar caché del navegador
+    // Agregar timestamp para evitar caché
     const finalUrl = imageUrl ? `${imageUrl}?t=${Date.now()}` : null;
     
     if (finalUrl) {
