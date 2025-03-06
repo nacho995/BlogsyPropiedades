@@ -99,8 +99,12 @@ export default function Navbar() {
                     <span className="sr-only">Open user menu</span>
                     <img
                       className="h-8 w-8 rounded-full"
-                      src={user?.profilePic || defaultProfilePic}
+                      src={localStorage.getItem('profilePic') || defaultProfilePic}
                       alt=""
+                      onError={(e) => {
+                        console.log("Error cargando imagen en navbar");
+                        e.target.src = defaultProfilePic;
+                      }}
                     />
                   </MenuButton>
                   <MenuItems className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">

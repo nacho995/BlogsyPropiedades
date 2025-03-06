@@ -1,134 +1,136 @@
-import React, { useState, useEffect } from 'react';
-import { updateProfile } from '../services/api'; // Asegúrate de que este endpoint esté configurado para recibir FormData
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useUser } from "../context/UserContext";
 
 export default function CambiarPerfil() {
-  const { user, login } = useUser();
-  const [name, setName] = useState(user?.name || '');
+  const [name, setName] = useState("");
   const [profilePic, setProfilePic] = useState(null);
-  const [preview, setPreview] = useState(user?.profilePic || '');
-  const [message, setMessage] = useState('');
-
-  // Maneja el cambio del input de archivo y genera una vista previa
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  
+  const navigate = useNavigate();
+  const { user, refreshUserData } = useUser();
+  
+  // Versión simplificada que no intenta crear vista previa
   const handleFileChange = (e) => {
     const file = e.target.files[0];
-    console.log("Archivo seleccionado:", file);
-    setProfilePic(file);
     if (file) {
-      const objectUrl = URL.createObjectURL(file);
-      console.log("Vista previa URL generada:", objectUrl);
-      setPreview(objectUrl);
+      console.log("Archivo seleccionado:", file.name);
+      setProfilePic(file);
+      // No crear vista previa para evitar el error
     }
   };
-
-  // Limpieza de URL de objeto cuando cambia o se desmonta
-  useEffect(() => {
-    return () => {
-      if (preview && preview.startsWith("blob:")) {
-        URL.revokeObjectURL(preview);
-      }
-    };
-  }, [preview]);
-
-  // Manejador del envío del formulario
+  
+  // Manejar envío de formulario
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage('');
-
-    if (!name.trim() && !profilePic) {
-      setMessage('Por favor ingresa al menos un valor para actualizar.');
+    
+    if (!name && !profilePic) {
+      setError("Debes cambiar al menos un campo.");
       return;
     }
-
-    // Crear objeto con los datos a actualizar
-    const userData = {};
-    if (name.trim() !== '') {
-      userData.name = name;
-    }
-    if (profilePic) {
-      userData.profilePic = profilePic;
-    }
-
+    
     try {
-      // Pasar el token del usuario a la función updateProfile
-      const result = await updateProfile(userData, user.token);
-      console.log("Respuesta del servidor en CambiarPerfil:", result);
+      setLoading(true);
+      setError(null);
       
-      // Verificar que los datos lleguen correctamente
-      if (!result.name && !result.profilePic) {
-        console.warn("La respuesta del servidor no incluye name ni profilePic:", result);
-      }
-
-      // Actualizar el estado del usuario con los nuevos datos
-      login({
-        token: user.token,
-        name: result.name || user.name,
-        profilePic: result.profilePic || user.profilePic
+      // Crear FormData
+      const userData = new FormData();
+      if (name) userData.append('name', name);
+      if (profilePic) userData.append('profilePic', profilePic);
+      
+      // Enviar al servidor
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${import.meta.env.VITE_API_PUBLIC_API_URL}/user/update-profile`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: userData
       });
       
-      setMessage('Perfil actualizado correctamente');
+      if (!response.ok) {
+        throw new Error("Error al actualizar el perfil");
+      }
+      
+      const result = await response.json();
+      console.log("Respuesta del servidor en CambiarPerfil:", result);
+      
+      // Guardar imagen en localStorage
+      if (result.profilePic && typeof result.profilePic === 'string') {
+        // Convertir URL a HTTPS
+        const secureUrl = result.profilePic.replace('http://', 'https://');
+        localStorage.setItem("profilePic", secureUrl);
+      }
+      
+      // Actualizar datos de usuario
+      await refreshUserData();
+      
+      // Mensaje y redirección
+      alert("Perfil actualizado correctamente");
+      navigate("/");
+      
     } catch (error) {
       console.error("Error detallado al actualizar el perfil:", error);
-      setMessage('Hubo un error al actualizar el perfil. Intenta de nuevo.');
+      setError("No se pudo actualizar el perfil");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-lg">
-      <h2 className="text-2xl font-bold mb-6 text-center">Actualizar Perfil</h2>
+    <div className="max-w-md mx-auto my-10 p-6 bg-white rounded-lg shadow-md">
+      <h2 className="text-2xl font-bold mb-6">Cambiar Perfil</h2>
       
-      {message && (
-        <div className={`p-4 mb-4 rounded ${message.includes('error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-          {message}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
         </div>
       )}
       
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+      <form onSubmit={handleSubmit}>
+        <div className="mb-4">
+          <label className="block text-gray-700 mb-2" htmlFor="name">
             Nombre
           </label>
           <input
-            type="text"
             id="name"
+            type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+            className="w-full p-2 border rounded"
+            placeholder="Nuevo nombre"
           />
         </div>
         
-        <div>
-          <label htmlFor="profilePic" className="block text-sm font-medium text-gray-700">
-            Foto de Perfil
+        <div className="mb-4">
+          <label className="block text-gray-700 mb-2" htmlFor="profilePic">
+            Imagen de perfil
           </label>
           <input
-            type="file"
             id="profilePic"
+            type="file"
             accept="image/*"
             onChange={handleFileChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+            className="w-full p-2 border rounded"
           />
         </div>
         
-        {preview && (
-          <div className="mt-4">
-            <p className="text-sm font-medium text-gray-700 mb-2">Vista previa:</p>
-            <img 
-              src={preview} 
-              alt="Vista previa" 
-              className="w-32 h-32 object-cover rounded-full mx-auto border-2 border-gray-300" 
-            />
+        {profilePic && (
+          <div className="mb-4">
+            <p className="text-gray-700 mb-2">✅ Imagen seleccionada: {profilePic.name}</p>
           </div>
         )}
         
-        <div>
-          <button
-            type="submit"
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            Actualizar Perfil
-          </button>
-        </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className={`w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 ${
+            loading ? "opacity-50 cursor-not-allowed" : ""
+          }`}
+        >
+          {loading ? "Guardando..." : "Guardar cambios"}
+        </button>
       </form>
     </div>
   );
