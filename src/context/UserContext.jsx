@@ -208,11 +208,9 @@ export function UserProvider({ children }) {
             
             // Actualizar estado
             setUser(prevUser => {
-              console.log("👤 Actualizando usuario con nueva imagen");
               return {
                 ...prevUser,
-                profilePic: datosUsuario.profilePic,
-                ultimaActualizacion: new Date().toISOString()
+                profilePic: datosUsuario.profilePic
               };
             });
             

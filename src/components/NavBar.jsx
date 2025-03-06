@@ -146,7 +146,7 @@ export default function Navbar() {
       console.log("✅ Usando imagen:", imageUrl.substring(0, 50) + "...");
       return (
         <img
-          className="h-8 w-8 rounded-full object-cover"
+          className="h-8 w-8 rounded-full"
           src={imageUrl}
           alt={`${user?.name || 'Usuario'}`}
           onError={(e) => {
