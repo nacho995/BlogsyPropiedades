@@ -48,14 +48,35 @@ export function UserProvider({ children }) {
     localStorage.setItem("token", userData.token || "");
     localStorage.setItem("name", userData.name || "");
     localStorage.setItem("profilePic", userData.profilePic || "");
+    localStorage.setItem("user", JSON.stringify(userData)); // Guardar todo el objeto
     
     // Actualizar estado
     setUser({
       token: userData.token,
       name: userData.name,
-      profilePic: userData.profilePic
+      profilePic: userData.profilePic,
+      isAdmin: userData.isAdmin || false,
+      email: userData.email || ""
     });
     setIsAuthenticated(true);
+  };
+  
+  // Función para actualizar solo la imagen de perfil
+  const updateProfileImage = (imageUrl) => {
+    setUser(prev => prev ? {
+      ...prev,
+      profilePic: imageUrl
+    } : null);
+    
+    // Actualizar también en localStorage
+    localStorage.setItem("profilePic", imageUrl);
+    
+    // Si guardas el usuario completo en localStorage, actualízalo también
+    if (localStorage.getItem('user')) {
+      const storedUser = JSON.parse(localStorage.getItem('user'));
+      storedUser.profilePic = imageUrl;
+      localStorage.setItem('user', JSON.stringify(storedUser));
+    }
   };
   
   // Función de logout
@@ -64,6 +85,7 @@ export function UserProvider({ children }) {
     localStorage.removeItem("token");
     localStorage.removeItem("name");
     localStorage.removeItem("profilePic");
+    localStorage.removeItem("user");
     
     // Resetear estado
     setUser(null);
@@ -76,7 +98,8 @@ export function UserProvider({ children }) {
     user,
     isAuthenticated,
     login,
-    logout
+    logout,
+    updateProfileImage
   };
   
   return (

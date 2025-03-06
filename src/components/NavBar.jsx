@@ -37,6 +37,23 @@ export default function Navbar() {
     logout();
   };
 
+  const handleImageError = (e) => {
+    const type = e.target.dataset.type;
+    switch(type) {
+      case 'profile':
+        e.target.src = defaultProfilePic;
+        break;
+      case 'property':
+        e.target.src = defaultPropertyImage;
+        break;
+      case 'blog':
+        e.target.src = defaultBlogImage;
+        break;
+      default:
+        e.target.src = defaultPropertyImage;
+    }
+  };
+
   return (
     <Disclosure as="nav" className="bg-gray-800">
       <div className="mx-auto max-w-7xl px-2 sm:px-6 lg:px-8">
@@ -101,6 +118,8 @@ export default function Navbar() {
                       className="h-8 w-8 rounded-full"
                       src={user?.profilePic || defaultProfilePic}
                       alt=""
+                      onError={handleImageError}
+                      data-type="profile"
                     />
                   </MenuButton>
                   <MenuItems className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
