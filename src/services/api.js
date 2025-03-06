@@ -53,21 +53,14 @@ const fetchAPI = async (endpoint, options = {}) => {
     
     // Verificar si el token expiró (401)
     if (response.status === 401) {
-      console.log("📢 Token expirado - Cerrando sesión");
+      console.log("📢 Token posiblemente expirado");
       
-      // Limpiar localStorage
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      localStorage.removeItem('name');
-      localStorage.removeItem('profilePic');
+      // En lugar de redireccionar directamente, emitir un evento para que el contexto decida
+      const event = new CustomEvent('session-expired', {
+        detail: { message: 'Tu sesión ha expirado' }
+      });
+      window.dispatchEvent(event);
       
-      // Alerta simple (puede mejorarse con toast)
-      alert("Tu sesión ha expirado. Serás redirigido al login");
-      
-      // Redireccionar a login (enfoque simple)
-      window.location.href = '/login';
-      
-      // Detener la ejecución
       throw new Error('Sesión expirada');
     }
     
@@ -240,37 +233,35 @@ export const resetPassword = async (token, password, passwordConfirm) => {
 /**
  * Actualiza el perfil del usuario
  * @param {Object} userData - Datos del usuario a actualizar
- * @param {string} token - Token de autenticación
  * @returns {Promise<Object>} - Datos actualizados del usuario
  */
-export const updateProfile = async (userData, token) => {
+export const updateProfile = async (userData) => {
   const formData = new FormData();
   
-  // Añadir nombre si existe
   if (userData.name) {
     formData.append('name', userData.name);
   }
   
-  // Añadir imagen de perfil si existe
-  if (userData.profilePic) {
+  if (userData.profilePic && userData.profilePic instanceof File) {
     formData.append('profilePic', userData.profilePic);
   }
   
   try {
-    const headers = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+    // Usar token desde localStorage
+    const token = localStorage.getItem('token');
     
+    // No incluir Content-Type con FormData
     const response = await fetch(`${API_URL}/user/update-profile`, {
       method: 'POST',
-      headers,
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
       body: formData
     });
     
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Error al actualizar perfil: ${errorText}`);
     }
     
     return await response.json();

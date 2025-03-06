@@ -1,31 +1,40 @@
 import React, { useState } from 'react';
 import { useUser } from '../context/UserContext';
-import { updateProfile } from '../services/api';
 
 const ProfileImageUploader = ({ currentImageUrl, onImageUpdated }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [previewImage, setPreviewImage] = useState(currentImageUrl || null);
-  const { user, updateProfileImage } = useUser();
+  const { user } = useUser();
   
   const handleImageChange = (e) => {
     const file = e.target.files[0];
+    
     if (file) {
-      // Mostrar vista previa local
+      // Validar tipo de archivo
+      if (!file.type.startsWith('image/')) {
+        setUploadError('Por favor selecciona un archivo de imagen válido');
+        return;
+      }
+      
+      // Validar tamaño (máx 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setUploadError('La imagen es demasiado grande. Máximo 5MB.');
+        return;
+      }
+      
+      // Mostrar vista previa
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreviewImage(reader.result);
       };
       reader.readAsDataURL(file);
       
-      // Notificar al componente padre
+      // Limpiar error previo y notificar al componente padre
+      setUploadError(null);
       onImageUpdated(file);
-      
-      // Si quieres subir la imagen inmediatamente sin esperar a que el usuario haga clic en "Actualizar perfil"
-      // handleDirectUpload(file);
     }
   };
-  
   
   return (
     <div className="profile-image-uploader">

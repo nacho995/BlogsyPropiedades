@@ -2,7 +2,7 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 
-// Componente simple para proteger rutas
+// Versión simplificada que solo verifica isAuthenticated
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useUser();
   

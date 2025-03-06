@@ -34,22 +34,17 @@ export default function CambiarPerfil() {
     }
 
     try {
-      const result = await updateProfile(userData, user.token);
-      console.log("Respuesta del servidor en CambiarPerfil:", result);
+      const result = await updateProfile(userData);
       
-      // Actualizar el estado del usuario con los nuevos datos
       login({
-        token: user.token,
+        ...user,
         name: result.name || user.name,
         profilePic: result.profilePic || user.profilePic
       });
       
-      // Guardar en localStorage
-      localStorage.setItem('profilePic', result.profilePic || user.profilePic);
-      
       setMessage('Perfil actualizado correctamente');
     } catch (error) {
-      console.error("Error detallado al actualizar el perfil:", error);
+      console.error("Error al actualizar el perfil:", error);
       setMessage('Hubo un error al actualizar el perfil. Intenta de nuevo.');
     } finally {
       setIsLoading(false);

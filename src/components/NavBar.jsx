@@ -39,26 +39,38 @@ export default function Navbar() {
   };
 
   const handleImageError = (e) => {
+    console.log("Error cargando imagen, usando imagen predeterminada");
+    
+    // Imagen predeterminada que funciona localmente (data URI)
+    const defaultImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150'%3E%3Ccircle cx='75' cy='75' r='75' fill='%23ccc'/%3E%3Ccircle cx='75' cy='65' r='25' fill='%23999'/%3E%3Cpath d='M 75 95 C 45 95 35 120 35 150 L 115 150 C 115 120 105 95 75 95 Z' fill='%23999'/%3E%3C/svg%3E";
+    
     const type = e.target.dataset.type;
     switch(type) {
       case 'profile':
-        e.target.src = defaultProfilePic;
+        e.target.src = defaultImage;
         break;
       case 'property':
-        e.target.src = defaultPropertyImage;
+        e.target.src = defaultPropertyImage || defaultImage;
         break;
       case 'blog':
-        e.target.src = defaultBlogImage;
+        e.target.src = defaultBlogImage || defaultImage;
         break;
       default:
-        e.target.src = defaultPropertyImage;
+        e.target.src = defaultImage;
     }
+    
+    e.target.onerror = null; // Evitar recursión infinita
   };
 
   useEffect(() => {
-    const handleSessionExpired = () => {
-      toast.error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
-      navigate('/login');
+    const handleSessionExpired = (event) => {
+      // Mostrar mensaje amigable
+      toast.error(event.detail?.message || 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
+      
+      // Redirigir al login después de un breve retraso
+      setTimeout(() => {
+        navigate('/login');
+      }, 1000);
     };
     
     window.addEventListener('session-expired', handleSessionExpired);
