@@ -261,7 +261,7 @@ export default function Principal() {
                             </svg>
                             {property.bedrooms || '3'} hab.
                           </div>
-                          <Link to={`/property/${property._id}`} className="text-amber-400 hover:text-amber-300 font-medium">
+                          <Link to={`/propiedades/${property._id}`} className="text-amber-400 hover:text-amber-300 font-medium">
                             Ver detalles →
                           </Link>
                         </div>
