@@ -184,38 +184,47 @@ export function UserProvider({ children }) {
       console.log("🔍 Verificando actualizaciones de perfil...");
       
       try {
-        // Intentar obtener datos del servidor
         const datos = await fetch(`${import.meta.env.VITE_API_PUBLIC_API_URL}/user/me`, {
           headers: {
             'Authorization': `Bearer ${user.token}`
           }
         });
         
-        // Si la respuesta es correcta
         if (datos.ok) {
           const datosUsuario = await datos.json();
           
-          // Verificar si hay cambios en la imagen de perfil - COMPARAR URLS, NO OBJETOS
-          const imagenActual = user.profilePic?.src || '';
-          const imagenNueva = datosUsuario.profilePic?.src || '';
+          // Comparar URLs de imágenes, no los objetos completos
+          const urlImagenActual = typeof user.profilePic === 'object' ? 
+                                 (user.profilePic?.src || '') : 
+                                 (user.profilePic || '');
+                               
+          const urlImagenNueva = typeof datosUsuario.profilePic === 'object' ? 
+                                (datosUsuario.profilePic?.src || '') : 
+                                (datosUsuario.profilePic || '');
           
           console.log("🔍 Comparando URLs de imágenes:");
-          console.log("  - Actual:", imagenActual);
-          console.log("  - Nueva:", imagenNueva);
+          console.log("  - Actual:", urlImagenActual);
+          console.log("  - Nueva:", urlImagenNueva);
           
-          if (datosUsuario.profilePic && imagenActual !== imagenNueva) {
+          // Solo actualizar si las URLs son diferentes
+          if (datosUsuario.profilePic && urlImagenActual !== urlImagenNueva) {
             console.log("🔄 ¡Nueva imagen de perfil detectada!");
             
-            // Actualizar estado
-            setUser(prevUser => {
-              return {
-                ...prevUser,
-                profilePic: datosUsuario.profilePic
-              };
-            });
+            setUser(prevUser => ({
+              ...prevUser,
+              profilePic: datosUsuario.profilePic
+            }));
             
-            // Guardar en localStorage como string JSON
+            // Guardar como JSON en localStorage
             localStorage.setItem('profilePic', JSON.stringify(datosUsuario.profilePic));
+            
+            // Actualizar también el objeto usuario completo en localStorage
+            if (localStorage.getItem('user')) {
+              const userStored = JSON.parse(localStorage.getItem('user'));
+              userStored.profilePic = datosUsuario.profilePic;
+              localStorage.setItem('user', JSON.stringify(userStored));
+            }
+            
             console.log("📦 Actualizado localStorage con nueva imagen");
           } else {
             console.log("✓ No hay cambios en la imagen de perfil");
@@ -250,10 +259,14 @@ export function UserProvider({ children }) {
       profilePic: imageUrl
     } : null);
     
-    // Actualizar también en localStorage
-    localStorage.setItem("profilePic", imageUrl);
+    // Si es un objeto, guardar como JSON
+    if (typeof imageUrl === 'object') {
+      localStorage.setItem("profilePic", JSON.stringify(imageUrl));
+    } else {
+      localStorage.setItem("profilePic", imageUrl);
+    }
     
-    // Si guardas el usuario completo en localStorage, actualízalo también
+    // Actualizar usuario completo
     if (localStorage.getItem('user')) {
       const storedUser = JSON.parse(localStorage.getItem('user'));
       storedUser.profilePic = imageUrl;

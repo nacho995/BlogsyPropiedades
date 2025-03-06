@@ -103,61 +103,47 @@ export default function Navbar() {
     };
   }, [navigate]);
 
-  // Función mejorada para renderizar avatar con diagnóstico
+  // Función mejorada para renderizar avatar
   const renderUserAvatar = (user) => {
-    // Evitar renderizado si no hay usuario
     if (!user) return null;
     
-    // Obtener la URL de la imagen desde diversas fuentes
-    let profileImageUrl = '';
+    let imageUrl = '';
     
-    // Si user.profilePic es un objeto con src
-    if (user.profilePic && user.profilePic.src) {
-      profileImageUrl = user.profilePic.src;
-    } 
-    // Si user.profilePic es directamente una URL
-    else if (typeof user.profilePic === 'string') {
-      profileImageUrl = user.profilePic;
-    }
-    // Si hay imagen en localStorage (recuperarla y parsear si es necesario)
-    else {
-      const localStorageImg = localStorage.getItem('profilePic');
-      if (localStorageImg) {
+    // Determinar la URL de la imagen según el tipo de dato
+    if (typeof user.profilePic === 'object' && user.profilePic?.src) {
+      imageUrl = user.profilePic.src;
+    } else if (typeof user.profilePic === 'string') {
+      imageUrl = user.profilePic;
+    } else {
+      // Intentar obtener del localStorage (podría ser un string JSON)
+      const storedPic = localStorage.getItem('profilePic');
+      if (storedPic) {
         try {
-          const parsedImg = JSON.parse(localStorageImg);
-          profileImageUrl = parsedImg.src || '';
+          // Intentar parsear como JSON
+          const picObj = JSON.parse(storedPic);
+          imageUrl = picObj.src || picObj;
         } catch (e) {
-          // Si no es JSON, podría ser directamente una URL
-          profileImageUrl = localStorageImg;
+          // Si no es JSON válido, usar como string
+          imageUrl = storedPic;
         }
       }
     }
     
-    // Usar imagen de respaldo si existe
-    if (!profileImageUrl) {
-      const backupImg = localStorage.getItem('profilePic_local');
-      if (backupImg) profileImageUrl = backupImg;
-    }
+    // Agregar timestamp para evitar caché del navegador
+    const finalUrl = imageUrl ? `${imageUrl}?t=${Date.now()}` : null;
     
-    // Añadir timestamp para evitar caché
-    const imageUrl = profileImageUrl ? `${profileImageUrl}?t=${Date.now()}` : null;
-    
-    if (imageUrl) {
-      console.log("✅ Usando imagen:", imageUrl.substring(0, 50) + "...");
+    if (finalUrl) {
       return (
         <img
-          className="h-8 w-8 rounded-full"
-          src={imageUrl}
+          className="h-8 w-8 rounded-full" 
+          src={finalUrl}
           alt={`${user?.name || 'Usuario'}`}
-          onError={(e) => {
-            console.log("❌ Error cargando imagen en NavBar:", e.target.src.substring(0, 50) + "...");
-            handleImageError(e);
-          }}
+          onError={handleImageError}
           data-type="profile"
         />
       );
     } else {
-      console.log("ℹ️ No hay imagen disponible, mostrando avatar con iniciales");
+      // Fallback a avatar con iniciales
       return (
         <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
           <span className="text-gray-600 font-semibold">
