@@ -5,6 +5,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { toast } from 'react-hot-toast';
 
+// IMPORTANTE: Declarar las variables globales FUERA del componente
+// para evitar problemas de inicialización
 const navigation = [
   { name: 'Dashboard', href: '/', current: false },
   { name: 'Añadir Blog', href: '/crear-blog', current: false },
@@ -12,6 +14,14 @@ const navigation = [
   { name: 'Añadir Propiedades', href: '/add-property', current: false },
   { name: 'Ver Propiedades', href: '/propiedades', current: false },
 ];
+
+// Imágenes predeterminadas estáticas - fuera del componente
+const IMG_DEFAULTS = {
+  profile: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
+  property: "https://place-hold.it/300x200?text=Propiedad",
+  blog: "https://place-hold.it/300x200?text=Blog",
+  fallback: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150'%3E%3Ccircle cx='75' cy='75' r='75' fill='%23ccc'/%3E%3C/svg%3E"
+};
 
 function clases(...classes) {
   return classes.filter(Boolean).join(' ');
@@ -29,47 +39,24 @@ export default function Navbar() {
     ...item,
     current: location.pathname === item.href,
   }));
-
-  // Valor por defecto para la foto de perfil
-  const defaultProfilePic = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80";
-  const defaultPropertyImage = "https://place-hold.it/300x200?text=Propiedad";
-  const defaultBlogImage = "https://place-hold.it/300x200?text=Blog";
   
   // Manejar el cierre de sesión
   const handleLogout = () => {
     logout();
   };
 
+  // Función simplificada para manejar errores de imagen
   const handleImageError = (e) => {
     console.log("Error cargando imagen, usando imagen predeterminada");
     
-    // Imagen fallback que funciona siempre (data URI)
-    const fallbackImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150'%3E%3Ccircle cx='75' cy='75' r='75' fill='%23ccc'/%3E%3C/svg%3E";
-    
-    const type = e.target.dataset.type;
-    switch(type) {
-      case 'profile':
-        e.target.src = defaultProfilePic;
-        break;
-      case 'property':
-        e.target.src = defaultPropertyImage;
-        break;
-      case 'blog':
-        e.target.src = defaultBlogImage;
-        break;
-      default:
-        e.target.src = fallbackImage;
-    }
-    
+    const type = e.target.dataset.type || 'fallback';
+    e.target.src = IMG_DEFAULTS[type] || IMG_DEFAULTS.fallback;
     e.target.onerror = null; // Evitar recursión infinita
   };
 
   useEffect(() => {
     const handleSessionExpired = (event) => {
-      // Mostrar mensaje amigable
       toast.error(event.detail?.message || 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
-      
-      // Redirigir al login después de un breve retraso
       setTimeout(() => {
         navigate('/login');
       }, 1000);
@@ -144,7 +131,7 @@ export default function Navbar() {
                     <span className="sr-only">Open user menu</span>
                     <img
                       className="h-8 w-8 rounded-full"
-                      src={user?.profilePic || defaultProfilePic}
+                      src={user?.profilePic || IMG_DEFAULTS.profile}
                       alt=""
                       onError={handleImageError}
                       data-type="profile"
