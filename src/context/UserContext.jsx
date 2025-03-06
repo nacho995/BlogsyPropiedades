@@ -36,9 +36,7 @@ export function UserProvider({ children }) {
       }
       
       if (storedToken) {
-        console.log("Refrescando datos del usuario con token:", storedToken);
         const userData = await getUserProfile(storedToken);
-        console.log("Datos de usuario actualizados:", userData);
         
         // Convertir URLs HTTP a HTTPS
         if (userData.profilePic && typeof userData.profilePic === 'string') {
@@ -102,8 +100,6 @@ export function UserProvider({ children }) {
         throw new Error("Datos de login incompletos");
       }
       
-      console.log("Guardando datos de login:", userData);
-      
       // Guardar en localStorage
       localStorage.setItem("token", userData.token || "");
       
@@ -135,7 +131,6 @@ export function UserProvider({ children }) {
         
         // Guardar en localStorage
         localStorage.setItem("profilePic", profilePicUrl);
-        console.log("Imagen de perfil guardada en localStorage:", profilePicUrl);
       }
       
       // Si userData.user está presente, usamos esa estructura

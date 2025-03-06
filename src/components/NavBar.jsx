@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, Fragment } from 'react';
 import { Button, Disclosure, DisclosureButton, DisclosurePanel, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react';
 import { Bars3Icon, BellIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -109,30 +109,20 @@ export default function Navbar() {
                   </MenuButton>
                   <MenuItems className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                     <MenuItem>
-                      {({ active }) => (
-                        <Link
-                          to="/cambiar-perfil"
-                          className={clases(
-                            active ? 'bg-gray-100' : '',
-                            'block px-4 py-2 text-sm text-gray-700'
-                          )}
-                        >
-                          Tu Perfil
-                        </Link>
-                      )}
+                      <Link
+                        to="/cambiar-perfil"
+                        className="block px-4 py-2 text-sm text-gray-700 ui-active:bg-gray-100"
+                      >
+                        Mi perfil
+                      </Link>
                     </MenuItem>
                     <MenuItem>
-                      {({ active }) => (
-                        <button
-                          onClick={handleLogout}
-                          className={clases(
-                            active ? 'bg-gray-100' : '',
-                            'block w-full text-left px-4 py-2 text-sm text-gray-700'
-                          )}
-                        >
-                          Cerrar Sesión
-                        </button>
-                      )}
+                      <button
+                        onClick={handleLogout}
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 ui-active:bg-gray-100"
+                      >
+                        Cerrar Sesión
+                      </button>
                     </MenuItem>
                   </MenuItems>
                 </Menu>
