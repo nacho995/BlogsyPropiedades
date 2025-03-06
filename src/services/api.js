@@ -172,10 +172,22 @@ export const createUser = async (data) => {
  */
 export const loginUser = async (credentials) => {
   try {
-    return await fetchAPI('/user/login', {
+    const response = await fetchAPI('/user/login', {
       method: 'POST',
       body: JSON.stringify(credentials)
     });
+    
+    console.log("Respuesta de login completa:", response);
+    
+    // Verificar estructura de respuesta para adaptarnos al formato del backend
+    if (response && response.token) {
+      return response; // { token, user }
+    } else if (response && response.data && response.data.token) {
+      return response.data; // { data: { token, user } }
+    } else {
+      console.error("Estructura de respuesta de login inesperada:", response);
+      throw new Error("Formato de respuesta incorrecto");
+    }
   } catch (error) {
     console.error('Error en login:', error);
     throw error;
@@ -450,12 +462,23 @@ export const getCurrentUser = async (tokenParam) => {
 // Función para obtener el perfil del usuario
 export async function getUserProfile(token) {
   try {
-    // Usamos la ruta correcta de tu API y fetchAPI para mantener consistencia
-    return await fetchAPI('/user/me', {
-      headers: {
-        'Authorization': `Bearer ${token || localStorage.getItem('token')}`
-      }
-    });
+    // La ruta correcta puede variar según tu API
+    // Primero intentamos con /user/me
+    try {
+      return await fetchAPI('/user/me', {
+        headers: {
+          'Authorization': `Bearer ${token || localStorage.getItem('token')}`
+        }
+      });
+    } catch (error) {
+      console.log("Intento fallido con /user/me, intentando con /user/profile");
+      // Si falla, intentamos con /user/profile como alternativa
+      return await fetchAPI('/user/profile', {
+        headers: {
+          'Authorization': `Bearer ${token || localStorage.getItem('token')}`
+        }
+      });
+    }
   } catch (error) {
     console.error('Error al obtener perfil:', error);
     throw error;

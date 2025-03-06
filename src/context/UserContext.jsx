@@ -13,10 +13,27 @@ export function UserProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   
+  // Función auxiliar para verificar token
+  const isValidToken = (token) => {
+    if (!token) return false;
+    
+    // Verificar estructura básica de JWT (3 partes separadas por puntos)
+    const parts = token.split('.');
+    return parts.length === 3;
+  };
+
   // Función para actualizar la información del usuario
   const refreshUserData = async () => {
     try {
       const storedToken = localStorage.getItem('token');
+      
+      // Verificar si el token tiene formato válido
+      if (!isValidToken(storedToken)) {
+        console.error("Token con formato inválido:", storedToken);
+        logout();
+        return;
+      }
+      
       if (storedToken) {
         console.log("Refrescando datos del usuario con token:", storedToken);
         const userData = await getUserProfile(storedToken);
@@ -65,21 +82,50 @@ export function UserProvider({ children }) {
   
   // Función de login
   const login = (userData) => {
-    // Guardar en localStorage
-    localStorage.setItem("token", userData.token || "");
-    localStorage.setItem("name", userData.name || "");
-    localStorage.setItem("profilePic", userData.profilePic || "");
-    
-    // Actualizar estado
-    setUser({
-      token: userData.token,
-      name: userData.name,
-      profilePic: userData.profilePic
-    });
-    setIsAuthenticated(true);
-    
-    // Refrescar datos inmediatamente para asegurar tener la info más actualizada
-    refreshUserData();
+    try {
+      // Validar datos básicos
+      if (!userData || !userData.token) {
+        console.error("Datos de login incompletos:", userData);
+        throw new Error("Datos de login incompletos");
+      }
+      
+      console.log("Guardando datos de login:", userData);
+      
+      // Guardar en localStorage
+      localStorage.setItem("token", userData.token || "");
+      
+      // Si userData.user está presente, usamos esa estructura
+      if (userData.user) {
+        localStorage.setItem("name", userData.user.name || "");
+        localStorage.setItem("profilePic", userData.user.profilePic || "");
+        
+        // Actualizar estado
+        setUser({
+          token: userData.token,
+          ...userData.user
+        });
+      } else {
+        // Estructura antigua
+        localStorage.setItem("name", userData.name || "");
+        localStorage.setItem("profilePic", userData.profilePic || "");
+        
+        // Actualizar estado
+        setUser({
+          token: userData.token,
+          name: userData.name,
+          profilePic: userData.profilePic
+        });
+      }
+      
+      setIsAuthenticated(true);
+      
+      // Refrescar datos inmediatamente para asegurar tener la info más actualizada
+      setTimeout(() => {
+        refreshUserData();
+      }, 500); // Pequeño retraso para asegurar que localStorage está actualizado
+    } catch (error) {
+      console.error("Error en función login:", error);
+    }
   };
   
   // Función de logout
@@ -102,7 +148,9 @@ export function UserProvider({ children }) {
     isAuthenticated,
     setIsAuthenticated,
     loading,
-    refreshUserData
+    refreshUserData,
+    login,
+    logout
   };
   
   return (
