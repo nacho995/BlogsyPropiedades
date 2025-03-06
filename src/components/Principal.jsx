@@ -34,17 +34,47 @@ function Principal() {
       // Función para cargar datos
       const fetchData = async () => {
         try {
-          // Llamadas a API para cargar propiedades y blogs
-          // const propertiesResponse = await fetch('/api/properties');
-          // const blogsResponse = await fetch('/api/blogs');
-          
-          // Simulando respuestas para el ejemplo
           setTimeout(() => {
-            setProperties([{ id: 1, title: 'Propiedad 1' }, { id: 2, title: 'Propiedad 2' }]);
-            setBlogs([{ id: 1, title: 'Blog 1' }, { id: 2, title: 'Blog 2' }]);
+            setProperties([
+              { 
+                id: 1, 
+                title: 'Propiedad 1', 
+                description: 'Descripción de la propiedad 1',
+                image: { 
+                  src: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?q=80&w=1000&auto=format&fit=crop' 
+                }
+              },
+              { 
+                id: 2, 
+                title: 'Propiedad 2', 
+                description: 'Descripción de la propiedad 2',
+                image: { 
+                  src: 'https://images.unsplash.com/photo-1560185127-6ed189bf02f4?q=80&w=1000&auto=format&fit=crop' 
+                }
+              }
+            ]);
+            
+            setBlogs([
+              { 
+                id: 1, 
+                title: 'Blog 1', 
+                description: 'Contenido del blog 1',
+                image: { 
+                  src: 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?q=80&w=1000&auto=format&fit=crop' 
+                }
+              },
+              { 
+                id: 2, 
+                title: 'Blog 2', 
+                description: 'Contenido del blog 2',
+                image: { 
+                  src: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=1000&auto=format&fit=crop' 
+                }
+              }
+            ]);
+            
             setLoading(false);
           }, 1000);
-          
         } catch (error) {
           console.error("Error cargando datos:", error);
           setLoading(false);
@@ -78,31 +108,17 @@ function Principal() {
   // Imagen de perfil por defecto
   const defaultProfilePic = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80";
 
-  // Añadir una función para depurar la estructura de imágenes
+  // Función simplificada similar a SeeBlogs
   const getImageUrl = (blog) => {
-    // Intentar obtener la imagen de varias fuentes posibles
-    if (blog.image && blog.image.src) return blog.image.src;
-    if (blog.image && typeof blog.image === 'string') return blog.image;
-    if (blog.images && blog.images.length > 0) {
-      if (typeof blog.images[0] === 'string') return blog.images[0];
-      if (blog.images[0] && blog.images[0].src) return blog.images[0].src;
-    }
-    
-    // Si no hay imagen, usar una URL de imagen estática de una CDN confiable
-    return 'https://cdn.jsdelivr.net/gh/twbs/icons@main/icons/image.svg';
+    return blog.image && blog.image.src 
+      ? blog.image.src 
+      : 'https://cdn.jsdelivr.net/gh/twbs/icons@main/icons/image.svg';
   };
 
   const getPropertyImageUrl = (property) => {
-    // Intentar obtener la imagen de varias fuentes posibles
-    if (property.image && property.image.src) return property.image.src;
-    if (property.image && typeof property.image === 'string') return property.image;
-    if (property.images && property.images.length > 0) {
-      if (typeof property.images[0] === 'string') return property.images[0];
-      if (property.images[0] && property.images[0].src) return property.images[0].src;
-    }
-    
-    // Si no hay imagen, usar una URL de imagen estática de una CDN confiable
-    return 'https://cdn.jsdelivr.net/gh/twbs/icons@main/icons/house.svg';
+    return property.image && property.image.src 
+      ? property.image.src 
+      : 'https://cdn.jsdelivr.net/gh/twbs/icons@main/icons/house.svg';
   };
 
   // Función para corregir URLs HTTP a HTTPS
@@ -228,17 +244,7 @@ function Principal() {
                             className="w-full h-full object-cover"
                             onError={(e) => {
                               console.log(`Error cargando imagen para blog ${blog.title}`);
-                              e.target.onerror = null;
-                              e.target.style.display = 'none';
-                              e.target.parentNode.style.backgroundColor = '#3b82f6';
-                              const icon = document.createElement('div');
-                              icon.innerHTML = '📝';
-                              icon.style.fontSize = '32px';
-                              icon.style.display = 'flex';
-                              icon.style.alignItems = 'center';
-                              icon.style.justifyContent = 'center';
-                              icon.style.height = '100%';
-                              e.target.parentNode.appendChild(icon);
+                              e.target.src = 'https://cdn.jsdelivr.net/gh/twbs/icons@main/icons/image.svg'; 
                             }}
                           />
                         </div>
