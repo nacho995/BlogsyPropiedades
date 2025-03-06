@@ -80,53 +80,29 @@ function Principal() {
 
   // Añadir una función para depurar la estructura de imágenes
   const getImageUrl = (blog) => {
-    console.log("Analizando imagen para blog:", blog.title);
-    let imageUrl = null;
-    
-    if (blog.image && blog.image.src) {
-      console.log("Encontrada imagen en format objeto.src:", blog.image.src);
-      imageUrl = blog.image.src;
-    } else if (blog.images && blog.images.length > 0) {
-      if (typeof blog.images[0] === 'string') {
-        console.log("Encontrada imagen en formato array de strings:", blog.images[0]);
-        imageUrl = blog.images[0];
-      } else if (blog.images[0] && blog.images[0].src) {
-        console.log("Encontrada imagen en formato array de objetos:", blog.images[0].src);
-        imageUrl = blog.images[0].src;
-      }
-    } else if (blog.image && typeof blog.image === 'string') {
-      console.log("Encontrada imagen en formato string directo:", blog.image);
-      imageUrl = blog.image;
+    // Intentar obtener la imagen de varias fuentes posibles
+    if (blog.image && blog.image.src) return blog.image.src;
+    if (blog.image && typeof blog.image === 'string') return blog.image;
+    if (blog.images && blog.images.length > 0) {
+      if (typeof blog.images[0] === 'string') return blog.images[0];
+      if (blog.images[0] && blog.images[0].src) return blog.images[0].src;
     }
     
-    if (!imageUrl) {
-      console.log("No se encontró imagen, usando placeholder");
-      imageUrl = 'https://via.placeholder.com/400x300?text=Blog+Image';
-    }
-    
-    return imageUrl;
+    // Si no hay imagen, usar una URL de imagen estática de una CDN confiable
+    return 'https://cdn.jsdelivr.net/gh/twbs/icons@main/icons/image.svg';
   };
 
   const getPropertyImageUrl = (property) => {
-    console.log("Analizando imagen para propiedad:", property.title);
-    let imageUrl = null;
-    
+    // Intentar obtener la imagen de varias fuentes posibles
+    if (property.image && property.image.src) return property.image.src;
+    if (property.image && typeof property.image === 'string') return property.image;
     if (property.images && property.images.length > 0) {
-      if (typeof property.images[0] === 'string') {
-        console.log("Encontrada imagen en formato string:", property.images[0]);
-        imageUrl = property.images[0];
-      } else if (property.images[0] && property.images[0].src) {
-        console.log("Encontrada imagen en formato objeto:", property.images[0].src);
-        imageUrl = property.images[0].src;
-      }
+      if (typeof property.images[0] === 'string') return property.images[0];
+      if (property.images[0] && property.images[0].src) return property.images[0].src;
     }
     
-    if (!imageUrl) {
-      console.log("No se encontró imagen, usando placeholder");
-      imageUrl = 'https://via.placeholder.com/400x300?text=Propiedad';
-    }
-    
-    return imageUrl;
+    // Si no hay imagen, usar una URL de imagen estática de una CDN confiable
+    return 'https://cdn.jsdelivr.net/gh/twbs/icons@main/icons/house.svg';
   };
 
   // Función para corregir URLs HTTP a HTTPS
@@ -253,7 +229,16 @@ function Principal() {
                             onError={(e) => {
                               console.log(`Error cargando imagen para blog ${blog.title}`);
                               e.target.onerror = null;
-                              e.target.src = 'https://via.placeholder.com/400x300?text=Sin+Imagen';
+                              e.target.style.display = 'none';
+                              e.target.parentNode.style.backgroundColor = '#3b82f6';
+                              const icon = document.createElement('div');
+                              icon.innerHTML = '📝';
+                              icon.style.fontSize = '32px';
+                              icon.style.display = 'flex';
+                              icon.style.alignItems = 'center';
+                              icon.style.justifyContent = 'center';
+                              icon.style.height = '100%';
+                              e.target.parentNode.appendChild(icon);
                             }}
                           />
                         </div>
@@ -307,7 +292,16 @@ function Principal() {
                             onError={(e) => {
                               console.log(`Error cargando imagen para propiedad ${property.title}`);
                               e.target.onerror = null;
-                              e.target.src = 'https://via.placeholder.com/400x300?text=Sin+Imagen';
+                              e.target.style.display = 'none';
+                              e.target.parentNode.style.backgroundColor = '#f59e0b';
+                              const icon = document.createElement('div');
+                              icon.innerHTML = '🏠';
+                              icon.style.fontSize = '32px';
+                              icon.style.display = 'flex';
+                              icon.style.alignItems = 'center';
+                              icon.style.justifyContent = 'center';
+                              icon.style.height = '100%';
+                              e.target.parentNode.appendChild(icon);
                             }}
                           />
                         </div>
@@ -329,7 +323,7 @@ function Principal() {
                               </svg>
                               {property.bedrooms || '3'} hab.
                             </div>
-                            <Link to={`/property/${property._id}`} className="text-amber-400 hover:text-amber-300 font-medium">
+                            <Link to={`/propiedades/${property._id}`} className="text-amber-400 hover:text-amber-300 font-medium">
                               Ver detalles →
                             </Link>
                           </div>
