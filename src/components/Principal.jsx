@@ -4,6 +4,9 @@ import { useUser } from "../context/UserContext";
 import { getBlogPosts, getPropertyPosts } from "../services/api";
 import { motion } from "framer-motion";
 
+// Console log para verificar si el componente se carga
+console.log("Componente Principal.jsx está siendo importado");
+
 function Principal() {
   // Estados mínimos necesarios
   const [blogs, setBlogs] = useState([]);
@@ -12,28 +15,60 @@ function Principal() {
   
   // Obtener datos del usuario
   const { user, isAuthenticated } = useUser();
+  
+  // Console log para verificar si el componente se monta
+  console.log("Componente Principal está renderizando");
 
   // Cargar datos una sola vez al montar
   useEffect(() => {
+    console.log("useEffect en Principal.jsx se ha ejecutado");
+    
     const fetchData = async () => {
+      console.log("Iniciando fetchData en Principal.jsx");
       setLoading(true);
       
       try {
-        // Cargar datos básicos
-        const blogsData = await getBlogPosts();
-        const propertiesData = await getPropertyPosts();
+        // Verificar si las funciones de API existen
+        console.log("Funciones API disponibles:", {
+          getBlogPosts: typeof getBlogPosts === 'function',
+          getPropertyPosts: typeof getPropertyPosts === 'function'
+        });
         
-        // Log para depuración
-        console.log("Datos de blogs cargados:", blogsData);
-        console.log("Datos de propiedades cargados:", propertiesData);
+        // Cargar datos básicos
+        console.log("Intentando cargar blogs...");
+        let blogsData;
+        try {
+          blogsData = await getBlogPosts();
+          console.log("Blogs cargados con éxito:", blogsData);
+        } catch (blogError) {
+          console.error("Error específico al cargar blogs:", blogError);
+          blogsData = [];
+        }
+        
+        console.log("Intentando cargar propiedades...");
+        let propertiesData;
+        try {
+          propertiesData = await getPropertyPosts();
+          console.log("Propiedades cargadas con éxito:", propertiesData);
+        } catch (propError) {
+          console.error("Error específico al cargar propiedades:", propError);
+          propertiesData = [];
+        }
         
         // Guardar solo los primeros 3 elementos
-        setBlogs(Array.isArray(blogsData) ? blogsData.slice(0, 3) : []);
-        setProperties(Array.isArray(propertiesData) ? propertiesData.slice(0, 3) : []);
+        const processedBlogs = Array.isArray(blogsData) ? blogsData.slice(0, 3) : [];
+        const processedProperties = Array.isArray(propertiesData) ? propertiesData.slice(0, 3) : [];
+        
+        console.log("Blogs procesados:", processedBlogs);
+        console.log("Propiedades procesadas:", processedProperties);
+        
+        setBlogs(processedBlogs);
+        setProperties(processedProperties);
       } catch (error) {
-        console.error("Error al cargar datos:", error);
+        console.error("Error general al cargar datos:", error);
       } finally {
         setLoading(false);
+        console.log("Carga de datos finalizada");
       }
     };
 
@@ -42,6 +77,57 @@ function Principal() {
 
   // Imagen de perfil por defecto
   const defaultProfilePic = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80";
+
+  // Añadir una función para depurar la estructura de imágenes
+  const getImageUrl = (blog) => {
+    console.log("Analizando imagen para blog:", blog.title);
+    let imageUrl = null;
+    
+    if (blog.image && blog.image.src) {
+      console.log("Encontrada imagen en format objeto.src:", blog.image.src);
+      imageUrl = blog.image.src;
+    } else if (blog.images && blog.images.length > 0) {
+      if (typeof blog.images[0] === 'string') {
+        console.log("Encontrada imagen en formato array de strings:", blog.images[0]);
+        imageUrl = blog.images[0];
+      } else if (blog.images[0] && blog.images[0].src) {
+        console.log("Encontrada imagen en formato array de objetos:", blog.images[0].src);
+        imageUrl = blog.images[0].src;
+      }
+    } else if (blog.image && typeof blog.image === 'string') {
+      console.log("Encontrada imagen en formato string directo:", blog.image);
+      imageUrl = blog.image;
+    }
+    
+    if (!imageUrl) {
+      console.log("No se encontró imagen, usando placeholder");
+      imageUrl = 'https://via.placeholder.com/400x300?text=Blog+Image';
+    }
+    
+    return imageUrl;
+  };
+
+  const getPropertyImageUrl = (property) => {
+    console.log("Analizando imagen para propiedad:", property.title);
+    let imageUrl = null;
+    
+    if (property.images && property.images.length > 0) {
+      if (typeof property.images[0] === 'string') {
+        console.log("Encontrada imagen en formato string:", property.images[0]);
+        imageUrl = property.images[0];
+      } else if (property.images[0] && property.images[0].src) {
+        console.log("Encontrada imagen en formato objeto:", property.images[0].src);
+        imageUrl = property.images[0].src;
+      }
+    }
+    
+    if (!imageUrl) {
+      console.log("No se encontró imagen, usando placeholder");
+      imageUrl = 'https://via.placeholder.com/400x300?text=Propiedad';
+    }
+    
+    return imageUrl;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-amber-600">
@@ -119,6 +205,7 @@ function Principal() {
 
       {/* Contenido principal */}
       <main className="max-w-6xl mx-auto py-12 px-4">
+        {console.log("Renderizando el contenido principal, loading:", loading)}
         {loading ? (
           <div className="flex justify-center items-center py-20">
             <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white"></div>
@@ -126,6 +213,7 @@ function Principal() {
         ) : (
           <div className="space-y-16">
             {/* Blogs */}
+            {console.log("Número de blogs a mostrar:", blogs.length)}
             {blogs.length > 0 && (
               <section>
                 <div className="flex items-center justify-between mb-8">
@@ -136,42 +224,50 @@ function Principal() {
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  {blogs.map((blog, index) => (
-                    <div 
-                      key={blog._id} 
-                      className="bg-white/10 backdrop-blur-md rounded-xl overflow-hidden shadow-lg border border-white/20 transform transition hover:scale-105"
-                      style={{ animationDelay: `${index * 0.1}s` }}
-                    >
-                      <div className="h-48 overflow-hidden">
-                        <img 
-                          src={(blog.image && blog.image.src) || (blog.images && blog.images.length > 0 ? blog.images[0].src || blog.images[0] : null) || blog.image || 'https://via.placeholder.com/400x300?text=Blog+Image'} 
-                          alt={blog.title} 
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = 'https://via.placeholder.com/400x300?text=Sin+Imagen';
-                          }}
-                        />
-                      </div>
-                      <div className="p-6">
-                        <h3 className="font-bold text-xl mb-2 text-white">{blog.title}</h3>
-                        <p className="text-blue-100 mb-4 line-clamp-2">{blog.description}</p>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-blue-200">
-                            {new Date(blog.createdAt).toLocaleDateString('es-ES')}
-                          </span>
-                          <Link to={`/blog/${blog._id}`} className="text-amber-400 hover:text-amber-300 font-medium">
-                            Leer más →
-                          </Link>
+                  {blogs.map((blog, index) => {
+                    console.log(`Renderizando blog ${index}:`, blog);
+                    const imageUrl = getImageUrl(blog);
+                    console.log(`URL de imagen final para blog ${index}:`, imageUrl);
+                    
+                    return (
+                      <div 
+                        key={blog._id} 
+                        className="bg-white/10 backdrop-blur-md rounded-xl overflow-hidden shadow-lg border border-white/20 transform transition hover:scale-105"
+                        style={{ animationDelay: `${index * 0.1}s` }}
+                      >
+                        <div className="h-48 overflow-hidden">
+                          <img 
+                            src={imageUrl}
+                            alt={blog.title} 
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              console.log(`Error cargando imagen para blog ${blog.title}`);
+                              e.target.onerror = null;
+                              e.target.src = 'https://via.placeholder.com/400x300?text=Sin+Imagen';
+                            }}
+                          />
+                        </div>
+                        <div className="p-6">
+                          <h3 className="font-bold text-xl mb-2 text-white">{blog.title}</h3>
+                          <p className="text-blue-100 mb-4 line-clamp-2">{blog.description}</p>
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-blue-200">
+                              {new Date(blog.createdAt).toLocaleDateString('es-ES')}
+                            </span>
+                            <Link to={`/blog/${blog._id}`} className="text-amber-400 hover:text-amber-300 font-medium">
+                              Leer más →
+                            </Link>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
             )}
 
             {/* Propiedades */}
+            {console.log("Número de propiedades a mostrar:", properties.length)}
             {properties.length > 0 && (
               <section>
                 <div className="flex items-center justify-between mb-8">
@@ -182,50 +278,55 @@ function Principal() {
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  {properties.map((property, index) => (
-                    <div 
-                      key={property._id} 
-                      className="bg-white/10 backdrop-blur-md rounded-xl overflow-hidden shadow-lg border border-white/20 transform transition hover:scale-105"
-                      style={{ animationDelay: `${index * 0.1}s` }}
-                    >
-                      <div className="h-48 overflow-hidden">
-                        <img 
-                          src={(property.images && property.images.length > 0) ? 
-                            (typeof property.images[0] === 'string' ? property.images[0] : property.images[0].src || null) : 
-                            'https://via.placeholder.com/400x300?text=Propiedad'} 
-                          alt={property.title} 
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = 'https://via.placeholder.com/400x300?text=Sin+Imagen';
-                          }}
-                        />
-                      </div>
-                      <div className="p-6">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="bg-amber-500 text-white text-xs font-semibold px-2.5 py-0.5 rounded-full">
-                            {property.propertyType || 'Venta'}
-                          </span>
-                          <span className="text-lg font-bold text-white">
-                            {property.price ? `${property.price.toLocaleString('es-ES')} €` : 'Consultar'}
-                          </span>
+                  {properties.map((property, index) => {
+                    console.log(`Renderizando propiedad ${index}:`, property);
+                    const imageUrl = getPropertyImageUrl(property);
+                    console.log(`URL de imagen final para propiedad ${index}:`, imageUrl);
+                    
+                    return (
+                      <div 
+                        key={property._id} 
+                        className="bg-white/10 backdrop-blur-md rounded-xl overflow-hidden shadow-lg border border-white/20 transform transition hover:scale-105"
+                        style={{ animationDelay: `${index * 0.1}s` }}
+                      >
+                        <div className="h-48 overflow-hidden">
+                          <img 
+                            src={imageUrl}
+                            alt={property.title} 
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              console.log(`Error cargando imagen para propiedad ${property.title}`);
+                              e.target.onerror = null;
+                              e.target.src = 'https://via.placeholder.com/400x300?text=Sin+Imagen';
+                            }}
+                          />
                         </div>
-                        <h3 className="font-bold text-xl mb-2 text-white">{property.title}</h3>
-                        <p className="text-blue-100 mb-4 line-clamp-2">{property.description}</p>
-                        <div className="flex justify-between items-center text-sm text-blue-200">
-                          <div className="flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                            </svg>
-                            {property.bedrooms || '3'} hab.
+                        <div className="p-6">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="bg-amber-500 text-white text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                              {property.propertyType || 'Venta'}
+                            </span>
+                            <span className="text-lg font-bold text-white">
+                              {property.price ? `${property.price.toLocaleString('es-ES')} €` : 'Consultar'}
+                            </span>
                           </div>
-                          <Link to={`/property/${property._id}`} className="text-amber-400 hover:text-amber-300 font-medium">
-                            Ver detalles →
-                          </Link>
+                          <h3 className="font-bold text-xl mb-2 text-white">{property.title}</h3>
+                          <p className="text-blue-100 mb-4 line-clamp-2">{property.description}</p>
+                          <div className="flex justify-between items-center text-sm text-blue-200">
+                            <div className="flex items-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                              </svg>
+                              {property.bedrooms || '3'} hab.
+                            </div>
+                            <Link to={`/property/${property._id}`} className="text-amber-400 hover:text-amber-300 font-medium">
+                              Ver detalles →
+                            </Link>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
             )}
