@@ -69,6 +69,33 @@ export default function Navbar() {
     };
   }, [navigate]);
 
+  // En el componente NavBar.jsx
+  // Agregar función auxiliar para renderizar avatar
+  const renderUserAvatar = (user) => {
+    // Buscar la imagen en ambas propiedades, primero en profileImage (Cloudinary)
+    const profileImage = user?.profileImage || user?.profilePic || null;
+    
+    if (profileImage) {
+      return (
+        <img
+          className="h-8 w-8 rounded-full object-cover"
+          src={`${profileImage}?t=${Date.now()}`}
+          alt={`${user.name || 'Usuario'}`}
+          onError={handleImageError}
+          data-type="profile"
+        />
+      );
+    } else {
+      return (
+        <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
+          <span className="text-gray-600 font-semibold">
+            {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+          </span>
+        </div>
+      );
+    }
+  };
+
   return (
     <Disclosure as="nav" className="bg-gray-800">
       <div className="mx-auto max-w-7xl px-2 sm:px-6 lg:px-8">
@@ -129,13 +156,7 @@ export default function Navbar() {
                 <Menu as="div" className="relative ml-3">
                   <MenuButton className="flex rounded-full bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-800">
                     <span className="sr-only">Open user menu</span>
-                    <img
-                      className="h-8 w-8 rounded-full"
-                      src={user?.profilePic ? `${user.profilePic}?t=${Date.now()}` : IMG_DEFAULTS.profile}
-                      alt=""
-                      onError={handleImageError}
-                      data-type="profile"
-                    />
+                    {renderUserAvatar(user)}
                   </MenuButton>
                   <MenuItems className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                     <MenuItem>

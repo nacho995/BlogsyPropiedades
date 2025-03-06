@@ -36,6 +36,16 @@ const ProfileImageUploader = ({ currentImageUrl, onImageUpdated }) => {
     }
   };
   
+  const renderInitialAvatar = (user) => {
+    return (
+      <div className="rounded-full w-32 h-32 bg-gray-300 flex items-center justify-center border-4 border-indigo-600">
+        <span className="text-gray-600 font-semibold text-5xl">
+          {user?.name ? user.name.charAt(0).toUpperCase() : '?'}
+        </span>
+      </div>
+    );
+  };
+  
   return (
     <div className="profile-image-uploader">
       <div className="image-preview mx-auto">
@@ -44,13 +54,13 @@ const ProfileImageUploader = ({ currentImageUrl, onImageUpdated }) => {
             src={previewImage} 
             alt="Imagen de perfil" 
             className="rounded-full w-32 h-32 object-cover border-4 border-indigo-600"
-            onError={(e) => e.target.src = "https://placehold.co/150"}
+            onError={(e) => {
+              console.log("Error cargando vista previa");
+              e.target.onerror = null; // Evitar bucle infinito
+              renderInitialAvatar(user);
+            }}
           />
-        ) : (
-          <div className="rounded-full w-32 h-32 bg-gray-200 flex items-center justify-center border-4 border-indigo-600">
-            <span className="text-gray-500">Sin imagen</span>
-          </div>
-        )}
+        ) : renderInitialAvatar(user)}
       </div>
       
       <div className="mt-4 text-center">

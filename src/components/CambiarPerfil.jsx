@@ -52,6 +52,29 @@ export default function CambiarPerfil() {
     }
   };
 
+  const renderUserAvatar = (user) => {
+    const profileImage = user?.profileImage || user?.profilePic || null;
+    
+    if (profileImage) {
+      return (
+        <img 
+          src={profileImage} 
+          alt={`${user?.name || 'Usuario'}`}
+          className="rounded-full w-32 h-32 object-cover border-4 border-indigo-600 mx-auto"
+          onError={(e) => e.target.src = "https://placehold.co/150"}
+        />
+      );
+    } else {
+      return (
+        <div className="rounded-full w-32 h-32 bg-gray-300 flex items-center justify-center border-4 border-indigo-600 mx-auto">
+          <span className="text-gray-600 font-semibold text-5xl">
+            {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+          </span>
+        </div>
+      );
+    }
+  };
+
   return (
     <div className="bg-gray-100 min-h-screen py-12">
       <div className="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden md:max-w-2xl p-8">
@@ -65,6 +88,11 @@ export default function CambiarPerfil() {
                 {message}
               </div>
             )}
+
+            <div className="mt-4 mb-6">
+              {renderUserAvatar(user)}
+              <p className="text-center text-gray-600 mt-2">{user?.name || 'Usuario'}</p>
+            </div>
 
             <form onSubmit={handleSubmit} className="mt-6">
               <div className="mb-6">

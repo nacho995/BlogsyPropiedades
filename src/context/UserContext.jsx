@@ -119,16 +119,25 @@ export function UserProvider({ children }) {
     // Guardar en localStorage
     localStorage.setItem("token", userData.token || "");
     localStorage.setItem("name", userData.name || "");
-    localStorage.setItem("profilePic", userData.profilePic || "");
-    localStorage.setItem("user", JSON.stringify(userData)); // Guardar todo el objeto
+    
+    // Guardar la imagen de perfil (considerar ambas propiedades)
+    const profilePic = userData.profileImage || userData.profilePic || "";
+    localStorage.setItem("profilePic", profilePic);
+    
+    localStorage.setItem("user", JSON.stringify({
+      ...userData,
+      profilePic // Asegurar que siempre tenemos profilePic consistente
+    }));
     
     // Actualizar estado
     setUser({
       token: userData.token,
       name: userData.name,
-      profilePic: userData.profilePic,
+      profilePic: profilePic,
+      profileImage: userData.profileImage, // Mantener ambas propiedades
       isAdmin: userData.isAdmin || false,
-      email: userData.email || ""
+      email: userData.email || "",
+      _updatedAt: new Date().toISOString()
     });
     setIsAuthenticated(true);
   };

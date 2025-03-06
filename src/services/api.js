@@ -268,16 +268,18 @@ export const updateProfile = async (userData) => {
     
     const result = await response.json();
     
-    // Aquí está la clave: actualizar inmediatamente localStorage
-    if (result.profilePic) {
-      localStorage.setItem('profilePic', result.profilePic);
+    // Guardar cualquiera de las propiedades de imagen que devuelva el servidor
+    const profilePic = result.profileImage || result.profilePic || "";
+    if (profilePic) {
+      localStorage.setItem('profilePic', profilePic);
       
       // También actualizar el objeto user en localStorage
       const userStr = localStorage.getItem('user');
       if (userStr) {
         try {
           const user = JSON.parse(userStr);
-          user.profilePic = result.profilePic;
+          user.profilePic = profilePic;
+          user.profileImage = result.profileImage; // Mantener ambas propiedades
           localStorage.setItem('user', JSON.stringify(user));
         } catch (e) {
           console.error("Error al actualizar user en localStorage:", e);
