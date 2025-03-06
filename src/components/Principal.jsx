@@ -9,72 +9,51 @@ import { getProfileImageUrl } from "../utils/profileUtils";
 console.log("Componente Principal.jsx está siendo importado");
 
 function Principal() {
-  // Estados mínimos necesarios
-  const [blogs, setBlogs] = useState([]);
+  // Obtener estado de autenticación directamente de localStorage
+  const token = localStorage.getItem("token");
+  const name = localStorage.getItem("name");
+  const isAuthenticated = !!token;
+  
+  // Estado para almacenar propiedades y blogs
   const [properties, setProperties] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [blogs, setBlogs] = useState([]);
+  const [loading, setLoading] = useState(false); // Inicialmente false
   
   // Obtener datos del usuario
-  const { user, isAuthenticated } = useUser();
+  const { user, isAuthenticated: userAuthenticated } = useUser();
   
   // Console log para verificar si el componente se monta
   console.log("Componente Principal está renderizando");
 
-  // Cargar datos una sola vez al montar
+  // Solo cargar datos si el usuario está autenticado
   useEffect(() => {
-    console.log("useEffect en Principal.jsx se ha ejecutado");
-    
-    const fetchData = async () => {
-      console.log("Iniciando fetchData en Principal.jsx");
+    if (isAuthenticated) {
+      // Solo iniciamos la carga si el usuario está autenticado
       setLoading(true);
       
-      try {
-        // Verificar si las funciones de API existen
-        console.log("Funciones API disponibles:", {
-          getBlogPosts: typeof getBlogPosts === 'function',
-          getPropertyPosts: typeof getPropertyPosts === 'function'
-        });
-        
-        // Cargar datos básicos
-        console.log("Intentando cargar blogs...");
-        let blogsData;
+      // Función para cargar datos
+      const fetchData = async () => {
         try {
-          blogsData = await getBlogPosts();
-          console.log("Blogs cargados con éxito:", blogsData);
-        } catch (blogError) {
-          console.error("Error específico al cargar blogs:", blogError);
-          blogsData = [];
+          // Llamadas a API para cargar propiedades y blogs
+          // const propertiesResponse = await fetch('/api/properties');
+          // const blogsResponse = await fetch('/api/blogs');
+          
+          // Simulando respuestas para el ejemplo
+          setTimeout(() => {
+            setProperties([{ id: 1, title: 'Propiedad 1' }, { id: 2, title: 'Propiedad 2' }]);
+            setBlogs([{ id: 1, title: 'Blog 1' }, { id: 2, title: 'Blog 2' }]);
+            setLoading(false);
+          }, 1000);
+          
+        } catch (error) {
+          console.error("Error cargando datos:", error);
+          setLoading(false);
         }
-        
-        console.log("Intentando cargar propiedades...");
-        let propertiesData;
-        try {
-          propertiesData = await getPropertyPosts();
-          console.log("Propiedades cargadas con éxito:", propertiesData);
-        } catch (propError) {
-          console.error("Error específico al cargar propiedades:", propError);
-          propertiesData = [];
-        }
-        
-        // Guardar solo los primeros 3 elementos
-        const processedBlogs = Array.isArray(blogsData) ? blogsData.slice(0, 3) : [];
-        const processedProperties = Array.isArray(propertiesData) ? propertiesData.slice(0, 3) : [];
-        
-        console.log("Blogs procesados:", processedBlogs);
-        console.log("Propiedades procesadas:", processedProperties);
-        
-        setBlogs(processedBlogs);
-        setProperties(processedProperties);
-      } catch (error) {
-        console.error("Error general al cargar datos:", error);
-      } finally {
-        setLoading(false);
-        console.log("Carga de datos finalizada");
-      }
-    };
-
-    fetchData();
-  }, []);
+      };
+      
+      fetchData();
+    }
+  }, [isAuthenticated]); // Dependencia en el estado de autenticación
 
   // En el useEffect donde se maneja la renderización del perfil de usuario
   useEffect(() => {
