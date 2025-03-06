@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { UserProvider } from './context/UserContext';
 import Navbar from './components/NavBar';
+import ImageLoader from './components/ImageLoader';
 
 import SignIn from './components/SignIn';
 import BlogCreation from './components/blogCreation';
@@ -20,6 +21,7 @@ function App() {
     return (
         <BrowserRouter>
             <UserProvider>
+                <ImageLoader />
                 <div className="App">
                     <Navbar />
                     <Routes>

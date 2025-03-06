@@ -107,13 +107,27 @@ export function UserProvider({ children }) {
       // Guardar en localStorage
       localStorage.setItem("token", userData.token || "");
       
+      // Extraer y guardar la URL de la imagen
+      let profilePicUrl = "";
+      
+      if (userData.profilePic) {
+        if (typeof userData.profilePic === 'string') {
+          profilePicUrl = userData.profilePic;
+        } else if (userData.profilePic.src) {
+          profilePicUrl = userData.profilePic.src;
+        }
+        
+        // Convertir a HTTPS
+        if (profilePicUrl.startsWith('http:')) {
+          profilePicUrl = profilePicUrl.replace('http:', 'https:');
+        }
+        
+        // Guardar en localStorage
+        localStorage.setItem("profilePic", profilePicUrl);
+      }
+      
       // Si userData.user está presente, usamos esa estructura
       if (userData.user) {
-        // Convertir la URL a HTTPS antes de guardarla
-        const profilePicUrl = ensureHttps(userData.user.profilePic);
-        localStorage.setItem("name", userData.user.name || "");
-        localStorage.setItem("profilePic", profilePicUrl || "");
-        
         // Actualizar estado
         setUser({
           token: userData.token,
@@ -122,11 +136,6 @@ export function UserProvider({ children }) {
         });
       } else {
         // Estructura antigua
-        // Convertir la URL a HTTPS antes de guardarla
-        const profilePicUrl = ensureHttps(userData.profilePic);
-        localStorage.setItem("name", userData.name || "");
-        localStorage.setItem("profilePic", profilePicUrl || "");
-        
         // Actualizar estado
         setUser({
           token: userData.token,
@@ -142,7 +151,7 @@ export function UserProvider({ children }) {
         refreshUserData();
       }, 500); // Pequeño retraso para asegurar que localStorage está actualizado
     } catch (error) {
-      console.error("Error en función login:", error);
+      console.error("Error en login:", error);
     }
   };
   

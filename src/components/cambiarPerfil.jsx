@@ -16,12 +16,10 @@ export default function CambiarPerfil() {
   // Manejar cambio de imagen con manejo de errores mejorado
   const handleFileChange = (e) => {
     const file = e.target.files[0];
-    
     if (file) {
       console.log("Archivo seleccionado:", file.name);
       setProfilePic(file);
-      
-      // No mostrar vista previa para evitar el error
+      // NO intentar crear vista previa para evitar el error startsWith
       setPreviewUrl(null);
     }
   };
@@ -121,26 +119,9 @@ export default function CambiarPerfil() {
           />
         </div>
         
-        {previewUrl && (
+        {profilePic && (
           <div className="mb-4">
-            <p className="text-gray-700 mb-2">
-              {previewUrl === "imagen-seleccionada" 
-                ? "✅ Imagen seleccionada correctamente" 
-                : "Vista previa:"}
-            </p>
-            {previewUrl !== "imagen-seleccionada" && (
-              <div className="w-32 h-32 rounded-full overflow-hidden border">
-                <img 
-                  src={previewUrl} 
-                  alt="Vista previa" 
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    console.error("Error en vista previa");
-                    e.target.src = "https://via.placeholder.com/100?text=Error"; 
-                  }}
-                />
-              </div>
-            )}
+            <p className="text-gray-700 mb-2">✅ Imagen seleccionada: {profilePic.name}</p>
           </div>
         )}
         
