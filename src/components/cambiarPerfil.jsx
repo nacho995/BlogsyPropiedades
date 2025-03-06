@@ -13,16 +13,39 @@ export default function CambiarPerfil() {
   const navigate = useNavigate();
   const { user, refreshUserData } = useUser();
   
-  // Manejar cambio de imagen
+  // Manejar cambio de imagen con manejo de errores mejorado
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
+    try {
+      const file = e.target.files[0];
+      console.log("Archivo seleccionado:", file);
+      
+      if (!file) return;
+      
       setProfilePic(file);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setPreviewUrl(reader.result);
-      };
-      reader.readAsDataURL(file);
+      
+      // Crear URL segura para la vista previa
+      try {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (event.target && typeof event.target.result === 'string') {
+            console.log("Vista previa URL generada correctamente");
+            setPreviewUrl(event.target.result);
+          } else {
+            console.error("FileReader no generó un resultado válido:", event.target.result);
+            setPreviewUrl(null);
+          }
+        };
+        reader.onerror = (error) => {
+          console.error("Error en FileReader:", error);
+          setPreviewUrl(null);
+        };
+        reader.readAsDataURL(file);
+      } catch (readerError) {
+        console.error("Error al crear vista previa:", readerError);
+        setPreviewUrl(null);
+      }
+    } catch (error) {
+      console.error("Error general en handleFileChange:", error);
     }
   };
   
@@ -40,14 +63,32 @@ export default function CambiarPerfil() {
       setError(null);
       
       // Crear objeto con datos
-      const userData = {};
-      if (name) userData.name = name;
-      if (profilePic) userData.profilePic = profilePic;
+      const userData = new FormData(); // Usar FormData directamente
+      if (name) userData.append('name', name);
+      if (profilePic) userData.append('profilePic', profilePic);
       
-      // Enviar al servidor
+      console.log("Enviando datos de actualización:", {
+        name: name || "(sin cambios)",
+        profilePic: profilePic ? profilePic.name : "(sin cambios)"
+      });
+      
+      // Enviar al servidor directamente usando fetch en lugar de la función updateProfile
       const token = localStorage.getItem("token");
-      const result = await updateProfile(userData, token);
+      const response = await fetch(`${import.meta.env.VITE_API_PUBLIC_API_URL}/user/update-profile`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: userData
+      });
       
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error del servidor:", errorText);
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
       console.log("Perfil actualizado:", result);
       
       // Actualizar el contexto del usuario
@@ -64,6 +105,66 @@ export default function CambiarPerfil() {
   };
   
   return (
-    // ... resto del componente ...
+    <div className="max-w-md mx-auto my-10 p-6 bg-white rounded-lg shadow-md">
+      <h2 className="text-2xl font-bold mb-6">Cambiar Perfil</h2>
+      
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+      
+      <form onSubmit={handleSubmit}>
+        <div className="mb-4">
+          <label className="block text-gray-700 mb-2" htmlFor="name">
+            Nombre
+          </label>
+          <input
+            id="name"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full p-2 border rounded"
+            placeholder="Nuevo nombre"
+          />
+        </div>
+        
+        <div className="mb-4">
+          <label className="block text-gray-700 mb-2" htmlFor="profilePic">
+            Imagen de perfil
+          </label>
+          <input
+            id="profilePic"
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="w-full p-2 border rounded"
+          />
+        </div>
+        
+        {previewUrl && (
+          <div className="mb-4">
+            <p className="text-gray-700 mb-2">Vista previa:</p>
+            <div className="w-32 h-32 rounded-full overflow-hidden border">
+              <img 
+                src={previewUrl}
+                alt="Vista previa" 
+                className="w-full h-full object-cover"
+              />
+            </div>
+          </div>
+        )}
+        
+        <button
+          type="submit"
+          disabled={loading}
+          className={`w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 ${
+            loading ? "opacity-50 cursor-not-allowed" : ""
+          }`}
+        >
+          {loading ? "Guardando..." : "Guardar cambios"}
+        </button>
+      </form>
+    </div>
   );
 } 

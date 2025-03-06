@@ -22,6 +22,12 @@ export function UserProvider({ children }) {
     return parts.length === 3;
   };
 
+  // Función auxiliar para asegurar URLs HTTPS
+  const ensureHttps = (url) => {
+    if (!url) return null;
+    return typeof url === 'string' ? url.replace('http://', 'https://') : url;
+  };
+
   // Función para actualizar la información del usuario
   const refreshUserData = async () => {
     try {
@@ -39,9 +45,21 @@ export function UserProvider({ children }) {
         const userData = await getUserProfile(storedToken);
         console.log("Datos de usuario actualizados:", userData);
         
+        // Convertir URLs HTTP a HTTPS
+        if (userData.profilePic && typeof userData.profilePic === 'string') {
+          userData.profilePic = ensureHttps(userData.profilePic);
+        } else if (userData.profilePic && userData.profilePic.src) {
+          userData.profilePic.src = ensureHttps(userData.profilePic.src);
+        }
+        
         // También actualizar el localStorage con los datos más recientes
         if (userData.name) localStorage.setItem("name", userData.name);
-        if (userData.profilePic) localStorage.setItem("profilePic", userData.profilePic);
+        if (userData.profilePic) {
+          const profilePicUrl = typeof userData.profilePic === 'string' 
+            ? userData.profilePic 
+            : (userData.profilePic.src || '');
+          localStorage.setItem("profilePic", profilePicUrl);
+        }
         
         setUser({
           ...userData,

@@ -135,6 +135,12 @@ function Principal() {
     return imageUrl;
   };
 
+  // Función para corregir URLs HTTP a HTTPS
+  const ensureHttps = (url) => {
+    if (!url) return null;
+    return typeof url === 'string' ? url.replace('http://', 'https://') : url;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-amber-600">
       {/* Hero Section con efecto de vidrio esmerilado */}
@@ -192,9 +198,13 @@ function Principal() {
                   <div className="absolute inset-0 bg-gradient-to-r from-amber-500 to-blue-600 rounded-full animate-spin-slow opacity-70 blur-md"></div>
                   <div className="relative w-40 h-40 rounded-full overflow-hidden border-4 border-white shadow-xl">
                     <img 
-                      src={`${user?.profilePic || defaultProfilePic}?t=${new Date().getTime()}`} 
+                      src={ensureHttps(user?.profilePic) || defaultProfilePic}
                       alt="Perfil" 
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        console.log("Error cargando imagen de perfil");
+                        e.target.src = defaultProfilePic;
+                      }}
                     />
                   </div>
                   <div className="absolute -bottom-2 -right-2 bg-green-500 rounded-full p-2 border-2 border-white">
