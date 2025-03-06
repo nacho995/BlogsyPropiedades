@@ -141,6 +141,44 @@ function Principal() {
     return typeof url === 'string' ? url.replace('http://', 'https://') : url;
   };
 
+  // Función mejorada para obtener la URL de la imagen de perfil
+  const getProfileImageUrl = (user) => {
+    if (!user) return defaultProfilePic;
+    
+    let imageUrl = null;
+    
+    // Caso 1: profilePic es un string directo
+    if (typeof user.profilePic === 'string') {
+      imageUrl = user.profilePic;
+    } 
+    // Caso 2: profilePic es un objeto con src
+    else if (user.profilePic && user.profilePic.src) {
+      imageUrl = user.profilePic.src;
+    } 
+    // Caso 3: profilePic es un objeto con url
+    else if (user.profilePic && user.profilePic.url) {
+      imageUrl = user.profilePic.url;
+    }
+    // Caso 4: existe profileImage como alternativa
+    else if (user.profileImage) {
+      if (typeof user.profileImage === 'string') {
+        imageUrl = user.profileImage;
+      } else if (user.profileImage.src) {
+        imageUrl = user.profileImage.src;
+      } else if (user.profileImage.url) {
+        imageUrl = user.profileImage.url;
+      }
+    }
+    
+    // Si no encontramos ninguna imagen, usar la predeterminada
+    if (!imageUrl) {
+      return defaultProfilePic;
+    }
+    
+    // Asegurar HTTPS
+    return ensureHttps(imageUrl);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-amber-600">
       {/* Hero Section con efecto de vidrio esmerilado */}
@@ -198,7 +236,7 @@ function Principal() {
                   <div className="absolute inset-0 bg-gradient-to-r from-amber-500 to-blue-600 rounded-full animate-spin-slow opacity-70 blur-md"></div>
                   <div className="relative w-40 h-40 rounded-full overflow-hidden border-4 border-white shadow-xl">
                     <img 
-                      src={ensureHttps(user?.profilePic) || defaultProfilePic}
+                      src={getProfileImageUrl(user)}
                       alt="Perfil" 
                       className="w-full h-full object-cover"
                       onError={(e) => {
