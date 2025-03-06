@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useHistory } from "react-router-dom";
 import { useUser } from "../context/UserContext";
-import { getBlogPosts, getPropertyPosts } from "../services/api";
+import { getBlogPosts, getPropertyPosts, syncProfileImage } from "../services/api"; // Import the new API function
 import { motion } from "framer-motion";
 import { getProfileImageUrl } from "../utils/profileUtils";
 
@@ -18,6 +18,7 @@ function Principal() {
   
   // Obtener datos del usuario
   const { user, isAuthenticated: userAuthenticated } = useUser();
+  const history = useHistory();
 
   // Cargar datos reales de la API
   useEffect(() => {
@@ -35,14 +36,21 @@ function Principal() {
         setBlogs(blogsData.slice(0, 3));
         setProperties(propertiesData.slice(0, 3));
       } catch (error) {
-        console.error("Error cargando datos:", error);
+        if (error.response && error.response.status === 401) {
+          // Token expirado o no válido, redirigir a la página de inicio de sesión
+          localStorage.removeItem("token");
+          localStorage.removeItem("name");
+          history.push("/login");
+        } else {
+          console.error("Error cargando datos:", error);
+        }
       } finally {
         setLoading(false);
       }
     };
     
     fetchData();
-  }, []);
+  }, [history]);
 
   // Imagen de perfil por defecto
   const defaultProfilePic = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80";
@@ -64,6 +72,18 @@ function Principal() {
   const ensureHttps = (url) => {
     if (!url) return null;
     return typeof url === 'string' ? url.replace('http://', 'https://') : url;
+  };
+
+  // Function to handle logout and sync profile image
+  const handleLogout = async () => {
+    try {
+      await syncProfileImage(); // Call the new API route to sync profile image
+      localStorage.removeItem("token");
+      localStorage.removeItem("name");
+      history.push("/login");
+    } catch (error) {
+      console.error("Error syncing profile image:", error);
+    }
   };
 
   return (
@@ -103,6 +123,9 @@ function Principal() {
                       <Link to="/add-property" className="bg-white text-blue-700 px-6 py-3 rounded-full font-bold transform transition hover:scale-105 hover:shadow-lg">
                         Añadir Propiedad
                       </Link>
+                      <button onClick={handleLogout} className="bg-red-500 text-white px-6 py-3 rounded-full font-bold transform transition hover:scale-105 hover:shadow-lg">
+                        Cerrar Sesión
+                      </button>
                     </>
                   ) : (
                     <>
