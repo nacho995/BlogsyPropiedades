@@ -74,16 +74,11 @@ function Principal() {
     return typeof url === 'string' ? url.replace('http://', 'https://') : url;
   };
 
-  // Function to handle logout and sync profile image
-  const handleLogout = async () => {
-    try {
-      await syncProfileImage(); // Call the new API route to sync profile image
-      localStorage.removeItem("token");
-      localStorage.removeItem("name");
-      navigate("/login"); // Replace history.push with navigate
-    } catch (error) {
-      console.error("Error syncing profile image:", error);
-    }
+  // Simplify the logout handler
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("name");
+    navigate("/login");
   };
 
   return (

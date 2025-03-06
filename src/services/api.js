@@ -484,3 +484,24 @@ export async function getUserProfile(token) {
     throw error;
   }
 }
+
+import axios from "axios";
+
+export const syncProfileImage = async () => {
+  const token = localStorage.getItem('token');
+  if (!token) return;
+  
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/users/sync-profile`,
+      {},
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error syncing profile image:', error);
+    throw error;
+  }
+};
