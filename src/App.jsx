@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { UserProvider } from './context/UserContext';
 import Navbar from './components/NavBar';
@@ -18,6 +18,16 @@ import PropertyDetail from './components/PropertyDetail';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
+    const [isAppReady, setIsAppReady] = useState(false);
+    
+    useEffect(() => {
+        setIsAppReady(true);
+    }, []);
+    
+    if (!isAppReady) {
+        return <div className="loading">Cargando...</div>;
+    }
+
     return (
         <BrowserRouter>
             <UserProvider>

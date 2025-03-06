@@ -78,13 +78,24 @@ export function UserProvider({ children }) {
     verificarToken();
   }, []);
   
+  // Función de logout
+  const logout = () => {
+    // Limpiar localStorage
+    localStorage.removeItem("token");
+    localStorage.removeItem("name");
+    localStorage.removeItem("profilePic");
+    localStorage.removeItem("user");
+    
+    // Resetear estado
+    setUser(null);
+    setIsAuthenticated(false);
+    navigate("/");
+  };
+  
   // Escuchar el evento session-expired para manejar el cierre de sesión
   useEffect(() => {
     const handleSessionExpired = (event) => {
-      console.log("Evento de sesión expirada recibido");
       logout();
-      
-      // No navegar aquí, dejar que el componente NavBar lo maneje
     };
     
     window.addEventListener('session-expired', handleSessionExpired);
@@ -92,7 +103,7 @@ export function UserProvider({ children }) {
     return () => {
       window.removeEventListener('session-expired', handleSessionExpired);
     };
-  }, [logout]); // Incluir logout como dependencia
+  }, [logout]); // Ahora logout ya existe
   
   // Función de login
   const login = (userData) => {
@@ -129,20 +140,6 @@ export function UserProvider({ children }) {
       storedUser.profilePic = imageUrl;
       localStorage.setItem('user', JSON.stringify(storedUser));
     }
-  };
-  
-  // Función de logout
-  const logout = () => {
-    // Limpiar localStorage
-    localStorage.removeItem("token");
-    localStorage.removeItem("name");
-    localStorage.removeItem("profilePic");
-    localStorage.removeItem("user");
-    
-    // Resetear estado
-    setUser(null);
-    setIsAuthenticated(false);
-    navigate("/");
   };
   
   // Valores del contexto

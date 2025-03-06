@@ -31,7 +31,9 @@ export default function Navbar() {
   }));
 
   // Valor por defecto para la foto de perfil
-  const defaultProfilePic = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80";
+  const defaultProfilePic = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80";
+  const defaultPropertyImage = "https://place-hold.it/300x200?text=Propiedad";
+  const defaultBlogImage = "https://place-hold.it/300x200?text=Blog";
   
   // Manejar el cierre de sesión
   const handleLogout = () => {
@@ -41,22 +43,22 @@ export default function Navbar() {
   const handleImageError = (e) => {
     console.log("Error cargando imagen, usando imagen predeterminada");
     
-    // Imagen predeterminada que funciona localmente (data URI)
-    const defaultImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150'%3E%3Ccircle cx='75' cy='75' r='75' fill='%23ccc'/%3E%3Ccircle cx='75' cy='65' r='25' fill='%23999'/%3E%3Cpath d='M 75 95 C 45 95 35 120 35 150 L 115 150 C 115 120 105 95 75 95 Z' fill='%23999'/%3E%3C/svg%3E";
+    // Imagen fallback que funciona siempre (data URI)
+    const fallbackImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150'%3E%3Ccircle cx='75' cy='75' r='75' fill='%23ccc'/%3E%3C/svg%3E";
     
     const type = e.target.dataset.type;
     switch(type) {
       case 'profile':
-        e.target.src = defaultImage;
+        e.target.src = defaultProfilePic;
         break;
       case 'property':
-        e.target.src = defaultPropertyImage || defaultImage;
+        e.target.src = defaultPropertyImage;
         break;
       case 'blog':
-        e.target.src = defaultBlogImage || defaultImage;
+        e.target.src = defaultBlogImage;
         break;
       default:
-        e.target.src = defaultImage;
+        e.target.src = fallbackImage;
     }
     
     e.target.onerror = null; // Evitar recursión infinita
