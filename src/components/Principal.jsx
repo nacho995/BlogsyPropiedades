@@ -5,9 +5,6 @@ import { getBlogPosts, getPropertyPosts } from "../services/api";
 import { motion } from "framer-motion";
 import { getProfileImageUrl } from "../utils/profileUtils";
 
-// Console log para verificar si el componente se carga
-console.log("Componente Principal.jsx está siendo importado");
-
 function Principal() {
   // Obtener estado de autenticación directamente de localStorage
   const token = localStorage.getItem("token");
@@ -21,14 +18,9 @@ function Principal() {
   
   // Obtener datos del usuario
   const { user, isAuthenticated: userAuthenticated } = useUser();
-  
-  // Console log para verificar si el componente se monta
-  console.log("Componente Principal está renderizando");
 
   // Cargar datos reales de la API
   useEffect(() => {
-    console.log("Renderizando el contenido principal, loading:", loading);
-    
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -38,9 +30,6 @@ function Principal() {
           getBlogPosts(),
           getPropertyPosts()
         ]);
-        
-        console.log("Blogs obtenidos:", blogsData.length);
-        console.log("Propiedades obtenidas:", propertiesData.length);
         
         // Limitamos a mostrar solo los 3 primeros elementos de cada tipo
         setBlogs(blogsData.slice(0, 3));
@@ -54,26 +43,6 @@ function Principal() {
     
     fetchData();
   }, []);
-
-  // En el useEffect donde se maneja la renderización del perfil de usuario
-  useEffect(() => {
-    // Este efecto se ejecutará cuando el usuario cambie
-    console.log("Datos actualizados del usuario:", user);
-  }, [user]);
-
-  // Después de la función getProfileImageUrl
-  useEffect(() => {
-    if (user) {
-      console.log("Estructura detallada del usuario:", JSON.stringify(user, null, 2));
-      console.log("Tipo de profilePic:", typeof user.profilePic);
-      if (user.profilePic && typeof user.profilePic === 'object') {
-        console.log("Propiedades de profilePic:", Object.keys(user.profilePic));
-      }
-      if (user.profileImage && typeof user.profileImage === 'object') {
-        console.log("Propiedades de profileImage:", Object.keys(user.profileImage));
-      }
-    }
-  }, [user]);
 
   // Imagen de perfil por defecto
   const defaultProfilePic = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80";
@@ -177,7 +146,6 @@ function Principal() {
 
       {/* Contenido principal */}
       <main className="max-w-6xl mx-auto py-12 px-4">
-        {console.log("Renderizando el contenido principal, loading:", loading)}
         {loading ? (
           <div className="flex justify-center items-center py-20">
             <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white"></div>
@@ -185,7 +153,6 @@ function Principal() {
         ) : (
           <div className="space-y-16">
             {/* Blogs */}
-            {console.log("Número de blogs a mostrar:", blogs.length)}
             {blogs.length > 0 && (
               <section>
                 <div className="flex items-center justify-between mb-8">
@@ -197,9 +164,7 @@ function Principal() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   {blogs.map((blog, index) => {
-                    console.log(`Renderizando blog ${index}:`, blog);
                     const imageUrl = getImageUrl(blog);
-                    console.log(`URL de imagen final para blog ${index}:`, imageUrl);
                     
                     return (
                       <div 
@@ -238,7 +203,6 @@ function Principal() {
             )}
 
             {/* Propiedades */}
-            {console.log("Número de propiedades a mostrar:", properties.length)}
             {properties.length > 0 && (
               <section>
                 <div className="flex items-center justify-between mb-8">
@@ -250,9 +214,7 @@ function Principal() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   {properties.map((property, index) => {
-                    console.log(`Renderizando propiedad ${index}:`, property);
                     const imageUrl = getPropertyImageUrl(property);
-                    console.log(`URL de imagen final para propiedad ${index}:`, imageUrl);
                     
                     return (
                       <div 
