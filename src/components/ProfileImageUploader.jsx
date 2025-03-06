@@ -4,7 +4,9 @@ import { useUser } from '../context/UserContext';
 const ProfileImageUploader = ({ currentImageUrl, onImageUpdated }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
-  const [previewImage, setPreviewImage] = useState(currentImageUrl || null);
+  const [previewImage, setPreviewImage] = useState(currentImageUrl || 
+                                                localStorage.getItem('profilePic_local') || 
+                                                localStorage.getItem('profilePic'));
   const { user } = useUser();
   
   const handleImageChange = (e) => {

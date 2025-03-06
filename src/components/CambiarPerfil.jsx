@@ -43,6 +43,8 @@ export default function CambiarPerfil() {
         _updatedAt: new Date().toISOString()
       });
       
+      localStorage.setItem('profileUpdatedAt', new Date().toISOString());
+      
       setMessage('Perfil actualizado correctamente');
     } catch (error) {
       console.error("Error al actualizar el perfil:", error);
@@ -50,6 +52,62 @@ export default function CambiarPerfil() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleShareProfile = async () => {
+    if (!profilePic && !user?.profilePic) {
+      setMessage('No hay imagen de perfil para compartir');
+      return;
+    }
+
+    const imageToShare = profilePic 
+      ? await readFileAsDataURL(profilePic)
+      : localStorage.getItem('profilePic_local') || user?.profilePic;
+    
+    if (!imageToShare) {
+      setMessage('No se pudo leer la imagen');
+      return;
+    }
+
+    try {
+      const shareData = {
+        title: 'Mi perfil',
+        text: `Perfil de ${user?.name || 'Usuario'}`,
+        url: window.location.origin
+      };
+
+      if (navigator.canShare && navigator.canShare({files: [createFileFromDataURL(imageToShare, 'profile.png')]})) {
+        shareData.files = [createFileFromDataURL(imageToShare, 'profile.png')];
+      }
+
+      await navigator.share(shareData);
+      setMessage('Perfil compartido exitosamente');
+    } catch (error) {
+      console.error('Error al compartir:', error);
+      setMessage('No se pudo compartir el perfil');
+    }
+  };
+
+  const createFileFromDataURL = (dataURL, filename) => {
+    const arr = dataURL.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    
+    return new File([u8arr], filename, {type: mime});
+  };
+
+  const readFileAsDataURL = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(file);
+    });
   };
 
   const renderUserAvatar = (user) => {

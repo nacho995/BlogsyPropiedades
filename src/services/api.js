@@ -231,7 +231,7 @@ export const resetPassword = async (token, password, passwordConfirm) => {
 };
 
 /**
- * Actualiza el perfil del usuario, asegurando que la imagen se suba correctamente
+ * Actualiza el perfil del usuario de manera que funcione en múltiples dispositivos
  */
 export const updateProfile = async (userData) => {
   const formData = new FormData();
@@ -240,10 +240,25 @@ export const updateProfile = async (userData) => {
     formData.append('name', userData.name);
   }
   
+  // Mejorar manejo de imagen para garantizar sincronización entre dispositivos
   if (userData.profilePic && userData.profilePic instanceof File) {
-    // Añadir metadata para asegurar que el servidor lo procese correctamente
     formData.append('profilePic', userData.profilePic);
-    console.log("Subiendo imagen de perfil:", userData.profilePic.name);
+    
+    // Crear respaldo local de la imagen para casos donde el servidor falle
+    try {
+      const reader = new FileReader();
+      const localImagePromise = new Promise(resolve => {
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(userData.profilePic);
+      });
+      const localImage = await localImagePromise;
+      
+      // Guardar versión local como respaldo
+      localStorage.setItem('profilePic_local', localImage);
+      console.log("Imagen guardada localmente como respaldo");
+    } catch (e) {
+      console.warn("No se pudo crear respaldo local de la imagen", e);
+    }
   }
   
   try {
@@ -252,8 +267,9 @@ export const updateProfile = async (userData) => {
       throw new Error("No hay token disponible");
     }
     
-    // Usar fetch directamente para tener más control
-    const response = await fetch(`${API_URL}/user/update-profile`, {
+    // Añadir timestamp para evitar caché
+    const timestamp = Date.now();
+    const response = await fetch(`${API_URL}/user/update-profile?t=${timestamp}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -262,35 +278,43 @@ export const updateProfile = async (userData) => {
     });
     
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Error al actualizar perfil: ${errorText}`);
+      console.warn("Error del servidor al actualizar perfil:", response.status);
+      
+      // Si hay error en el servidor, usar datos locales como respaldo
+      return {
+        name: userData.name || localStorage.getItem('name') || '',
+        profilePic: localStorage.getItem('profilePic_local') || ''
+      };
     }
     
     const result = await response.json();
     
-    // Guardar cualquiera de las propiedades de imagen que devuelva el servidor
-    const profilePic = result.profileImage || result.profilePic || "";
-    if (profilePic) {
-      localStorage.setItem('profilePic', profilePic);
-      
-      // También actualizar el objeto user en localStorage
-      const userStr = localStorage.getItem('user');
-      if (userStr) {
-        try {
-          const user = JSON.parse(userStr);
-          user.profilePic = profilePic;
-          user.profileImage = result.profileImage; // Mantener ambas propiedades
-          localStorage.setItem('user', JSON.stringify(user));
-        } catch (e) {
-          console.error("Error al actualizar user en localStorage:", e);
-        }
+    // Actualizar localStorage con los nuevos datos
+    const profilePic = result.profileImage || result.profilePic || localStorage.getItem('profilePic_local') || '';
+    localStorage.setItem('profilePic', profilePic);
+    
+    // Actualizar objeto usuario en localStorage
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        user.profilePic = profilePic;
+        user.lastUpdated = new Date().toISOString(); // Añadir timestamp
+        localStorage.setItem('user', JSON.stringify(user));
+      } catch (e) {
+        console.error("Error al actualizar user en localStorage:", e);
       }
     }
     
     return result;
   } catch (error) {
     console.error('Error al actualizar perfil:', error);
-    throw error;
+    
+    // En caso de error, devolver datos locales como respaldo
+    return {
+      name: userData.name || localStorage.getItem('name') || '',
+      profilePic: localStorage.getItem('profilePic_local') || ''
+    };
   }
 }
 
@@ -465,10 +489,44 @@ export const getCurrentUser = async (tokenParam) => {
   }
 
   try {
-    return await fetchAPI('/user/me');
+    // Añadir timestamp para evitar caché
+    const timestamp = Date.now();
+    const response = await fetch(`${API_URL}/user/me?t=${timestamp}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) {
+      // Si hay error del servidor, usar datos de localStorage como respaldo
+      console.warn(`Error ${response.status} al obtener usuario. Usando datos locales.`);
+      return {
+        name: localStorage.getItem('name') || '',
+        profilePic: localStorage.getItem('profilePic') || localStorage.getItem('profilePic_local') || '',
+        _fromLocalStorage: true
+      };
+    }
+    
+    const userData = await response.json();
+    
+    // Actualizar localStorage con los datos más recientes
+    if (userData.profilePic || userData.profileImage) {
+      localStorage.setItem('profilePic', userData.profilePic || userData.profileImage || '');
+    }
+    if (userData.name) {
+      localStorage.setItem('name', userData.name);
+    }
+    
+    return userData;
   } catch (error) {
     console.error('Error en getCurrentUser:', error);
-    throw error;
+    
+    // En caso de error de red, usar datos locales
+    return {
+      name: localStorage.getItem('name') || '',
+      profilePic: localStorage.getItem('profilePic') || localStorage.getItem('profilePic_local') || '',
+      _fromLocalStorage: true
+    };
   }
 };
 

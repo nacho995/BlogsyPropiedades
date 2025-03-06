@@ -72,15 +72,18 @@ export default function Navbar() {
   // En el componente NavBar.jsx
   // Agregar función auxiliar para renderizar avatar
   const renderUserAvatar = (user) => {
-    // Buscar la imagen en ambas propiedades, primero en profileImage (Cloudinary)
-    const profileImage = user?.profileImage || user?.profilePic || null;
+    // Buscar la imagen en todas las fuentes posibles (con prioridad)
+    const profileImage = user?.profileImage || user?.profilePic || localStorage.getItem('profilePic') || localStorage.getItem('profilePic_local') || null;
     
-    if (profileImage) {
+    // Añadir timestamp para evitar caché
+    const imageUrl = profileImage ? `${profileImage}?t=${Date.now()}` : null;
+    
+    if (imageUrl) {
       return (
         <img
           className="h-8 w-8 rounded-full object-cover"
-          src={`${profileImage}?t=${Date.now()}`}
-          alt={`${user.name || 'Usuario'}`}
+          src={imageUrl}
+          alt={`${user?.name || 'Usuario'}`}
           onError={handleImageError}
           data-type="profile"
         />

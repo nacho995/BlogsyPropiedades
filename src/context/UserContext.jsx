@@ -42,7 +42,7 @@ export function UserProvider({ children }) {
     };
   }, []);
   
-  // Mejorar la verificación inicial para obtener siempre la imagen más reciente
+  // Mejora en verificarToken para manejar error 500
   useEffect(() => {
     const verificarToken = async () => {
       const token = localStorage.getItem('token');
@@ -50,35 +50,58 @@ export function UserProvider({ children }) {
       if (!token) return;
       
       try {
-        // Siempre consultar al servidor para obtener datos actualizados
         const response = await fetch(`${import.meta.env.VITE_API_PUBLIC_API_URL}/user/me`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
         });
         
+        // Si hay respuesta correcta del servidor
         if (response.ok) {
           const userData = await response.json();
           
-          // Actualizar todos los datos, incluida la imagen de perfil
           setUser({
             token,
             ...userData
           });
           
-          // Guardar también en localStorage para tener respaldo
           localStorage.setItem("profilePic", userData.profilePic || "");
           localStorage.setItem("name", userData.name || "");
           
           setIsAuthenticated(true);
+          return;
+        }
+        
+        // Si hay error 500 u otro error, no cerrar sesión, usar datos locales
+        if (response.status === 500) {
+          console.warn("Error 500 del servidor, usando datos locales");
+          
+          // Usar los datos de respaldo 
+          setUser({
+            token,
+            name: localStorage.getItem("name") || "",
+            profilePic: localStorage.getItem("profilePic") || localStorage.getItem("profilePic_local") || "",
+            _fromLocalStorage: true
+          });
+          setIsAuthenticated(true);
+          return;
+        }
+        
+        // Solo para error 401 (no autorizado) cerrar sesión
+        if (response.status === 401) {
+          console.log("Token inválido, cerrando sesión");
+          logout();
+          return;
         }
       } catch (error) {
-        console.error("Error al verificar datos de usuario:", error);
-        // En caso de error, usar datos de respaldo del localStorage
+        console.error("Error de red al verificar usuario:", error);
+        
+        // Si falla la conexión, usar datos de localStorage pero no cerrar sesión
         setUser({
           token,
           name: localStorage.getItem("name") || "",
-          profilePic: localStorage.getItem("profilePic") || ""
+          profilePic: localStorage.getItem("profilePic") || localStorage.getItem("profilePic_local") || "",
+          _fromLocalStorage: true
         });
         setIsAuthenticated(true);
       }
@@ -124,9 +147,14 @@ export function UserProvider({ children }) {
     const profilePic = userData.profileImage || userData.profilePic || "";
     localStorage.setItem("profilePic", profilePic);
     
+    // Guardar timestamp para control de sincronización
+    const timestamp = new Date().toISOString();
+    
+    // Guardar usuario completo con datos actualizados
     localStorage.setItem("user", JSON.stringify({
       ...userData,
-      profilePic // Asegurar que siempre tenemos profilePic consistente
+      profilePic, // Asegurar consistencia
+      lastUpdated: timestamp
     }));
     
     // Actualizar estado
@@ -137,10 +165,45 @@ export function UserProvider({ children }) {
       profileImage: userData.profileImage, // Mantener ambas propiedades
       isAdmin: userData.isAdmin || false,
       email: userData.email || "",
-      _updatedAt: new Date().toISOString()
+      lastUpdated: timestamp
     });
     setIsAuthenticated(true);
   };
+  
+  // Verificación periódica de actualizaciones
+  useEffect(() => {
+    // Solo verificar si el usuario está autenticado
+    if (!isAuthenticated || !user?.token) return;
+    
+    const checkForUpdates = async () => {
+      try {
+        const userData = await getCurrentUser();
+        
+        // Comprobar si hay cambios
+        if (userData.profilePic !== user.profilePic || userData.name !== user.name) {
+          console.log("Detectados cambios en el perfil desde otro dispositivo");
+          
+          // Actualizar estado con datos nuevos
+          setUser(prev => ({
+            ...prev,
+            name: userData.name || prev.name,
+            profilePic: userData.profilePic || prev.profilePic,
+            lastChecked: new Date().toISOString()
+          }));
+        }
+      } catch (error) {
+        console.warn("Error al verificar actualizaciones de perfil:", error);
+      }
+    };
+    
+    // Verificar cada 5 minutos (ajustar según necesidades)
+    const intervalId = setInterval(checkForUpdates, 5 * 60 * 1000);
+    
+    // Verificar una vez al inicio
+    checkForUpdates();
+    
+    return () => clearInterval(intervalId);
+  }, [isAuthenticated, user?.token]);
   
   // Función para actualizar solo la imagen de perfil
   const updateProfileImage = (imageUrl) => {
