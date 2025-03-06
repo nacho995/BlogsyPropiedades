@@ -212,13 +212,41 @@ function Principal() {
                 <div className="relative">
                   <div className="absolute inset-0 bg-gradient-to-r from-amber-500 to-blue-600 rounded-full animate-spin-slow opacity-70 blur-md"></div>
                   <div className="relative w-40 h-40 rounded-full overflow-hidden border-4 border-white shadow-xl">
+                    {/* Agregar un botón de depuración directamente en la UI para desarrollo */}
+                    {import.meta.env.DEV && (
+                      <button 
+                        onClick={() => {
+                          console.log("DEPURACIÓN DE IMAGEN DE PERFIL");
+                          console.log("Usuario:", user);
+                          console.log("Tipo de profilePic:", typeof user?.profilePic);
+                          console.log("Usuario JSON:", JSON.stringify(user, null, 2));
+                          console.log("LocalStorage profilePic:", localStorage.getItem('profilePic'));
+                          
+                          // Intentar cargar directamente desde localStorage
+                          const storedProfilePic = localStorage.getItem('profilePic');
+                          alert(`URL desde localStorage: ${storedProfilePic || 'no encontrada'}`);
+                        }}
+                        className="absolute top-0 right-0 z-10 bg-red-500 text-white text-xs p-1"
+                      >
+                        Debug
+                      </button>
+                    )}
+                    
                     <img 
                       src={getProfileImageUrl(user, defaultProfilePic)}
                       alt="Perfil" 
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        console.log("Error cargando imagen de perfil, usando imagen por defecto");
-                        e.target.src = defaultProfilePic;
+                        console.error("Error cargando imagen de perfil:", e);
+                        // Intentar directamente con la imagen en localStorage
+                        const storedImg = localStorage.getItem('profilePic');
+                        if (storedImg && storedImg !== e.target.src) {
+                          console.log("Intentando con imagen en localStorage:", storedImg);
+                          e.target.src = storedImg;
+                        } else {
+                          console.log("Usando imagen por defecto");
+                          e.target.src = defaultProfilePic;
+                        }
                       }}
                     />
                   </div>

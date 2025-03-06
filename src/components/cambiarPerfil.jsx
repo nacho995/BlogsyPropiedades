@@ -23,32 +23,37 @@ export default function CambiarPerfil() {
       
       setProfilePic(file);
       
-      // Crear URL segura para la vista previa
+      // Usar un enfoque completamente diferente para la previsualización
+      // que evite el error de startsWith
       try {
-        // Método más directo y seguro para crear una URL de vista previa
+        // Crear un elemento img en memoria
+        const img = document.createElement('img');
+        
+        // Crear objeto URL de manera segura
         const objectUrl = URL.createObjectURL(file);
-        console.log("URL de objeto creada:", objectUrl);
-        setPreviewUrl(objectUrl);
         
-        // Limpiar la URL cuando ya no se necesite
-        return () => URL.revokeObjectURL(objectUrl);
-      } catch (readerError) {
-        console.error("Error al crear vista previa con URL.createObjectURL:", readerError);
+        // Asignar la URL al elemento img
+        img.onload = function() {
+          // La imagen se cargó correctamente
+          console.log("Vista previa creada correctamente");
+          setPreviewUrl(objectUrl);
+        };
         
-        // Usar FileReader como fallback
-        try {
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            if (event.target && typeof event.target.result === 'string') {
-              console.log("Vista previa generada por FileReader");
-              setPreviewUrl(event.target.result);
-            }
-          };
-          reader.readAsDataURL(file);
-        } catch (fileReaderError) {
-          console.error("Error al usar FileReader como fallback:", fileReaderError);
+        img.onerror = function() {
+          console.error("Error al cargar la vista previa");
           setPreviewUrl(null);
-        }
+        };
+        
+        // Iniciar la carga
+        img.src = objectUrl;
+        
+        // Limpiar recursos
+        return () => {
+          URL.revokeObjectURL(objectUrl);
+        };
+      } catch (error) {
+        console.error("Error al crear vista previa:", error);
+        setPreviewUrl(null);
       }
     } catch (error) {
       console.error("Error general en handleFileChange:", error);
@@ -98,16 +103,37 @@ export default function CambiarPerfil() {
       console.log("Perfil actualizado:", result);
       
       // Convertir la URL a HTTPS antes de guardarla en localStorage o mostrarla
-      if (result.profilePic && typeof result.profilePic === 'string') {
-        result.profilePic = result.profilePic.replace('http://', 'https://');
-        localStorage.setItem("profilePic", result.profilePic);
+      if (result.profilePic) {
+        let profilePicUrl;
+        
+        if (typeof result.profilePic === 'string') {
+          profilePicUrl = result.profilePic.replace('http://', 'https://');
+        } else if (typeof result.profilePic === 'object' && result.profilePic.src) {
+          profilePicUrl = result.profilePic.src.replace('http://', 'https://');
+        } else if (typeof result.profilePic === 'object' && result.profilePic.url) {
+          profilePicUrl = result.profilePic.url.replace('http://', 'https://');
+        }
+        
+        if (profilePicUrl) {
+          console.log("Guardando URL de imagen en localStorage:", profilePicUrl);
+          localStorage.setItem("profilePic", profilePicUrl);
+          
+          // Forzar la actualización en el componente actual
+          setPreviewUrl(profilePicUrl);
+        }
       }
       
-      // Actualizar el contexto del usuario
-      await refreshUserData();
-      
-      // Redirigir
-      navigate("/");
+      // Crear un pequeño retraso antes de refrescar los datos
+      setTimeout(async () => {
+        // Actualizar el contexto del usuario
+        await refreshUserData();
+        
+        // Mostrar mensaje de éxito
+        alert("Perfil actualizado correctamente");
+        
+        // Redirigir después de mostrar el mensaje
+        navigate("/");
+      }, 1000);
     } catch (error) {
       console.error("Error detallado al actualizar el perfil:", error);
       setError("No se pudo actualizar el perfil. Intenta de nuevo.");
