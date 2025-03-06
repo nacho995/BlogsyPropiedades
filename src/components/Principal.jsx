@@ -297,17 +297,7 @@ function Principal() {
                             className="w-full h-full object-cover"
                             onError={(e) => {
                               console.log(`Error cargando imagen para propiedad ${property.title}`);
-                              e.target.onerror = null;
-                              e.target.style.display = 'none';
-                              e.target.parentNode.style.backgroundColor = '#f59e0b';
-                              const icon = document.createElement('div');
-                              icon.innerHTML = '🏠';
-                              icon.style.fontSize = '32px';
-                              icon.style.display = 'flex';
-                              icon.style.alignItems = 'center';
-                              icon.style.justifyContent = 'center';
-                              icon.style.height = '100%';
-                              e.target.parentNode.appendChild(icon);
+                              e.target.src = 'https://cdn.jsdelivr.net/gh/twbs/icons@main/icons/house.svg';
                             }}
                           />
                         </div>

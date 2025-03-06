@@ -107,16 +107,27 @@ export function UserProvider({ children }) {
       // Guardar en localStorage
       localStorage.setItem("token", userData.token || "");
       
-      // Extraer y guardar la URL de la imagen
+      // Extraer y guardar la URL de la imagen de forma más robusta
       let profilePicUrl = "";
       
+      // Intentar obtener la imagen de diferentes fuentes posibles
       if (userData.profilePic) {
         if (typeof userData.profilePic === 'string') {
           profilePicUrl = userData.profilePic;
         } else if (userData.profilePic.src) {
           profilePicUrl = userData.profilePic.src;
         }
-        
+      } else if (userData.user && userData.user.profilePic) {
+        // Intentar extraer de user.profilePic si existe
+        if (typeof userData.user.profilePic === 'string') {
+          profilePicUrl = userData.user.profilePic;
+        } else if (userData.user.profilePic.src) {
+          profilePicUrl = userData.user.profilePic.src;
+        }
+      }
+      
+      // Solo actualizamos si encontramos una imagen
+      if (profilePicUrl) {
         // Convertir a HTTPS
         if (profilePicUrl.startsWith('http:')) {
           profilePicUrl = profilePicUrl.replace('http:', 'https:');
@@ -124,6 +135,7 @@ export function UserProvider({ children }) {
         
         // Guardar en localStorage
         localStorage.setItem("profilePic", profilePicUrl);
+        console.log("Imagen de perfil guardada en localStorage:", profilePicUrl);
       }
       
       // Si userData.user está presente, usamos esa estructura
@@ -157,10 +169,13 @@ export function UserProvider({ children }) {
   
   // Función de logout
   const logout = () => {
-    // Limpiar localStorage
+    // Guardar la imagen de perfil antes de limpiar
+    const profilePicUrl = localStorage.getItem("profilePic");
+    
+    // Limpiar localStorage pero no completamente
     localStorage.removeItem("token");
     localStorage.removeItem("name");
-    localStorage.removeItem("profilePic");
+    // No eliminamos profilePic para mantenerla entre sesiones
     
     // Resetear estado
     setUser(null);
