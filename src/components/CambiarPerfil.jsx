@@ -16,7 +16,6 @@ export default function CambiarPerfil() {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      console.log("Archivo seleccionado:", file.name);
       setProfilePic(file);
       // No crear vista previa para evitar el error
     }
@@ -56,7 +55,6 @@ export default function CambiarPerfil() {
       }
       
       const result = await response.json();
-      console.log("Respuesta del servidor en CambiarPerfil:", result);
       
       // Guardar imagen en localStorage
       if (result.profilePic && typeof result.profilePic === 'string') {
