@@ -26,33 +26,6 @@ const ProfileImageUploader = ({ currentImageUrl, onImageUpdated }) => {
     }
   };
   
-  // Función opcional para subir directamente la imagen sin pasar por el formulario principal
-  const handleDirectUpload = async (file) => {
-    setIsUploading(true);
-    setUploadError(null);
-    
-    try {
-      const formData = new FormData();
-      formData.append('profilePic', file);
-      
-      const result = await updateProfile({ profilePic: file }, user.token);
-      
-      if (result.profilePic) {
-        // Actualizar el contexto con la nueva URL de la imagen
-        updateProfileImage(result.profilePic);
-        
-        // Opcional: notificar al componente padre si es necesario
-        onImageUpdated(null); // Reiniciar el estado de file en el componente padre
-      } else {
-        setUploadError('No se pudo obtener la URL de la imagen');
-      }
-    } catch (error) {
-      console.error('Error al subir la imagen de perfil:', error);
-      setUploadError('Error al subir la imagen');
-    } finally {
-      setIsUploading(false);
-    }
-  };
   
   return (
     <div className="profile-image-uploader">
