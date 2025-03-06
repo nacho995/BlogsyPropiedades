@@ -15,6 +15,7 @@ import SeeProperty from './components/SeeProperties';
 import CambiarPerfil from './components/CambiarPerfil';
 import PropertyCreation from './components/addProperties';
 import PropertyDetail from './components/PropertyDetail';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
     return (
@@ -25,12 +26,24 @@ function App() {
                     <Routes>
                         <Route path="/" element={<Principal />} />
                         <Route path="/login" element={<SignIn />} />
-                        <Route path="/crear-blog" element={<BlogCreation />} />
+                        <Route path="/crear-blog" element={
+                            <ProtectedRoute>
+                                <BlogCreation />
+                            </ProtectedRoute>
+                        } />
                         <Route path="/ver-blogs" element={<SeeBlogs />} />
                         <Route path="/blog/:id" element={<BlogDetail />} />
-                        <Route path="/cambiar-perfil" element={<CambiarPerfil/>} />
+                        <Route path="/cambiar-perfil" element={
+                            <ProtectedRoute>
+                                <CambiarPerfil />
+                            </ProtectedRoute>
+                        } />
                         <Route path="/propiedades" element={<SeeProperty/>} />
-                        <Route path="/add-property" element={<PropertyCreation/>} />
+                        <Route path="/add-property" element={
+                            <ProtectedRoute>
+                                <PropertyCreation />
+                            </ProtectedRoute>
+                        } />
                         <Route path="/property/:id" element={<PropertyDetail/>} />
                     </Routes>
                     <Toaster position="top-right" />

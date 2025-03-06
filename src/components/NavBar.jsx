@@ -3,6 +3,7 @@ import { Button, Disclosure, DisclosureButton, DisclosurePanel, Menu, MenuButton
 import { Bars3Icon, BellIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
+import { toast } from 'react-hot-toast';
 
 const navigation = [
   { name: 'Dashboard', href: '/', current: false },
@@ -53,6 +54,19 @@ export default function Navbar() {
         e.target.src = defaultPropertyImage;
     }
   };
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      toast.error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
+      navigate('/login');
+    };
+    
+    window.addEventListener('session-expired', handleSessionExpired);
+    
+    return () => {
+      window.removeEventListener('session-expired', handleSessionExpired);
+    };
+  }, [navigate]);
 
   return (
     <Disclosure as="nav" className="bg-gray-800">

@@ -7,7 +7,10 @@ const API_URL = import.meta.env.VITE_API_PUBLIC_API_URL || 'http://localhost:400
 const handleResponse = async (response) => {
   if (response.status === 401) {
     // Token expirado o inválido
+    localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('name');
+    localStorage.removeItem('profilePic');
     window.dispatchEvent(new Event('logout'));
     throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
   }
@@ -48,6 +51,26 @@ const fetchAPI = async (endpoint, options = {}) => {
       headers
     });
     
+    // Verificar si el token expiró (401)
+    if (response.status === 401) {
+      console.log("📢 Token expirado - Cerrando sesión");
+      
+      // Limpiar localStorage
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('name');
+      localStorage.removeItem('profilePic');
+      
+      // Alerta simple (puede mejorarse con toast)
+      alert("Tu sesión ha expirado. Serás redirigido al login");
+      
+      // Redireccionar a login (enfoque simple)
+      window.location.href = '/login';
+      
+      // Detener la ejecución
+      throw new Error('Sesión expirada');
+    }
+    
     // Verificar si la respuesta está vacía
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {
@@ -56,7 +79,7 @@ const fetchAPI = async (endpoint, options = {}) => {
     
     return await response.text();
   } catch (error) {
-    console.error(`Error en petición a ${url}:`, error);
+    console.error('Error en fetchAPI:', error.message);
     throw error;
   }
 };
@@ -431,6 +454,19 @@ export const getCurrentUser = async (tokenParam) => {
     return await fetchAPI('/user/me');
   } catch (error) {
     console.error('Error en getCurrentUser:', error);
+    throw error;
+  }
+};
+
+/**
+ * Verifica si el token actual es válido
+ * @returns {Promise<Object>} Respuesta del servidor
+ */
+export const verifyToken = async () => {
+  try {
+    return await fetchAPI('/user/verify-token');
+  } catch (error) {
+    console.error('Error al verificar token:', error);
     throw error;
   }
 };

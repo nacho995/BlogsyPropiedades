@@ -42,6 +42,46 @@ export function UserProvider({ children }) {
     };
   }, []);
   
+  // Verificar token al iniciar
+  useEffect(() => {
+    const verificarToken = async () => {
+      const token = localStorage.getItem('token');
+      
+      if (token) {
+        try {
+          // Hacer una petición simple al backend
+          const response = await fetch(`${import.meta.env.VITE_API_PUBLIC_API_URL}/user/me`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          // Si da error 401, cerrar sesión
+          if (response.status === 401) {
+            console.log("Token inválido al iniciar");
+            logout();
+            return;
+          }
+          
+          // Si está bien, mantener la sesión
+          if (response.ok) {
+            const userData = await response.json();
+            setUser({
+              token,
+              ...userData
+            });
+            setIsAuthenticated(true);
+          }
+        } catch (error) {
+          console.error("Error al verificar token:", error);
+          logout();
+        }
+      }
+    };
+    
+    verificarToken();
+  }, []);
+  
   // Función de login
   const login = (userData) => {
     // Guardar en localStorage
