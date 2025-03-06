@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { UserProvider } from './context/UserContext';
 import Navbar from './components/NavBar';
@@ -15,27 +15,8 @@ import SeeProperty from './components/SeeProperties';
 import CambiarPerfil from './components/CambiarPerfil';
 import PropertyCreation from './components/addProperties';
 import PropertyDetail from './components/PropertyDetail';
-import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
-    const [isAppReady, setIsAppReady] = useState(false);
-    
-    useEffect(() => {
-        // Verificar si hay conexión a internet
-        if (navigator.onLine) {
-            // Si hay conexión, la app está lista
-            setIsAppReady(true);
-        } else {
-            // Si no hay conexión, mostrar mensaje
-            alert('No hay conexión a internet. Es posible que algunas imágenes no se carguen correctamente.');
-            setIsAppReady(true);
-        }
-    }, []);
-    
-    if (!isAppReady) {
-        return <div className="loading">Cargando...</div>;
-    }
-
     return (
         <BrowserRouter>
             <UserProvider>
@@ -44,24 +25,12 @@ function App() {
                     <Routes>
                         <Route path="/" element={<Principal />} />
                         <Route path="/login" element={<SignIn />} />
-                        <Route path="/crear-blog" element={
-                            <ProtectedRoute>
-                                <BlogCreation />
-                            </ProtectedRoute>
-                        } />
+                        <Route path="/crear-blog" element={<BlogCreation />} />
                         <Route path="/ver-blogs" element={<SeeBlogs />} />
                         <Route path="/blog/:id" element={<BlogDetail />} />
-                        <Route path="/cambiar-perfil" element={
-                            <ProtectedRoute>
-                                <CambiarPerfil />
-                            </ProtectedRoute>
-                        } />
+                        <Route path="/cambiar-perfil" element={<CambiarPerfil/>} />
                         <Route path="/propiedades" element={<SeeProperty/>} />
-                        <Route path="/add-property" element={
-                            <ProtectedRoute>
-                                <PropertyCreation />
-                            </ProtectedRoute>
-                        } />
+                        <Route path="/add-property" element={<PropertyCreation/>} />
                         <Route path="/property/:id" element={<PropertyDetail/>} />
                     </Routes>
                     <Toaster position="top-right" />

@@ -3,11 +3,7 @@ import { Button, Disclosure, DisclosureButton, DisclosurePanel, Menu, MenuButton
 import { Bars3Icon, BellIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import { toast } from 'react-hot-toast';
-import { secureUrl, getImageUrl } from '../services/api'; // Importar las funciones utilitarias
 
-// IMPORTANTE: Declarar las variables globales FUERA del componente
-// para evitar problemas de inicialización
 const navigation = [
   { name: 'Dashboard', href: '/', current: false },
   { name: 'Añadir Blog', href: '/crear-blog', current: false },
@@ -16,28 +12,9 @@ const navigation = [
   { name: 'Ver Propiedades', href: '/propiedades', current: false },
 ];
 
-// Imágenes predeterminadas estáticas - fuera del componente
-const IMG_DEFAULTS = {
-  profile: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
-  property: "https://place-hold.it/300x200?text=Propiedad",
-  blog: "https://place-hold.it/300x200?text=Blog",
-  fallback: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150'%3E%3Ccircle cx='75' cy='75' r='75' fill='%23ccc'/%3E%3C/svg%3E"
-};
-
 function clases(...classes) {
   return classes.filter(Boolean).join(' ');
 }
-
-// Función para convertir HTTP a HTTPS si el sitio usa HTTPS
-const secureUrl = (url) => {
-  if (typeof url !== 'string') return '';
-  
-  // Si estamos en HTTPS, convertir todas las URLs a HTTPS
-  if (window.location.protocol === 'https:' && url.startsWith('http:')) {
-    return url.replace('http:', 'https:');
-  }
-  return url;
-};
 
 export default function Navbar() {
   const location = useLocation();
@@ -51,127 +28,13 @@ export default function Navbar() {
     ...item,
     current: location.pathname === item.href,
   }));
+
+  // Valor por defecto para la foto de perfil
+  const defaultProfilePic = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80";
   
   // Manejar el cierre de sesión
   const handleLogout = () => {
     logout();
-  };
-
-  // Función simplificada para manejar errores de imagen
-  const handleImageError = (e) => {
-    console.log("Error cargando imagen, usando imagen predeterminada");
-    
-    const type = e.target.dataset.type || 'fallback';
-    
-    // Verificar si la URL ya es una imagen de respaldo para evitar bucles
-    if (e.target.src.includes(IMG_DEFAULTS[type]) || e.target.retryCount >= 2) {
-      // Si ya estamos usando la imagen predeterminada y aún falla,
-      // crear un avatar con iniciales directamente en el DOM
-      e.target.style.display = 'none';
-      e.target.onload = null;
-      e.target.onerror = null;
-      
-      // Obtener el padre donde insertar el avatar alternativo
-      const parent = e.target.parentNode;
-      
-      // Crear el avatar con iniciales
-      const avatarDiv = document.createElement('div');
-      avatarDiv.className = "h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center";
-      avatarDiv.style.display = 'flex';
-      avatarDiv.style.alignItems = 'center';
-      avatarDiv.style.justifyContent = 'center';
-      
-      const initialSpan = document.createElement('span');
-      initialSpan.className = "text-gray-600 font-semibold";
-      initialSpan.textContent = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
-      
-      avatarDiv.appendChild(initialSpan);
-      parent.appendChild(avatarDiv);
-    } else {
-      // Si aún no hemos intentado con la imagen predeterminada, intentarlo ahora
-      e.target.src = IMG_DEFAULTS[type];
-      // Marcar que ya hemos intentado una vez
-      e.target.retryCount = (e.target.retryCount || 0) + 1;
-      
-      // Conservar onerror para máximo 2 intentos
-      if (e.target.retryCount >= 2) {
-        e.target.onerror = null;
-      }
-    }
-  };
-
-  useEffect(() => {
-    const handleSessionExpired = (event) => {
-      toast.error(event.detail?.message || 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
-      setTimeout(() => {
-        navigate('/login');
-      }, 1000);
-    };
-    
-    window.addEventListener('session-expired', handleSessionExpired);
-    
-    return () => {
-      window.removeEventListener('session-expired', handleSessionExpired);
-    };
-  }, [navigate]);
-
-  // Función mejorada para renderizar avatar
-  const renderUserAvatar = (user) => {
-    if (!user) return null;
-    
-    let imageUrl = '';
-    
-    // Extraer URL de imagen de diferentes fuentes
-    if (user.profilePic) {
-      imageUrl = getImageUrl(user.profilePic);
-    }
-    
-    // Si no hay URL en el objeto user, intentar desde localStorage
-    if (!imageUrl) {
-      const storedPic = localStorage.getItem('profilePic');
-      if (storedPic) {
-        try {
-          // Intentar parsear como JSON
-          const picObj = JSON.parse(storedPic);
-          imageUrl = getImageUrl(picObj);
-        } catch (e) {
-          // Si no es JSON válido, usar directamente
-          imageUrl = storedPic;
-        }
-      }
-    }
-    
-    // Si aún no tenemos URL, intentar con imagen de respaldo
-    if (!imageUrl) {
-      imageUrl = localStorage.getItem('profilePic_local') || '';
-    }
-    
-    // Asegurar que la URL sea HTTPS si estamos en HTTPS
-    imageUrl = secureUrl(imageUrl);
-    
-    // Agregar timestamp para evitar caché
-    const finalUrl = imageUrl ? `${imageUrl}?t=${Date.now()}` : null;
-    
-    if (finalUrl) {
-      return (
-        <img
-          className="h-8 w-8 rounded-full" 
-          src={finalUrl}
-          alt={`${user?.name || 'Usuario'}`}
-          onError={handleImageError}
-          data-type="profile"
-        />
-      );
-    } else {
-      // Fallback a avatar con iniciales
-      return (
-        <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
-          <span className="text-gray-600 font-semibold">
-            {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
-          </span>
-        </div>
-      );
-    }
   };
 
   return (
@@ -234,7 +97,11 @@ export default function Navbar() {
                 <Menu as="div" className="relative ml-3">
                   <MenuButton className="flex rounded-full bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-800">
                     <span className="sr-only">Open user menu</span>
-                    {renderUserAvatar(user)}
+                    <img
+                      className="h-8 w-8 rounded-full"
+                      src={user?.profilePic || defaultProfilePic}
+                      alt=""
+                    />
                   </MenuButton>
                   <MenuItems className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                     <MenuItem>

@@ -4,48 +4,28 @@ import { useUser } from "../context/UserContext";
 import { getBlogPosts, getPropertyPosts } from "../services/api";
 import { motion } from "framer-motion";
 
-export default function Principal() {
+function Principal() {
+  // Estados mínimos necesarios
   const [blogs, setBlogs] = useState([]);
   const [properties, setProperties] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const { user } = useUser();
+  const [loading, setLoading] = useState(false);
+  
+  // Obtener datos del usuario
+  const { user, isAuthenticated } = useUser();
 
-  // Usar imágenes en base64 (pequeñas imágenes codificadas como texto)
-  const defaultProfilePic = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJYAAACWCAYAAAA8AXHiAAAACXBIWXMAAAsTAAALEwEAmpwYAAAFEmlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgNS42LWMxNDUgNzkuMTYzNDk5LCAyMDE4LzA4LzEzLTE2OjQwOjIyICAgICAgICAiPiA8cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPiA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtbG5zOmRjPSJodHRwOi8vcHVybC5vcmcvZGMvZWxlbWVudHMvMS4xLyIgeG1sbnM6cGhvdG9zaG9wPSJodHRwOi8vbnMuYWRvYmUuY29tL3Bob3Rvc2hvcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RFdnQ9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZUV2ZW50IyIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ0MgMjAxOSAoV2luZG93cykiIHhtcDpDcmVhdGVEYXRlPSIyMDIzLTA2LTI5VDE0OjM3OjE5KzAyOjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyMy0wNi0yOVQxNDozODoxMSswMjowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyMy0wNi0yOVQxNDozODoxMSswMjowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHBob3Rvc2hvcDpJQ0NQcm9maWxlPSJzUkdCIElFQzYxOTY2LTIuMSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDo3YzY4ZmY5Ni0xNjUw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";
-  const defaultPropertyImage = "https://placehold.co/400x300";
-  const defaultBlogImage = "https://placehold.co/400x300";
-
-  // Función para manejar errores de carga de imagen
-  const handleImageError = (e) => {
-    const type = e.target.dataset.type;
-    switch(type) {
-      case 'profile':
-        e.target.src = defaultProfilePic;
-        break;
-      case 'property':
-        e.target.src = defaultPropertyImage;
-        break;
-      case 'blog':
-        e.target.src = defaultBlogImage;
-        break;
-      default:
-        e.target.src = defaultPropertyImage;
-    }
-  };
-
+  // Cargar datos una sola vez al montar
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
+      
       try {
-        // Solo cargar datos si el usuario está autenticado
-        if (user) {
-          const [blogsData, propertiesData] = await Promise.all([
-            getBlogPosts(),
-            getPropertyPosts()
-          ]);
-          setBlogs(blogsData);
-          setProperties(propertiesData);
-        }
+        // Cargar datos básicos
+        const blogsData = await getBlogPosts();
+        const propertiesData = await getPropertyPosts();
+        
+        // Guardar solo los primeros 3 elementos
+        setBlogs(Array.isArray(blogsData) ? blogsData.slice(0, 3) : []);
+        setProperties(Array.isArray(propertiesData) ? propertiesData.slice(0, 3) : []);
       } catch (error) {
         console.error("Error al cargar datos:", error);
       } finally {
@@ -54,40 +34,10 @@ export default function Principal() {
     };
 
     fetchData();
-  }, [user]); // Añadimos user como dependencia para que se ejecute cuando cambie el estado de autenticación
+  }, []);
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-black bg-fixed p-6">
-        <div className="max-w-7xl mx-auto text-center text-white">
-          <h1 className="text-4xl font-bold mb-6">Bienvenido a nuestra plataforma</h1>
-          <p className="text-xl mb-8">Por favor, inicia sesión o regístrate para ver nuestro contenido</p>
-          <div className="flex justify-center gap-4">
-            <Link
-              to="/login"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold"
-            >
-              Iniciar Sesión
-            </Link>
-            <Link
-              to="/register"
-              className="bg-white hover:bg-gray-100 text-blue-900 px-6 py-3 rounded-lg font-semibold"
-            >
-              Registrarse
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-black bg-fixed p-6 flex justify-center items-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-white"></div>
-      </div>
-    );
-  }
+  // Imagen de perfil por defecto
+  const defaultProfilePic = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-amber-600">
@@ -107,14 +57,18 @@ export default function Principal() {
               {/* Texto de bienvenida */}
               <div className="text-center md:text-left">
                 <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4 tracking-tight">
-                  {user ? `¡Hola, ${user?.name || "Usuario"}!` : "Bienvenido a InmoBlog"}
+                  {isAuthenticated 
+                    ? `¡Hola, ${user?.name || "Usuario"}!` 
+                    : "Bienvenido a InmoBlog"}
                 </h1>
                 <p className="text-xl text-blue-100 mb-6 max-w-xl">
-                  {user ? "Tu portal inmobiliario y de contenido personalizado" : "Descubre propiedades exclusivas y contenido de calidad"}
+                  {isAuthenticated 
+                    ? "Tu portal inmobiliario y de contenido personalizado" 
+                    : "Descubre propiedades exclusivas y contenido de calidad"}
                 </p>
                 
                 <div className="flex flex-wrap justify-center md:justify-start gap-4">
-                  {user ? (
+                  {isAuthenticated ? (
                     <>
                       <Link to="/crear-blog" className="bg-gradient-to-r from-amber-500 to-blue-600 text-white px-6 py-3 rounded-full font-bold transform transition hover:scale-105 hover:shadow-lg">
                         Crear Blog
@@ -137,16 +91,14 @@ export default function Principal() {
               </div>
               
               {/* Perfil de usuario con animación */}
-              {user && (
+              {isAuthenticated && (
                 <div className="relative">
                   <div className="absolute inset-0 bg-gradient-to-r from-amber-500 to-blue-600 rounded-full animate-spin-slow opacity-70 blur-md"></div>
                   <div className="relative w-40 h-40 rounded-full overflow-hidden border-4 border-white shadow-xl">
                     <img 
-                      src={user?.profilePic || defaultProfilePic}
-                      alt="Perfil"
+                      src={user?.profilePic || defaultProfilePic} 
+                      alt="Perfil" 
                       className="w-full h-full object-cover"
-                      onError={handleImageError}
-                      data-type="profile"
                     />
                   </div>
                   <div className="absolute -bottom-2 -right-2 bg-green-500 rounded-full p-2 border-2 border-white">
@@ -186,15 +138,15 @@ export default function Principal() {
                       className="bg-white/10 backdrop-blur-md rounded-xl overflow-hidden shadow-lg border border-white/20 transform transition hover:scale-105"
                       style={{ animationDelay: `${index * 0.1}s` }}
                     >
-                      <div className="h-48 overflow-hidden">
-                        <img 
-                          src={blog.image?.src || defaultBlogImage} 
-                          alt={blog.image?.alt || blog.title} 
-                          className="w-full h-full object-cover"
-                          onError={handleImageError}
-                          data-type="blog"
-                        />
-                      </div>
+                      {blog.image && (
+                        <div className="h-48 overflow-hidden">
+                          <img 
+                            src={blog.image} 
+                            alt={blog.title} 
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
                       <div className="p-6">
                         <h3 className="font-bold text-xl mb-2 text-white">{blog.title}</h3>
                         <p className="text-blue-100 mb-4 line-clamp-2">{blog.description}</p>
@@ -230,19 +182,15 @@ export default function Principal() {
                       className="bg-white/10 backdrop-blur-md rounded-xl overflow-hidden shadow-lg border border-white/20 transform transition hover:scale-105"
                       style={{ animationDelay: `${index * 0.1}s` }}
                     >
-                      <div className="h-48 overflow-hidden">
-                        <img 
-                          src={Array.isArray(property.images) && property.images[0]?.src 
-                            ? property.images[0].src 
-                            : Array.isArray(property.images) && property.images[0] 
-                              ? property.images[0] 
-                              : defaultPropertyImage}
-                          alt={property.title || "Propiedad"}
-                          className="w-full h-full object-cover"
-                          onError={handleImageError}
-                          data-type="property"
-                        />
-                      </div>
+                      {property.images && property.images[0] && (
+                        <div className="h-48 overflow-hidden">
+                          <img 
+                            src={property.images[0]} 
+                            alt={property.title} 
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
                       <div className="p-6">
                         <div className="flex justify-between items-center mb-2">
                           <span className="bg-amber-500 text-white text-xs font-semibold px-2.5 py-0.5 rounded-full">
@@ -261,7 +209,7 @@ export default function Principal() {
                             </svg>
                             {property.bedrooms || '3'} hab.
                           </div>
-                          <Link to={`/propiedades/${property._id}`} className="text-amber-400 hover:text-amber-300 font-medium">
+                          <Link to={`/property/${property._id}`} className="text-amber-400 hover:text-amber-300 font-medium">
                             Ver detalles →
                           </Link>
                         </div>
@@ -311,3 +259,5 @@ export default function Principal() {
     </div>
   );
 }
+
+export default Principal;

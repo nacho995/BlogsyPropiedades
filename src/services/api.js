@@ -1,27 +1,7 @@
 // src/services/api.js
 
 // Configuración base
-const API_BASE_URL = import.meta.env.VITE_API_PUBLIC_API_URL || 'https://goza-madrid.onrender.com';
-
-// Mover handleResponse fuera de fetchAPI para que sea accesible por todas las funciones
-const handleResponse = async (response) => {
-  if (response.status === 401) {
-    // Token expirado o inválido
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('name');
-    localStorage.removeItem('profilePic');
-    window.dispatchEvent(new Event('logout'));
-    throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
-  }
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Error en la solicitud');
-  }
-  
-  return response.json();
-};
+const API_URL = import.meta.env.VITE_API_PUBLIC_API_URL || 'http://localhost:4000';
 
 /**
  * Función para realizar peticiones HTTP con fetch
@@ -29,78 +9,63 @@ const handleResponse = async (response) => {
  * @param {Object} options - Opciones de fetch (method, body, etc)
  * @returns {Promise<any>} - Respuesta de la API
  */
-export const fetchAPI = async (endpoint, options = {}) => {
-  const url = `${API_BASE_URL}${endpoint}`;
-  
-  // Asegurar que tenemos headers
-  options.headers = options.headers || {};
-  
-  // Añadir Content-Type por defecto si no está presente y hay un body
-  if (options.body && !options.headers['Content-Type']) {
-    options.headers['Content-Type'] = 'application/json';
-  }
-  
-  // Añadir token si está disponible en localStorage
+const fetchAPI = async (endpoint, options = {}) => {
+  // Añadir token de autenticación si existe
   const token = localStorage.getItem('token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers
+  };
+  
   if (token) {
-    options.headers['Authorization'] = `Bearer ${token}`;
+    headers['Authorization'] = `Bearer ${token}`;
   }
+  
+  const url = `${API_URL}${endpoint}`;
   
   try {
-    const response = await fetch(url, options);
+    console.log(`Realizando petición ${options.method || 'GET'} a ${url}`);
     
-    // Manejar respuestas no exitosas
+    const response = await fetch(url, {
+      ...options,
+      headers
+    });
+    
+    // Verificar si la respuesta es exitosa
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ 
-        message: `Error ${response.status}: ${response.statusText}` 
-      }));
+      // Clonar la respuesta antes de leerla para evitar el error "body stream already read"
+      const clonedResponse = response.clone();
       
-      throw new Error(errorData.message || `Error ${response.status}`);
+      // Intentar obtener el mensaje de error del servidor
+      let errorMessage;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorData.error || `Error ${response.status}: ${response.statusText}`;
+      } catch (e) {
+        // Si no podemos obtener un JSON, intentamos obtener el texto
+        try {
+          errorMessage = await clonedResponse.text();
+        } catch (textError) {
+          // Si todo falla, usamos el status y statusText
+          errorMessage = `Error ${response.status}: ${response.statusText}`;
+        }
+      }
+      
+      console.error(`Error en respuesta del servidor (${response.status}):`, errorMessage);
+      throw new Error(errorMessage);
     }
     
-    // Para respuestas exitosas, intentar parsear como JSON
-    return await response.json();
+    // Verificar si la respuesta está vacía
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      return await response.json();
+    }
+    
+    return await response.text();
   } catch (error) {
-    console.error(`Error en petición API a ${endpoint}:`, error);
+    console.error(`Error en petición a ${url}:`, error);
     throw error;
   }
-};
-
-/**
- * Función para normalizar URLs HTTP a HTTPS cuando es necesario
- * @param {string} url - URL a normalizar
- * @returns {string} - URL normalizada
- */
-export const secureUrl = (url) => {
-  if (typeof url !== 'string') {
-    return '';
-  }
-  
-  // Si estamos en HTTPS y la URL es HTTP, convertirla
-  if (window.location.protocol === 'https:' && url.startsWith('http:')) {
-    return url.replace('http:', 'https:');
-  }
-  
-  return url;
-};
-
-/**
- * Función para extraer URL real de un objeto de imagen
- * @param {Object} imageObj - Objeto de imagen
- * @returns {string} - URL de la imagen
- */
-export const getImageUrl = (imageObj) => {
-  if (!imageObj) return '';
-  
-  if (typeof imageObj === 'string') {
-    return imageObj;
-  }
-  
-  if (typeof imageObj === 'object') {
-    return imageObj.src || imageObj.url || '';
-  }
-  
-  return '';
 };
 
 /**
@@ -257,132 +222,47 @@ export const resetPassword = async (token, password, passwordConfirm) => {
 };
 
 /**
- * Actualiza el perfil del usuario de manera que funcione en múltiples dispositivos
+ * Actualiza el perfil del usuario
+ * @param {Object} userData - Datos del usuario a actualizar
+ * @param {string} token - Token de autenticación
+ * @returns {Promise<Object>} - Datos actualizados del usuario
  */
-export const updateProfile = async (userData) => {
-  console.log("📸 INICIO updateProfile con datos:", userData);
+export const updateProfile = async (userData, token) => {
   const formData = new FormData();
   
+  // Añadir nombre si existe
   if (userData.name) {
     formData.append('name', userData.name);
-    console.log("👤 Actualizando nombre:", userData.name);
   }
   
-  // Guardar imagen para que funcione en todos los dispositivos
-  if (userData.profilePic && userData.profilePic instanceof File) {
-    console.log("🖼️ Procesando imagen para subir:", userData.profilePic.name, "tamaño:", (userData.profilePic.size/1024).toFixed(2) + "KB");
-    
-    // Añadir imagen al FormData para enviar al servidor
+  // Añadir imagen de perfil si existe
+  if (userData.profilePic) {
     formData.append('profilePic', userData.profilePic);
-    
-    // Crear una copia local de la imagen como respaldo
-    try {
-      // Crear un FileReader para leer la imagen como URL
-      const lector = new FileReader();
-      
-      // Crear una promesa para esperar a que termine de leer
-      const promesaImagen = new Promise(resolver => {
-        lector.onloadend = () => resolver(lector.result);
-        lector.readAsDataURL(userData.profilePic);
-      });
-      
-      // Esperar a que termine de leer la imagen
-      const imagenLocal = await promesaImagen;
-      console.log("📦 Imagen convertida a data URL, longitud:", imagenLocal.length);
-      
-      // Guardar en localStorage para poder usarla si falla la carga
-      localStorage.setItem('profilePic_local', imagenLocal);
-      
-      // También guardar cuándo fue actualizada
-      localStorage.setItem('profilePic_actualizada', new Date().toString());
-      
-      console.log("✅ Imagen guardada localmente como respaldo");
-    } catch (error) {
-      console.log("❌ No se pudo guardar imagen local:", error);
-    }
-  } else {
-    console.log("⚠️ No hay imagen para subir o no es un archivo válido");
   }
   
   try {
-    const token = localStorage.getItem('token');
-    console.log("🔑 Token disponible:", token ? "Sí (longitud: " + token.length + ")" : "No");
-    
-    if (!token) {
-      throw new Error("No hay token disponible");
+    const headers = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
     
-    // Añadir timestamp para evitar caché
-    const timestamp = Date.now();
-    console.log("🕒 Enviando petición al servidor con timestamp:", timestamp);
-    
-    const response = await fetch(`${API_BASE_URL}/user/update-profile?t=${timestamp}`, {
+    const response = await fetch(`${API_URL}/user/update-profile`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
+      headers,
       body: formData
     });
     
-    console.log("📡 Respuesta del servidor:", response.status, response.statusText);
-    
     if (!response.ok) {
-      console.warn("❌ Error del servidor:", response.status, response.statusText);
-      
-      // Si hay error en el servidor, usar datos locales como respaldo
-      const errorBody = await response.text();
-      console.log("📄 Cuerpo del error:", errorBody);
-      
-      const respaldoLocal = {
-        name: userData.name || localStorage.getItem('name') || '',
-        profilePic: localStorage.getItem('profilePic_local') || ''
-      };
-      console.log("🚨 Usando respaldo local:", respaldoLocal);
-      
-      return respaldoLocal;
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
     }
     
-    const result = await response.json();
-    console.log("✅ Datos recibidos del servidor:", result);
-    
-    // Actualizar localStorage con los nuevos datos
-    const profilePic = result.profileImage || result.profilePic || localStorage.getItem('profilePic_local') || '';
-    console.log("🖼️ URL de imagen actualizada:", profilePic);
-    
-    localStorage.setItem('profilePic', profilePic);
-    console.log("📦 profilePic guardado en localStorage");
-    
-    // Actualizar objeto usuario en localStorage
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        console.log("👤 Datos actuales de user en localStorage:", user);
-        
-        user.profilePic = profilePic;
-        user.lastUpdated = new Date().toISOString(); // Añadir timestamp
-        localStorage.setItem('user', JSON.stringify(user));
-        
-        console.log("✅ user actualizado en localStorage");
-      } catch (e) {
-        console.error("❌ Error al actualizar user en localStorage:", e);
-      }
-    }
-    
-    return result;
+    return await response.json();
   } catch (error) {
-    console.error('❌ Error completo al actualizar perfil:', error);
-    
-    // En caso de error, devolver datos locales como respaldo
-    const respaldoEmergencia = {
-      name: userData.name || localStorage.getItem('name') || '',
-      profilePic: localStorage.getItem('profilePic_local') || ''
-    };
-    
-    console.log("🆘 Devolviendo respaldo de emergencia:", respaldoEmergencia);
-    return respaldoEmergencia;
+    console.error('Error al actualizar perfil:', error);
+    throw error;
   }
-}
+};
 
 /**
  * Función para subir imágenes de blogs
@@ -400,9 +280,9 @@ export const uploadImageBlog = async (file, token) => {
       headers['Authorization'] = `Bearer ${token}`;
     }
     
-    console.log("Subiendo imagen de blog a:", `${API_BASE_URL}/blog/upload`);
+    console.log("Subiendo imagen de blog a:", `${API_URL}/blog/upload`);
     
-    const response = await fetch(`${API_BASE_URL}/blog/upload`, {
+    const response = await fetch(`${API_URL}/blog/upload`, {
       method: 'POST',
       headers,
       body: formData
@@ -442,9 +322,9 @@ export const uploadFile = async (file, token) => {
     
     // No hay una ruta específica para subir archivos en propertyRouter
     // Debe usarse la ruta principal con propiedad vacía
-    console.log("Subiendo archivo a:", `${API_BASE_URL}/property`);
+    console.log("Subiendo archivo a:", `${API_URL}/property`);
     
-    const response = await fetch(`${API_BASE_URL}/property`, {
+    const response = await fetch(`${API_URL}/property`, {
       method: 'POST',
       headers,
       body: formData
@@ -535,8 +415,7 @@ export const updatePropertyPost = async (id, data) => {
  */
 export const getPropertyById = async (id) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/property/${id}`);
-    return handleResponse(response);
+    return await fetchAPI(`/property/${id}`);
   } catch (error) {
     console.error(`Error al obtener propiedad ${id}:`, error);
     throw error;
@@ -544,91 +423,20 @@ export const getPropertyById = async (id) => {
 };
 
 /**
- * Obtiene los datos del usuario actual con diagnóstico
+ * Obtiene los datos del usuario actual
+ * @param {string} [tokenParam] - Token opcional para autenticación
+ * @returns {Promise<Object>} Datos del usuario
  */
 export const getCurrentUser = async (tokenParam) => {
-  console.log("🔍 INICIO getCurrentUser");
-  
   const token = tokenParam || localStorage.getItem('token');
-  console.log("🔑 Token disponible:", token ? "Sí (longitud: " + token.length + ")" : "No");
-  
   if (!token) {
-    console.log("❌ No hay token, no se puede obtener usuario");
     throw new Error('No hay token de autenticación');
   }
 
   try {
-    // Añadir timestamp para evitar caché
-    const timestamp = Date.now();
-    console.log("🕒 Obteniendo usuario con timestamp:", timestamp);
-    
-    const response = await fetch(`${API_BASE_URL}/user/me?t=${timestamp}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    console.log("📡 Respuesta al obtener usuario:", response.status, response.statusText);
-    
-    if (!response.ok) {
-      // Si hay error del servidor, usar datos de localStorage como respaldo
-      console.warn(`❌ Error ${response.status} al obtener usuario.`);
-      
-      const localData = {
-        name: localStorage.getItem('name') || '',
-        profilePic: localStorage.getItem('profilePic') || localStorage.getItem('profilePic_local') || '',
-        _fromLocalStorage: true
-      };
-      
-      console.log("🚨 Usando datos locales para usuario:", localData);
-      return localData;
-    }
-    
-    const userData = await response.json();
-    console.log("✅ Datos de usuario recibidos del servidor:", userData);
-    
-    // Diagnóstico de fuentes de imagen
-    console.log("🔍 Fuentes de imagen disponibles:");
-    console.log("  - userData.profilePic:", userData.profilePic || "no disponible");
-    console.log("  - userData.profileImage:", userData.profileImage || "no disponible");
-    console.log("  - localStorage.profilePic:", localStorage.getItem('profilePic') || "no disponible");
-    console.log("  - localStorage.profilePic_local:", localStorage.getItem('profilePic_local') || "no disponible");
-    
-    // Actualizar localStorage con los datos más recientes
-    if (userData.profilePic || userData.profileImage) {
-      localStorage.setItem('profilePic', userData.profilePic || userData.profileImage || '');
-      console.log("📦 profilePic actualizado en localStorage:", userData.profilePic || userData.profileImage);
-    }
-    if (userData.name) {
-      localStorage.setItem('name', userData.name);
-      console.log("📦 name actualizado en localStorage:", userData.name);
-    }
-    
-    return userData;
+    return await fetchAPI('/user/me');
   } catch (error) {
-    console.error('❌ Error completo en getCurrentUser:', error);
-    
-    // En caso de error de red, usar datos locales
-    const respaldoEmergencia = {
-      name: localStorage.getItem('name') || '',
-      profilePic: localStorage.getItem('profilePic') || localStorage.getItem('profilePic_local') || '',
-      _fromLocalStorage: true
-    };
-    
-    console.log("🆘 Devolviendo respaldo de emergencia para usuario:", respaldoEmergencia);
-    return respaldoEmergencia;
-  }
-};
-
-/**
- * Verifica si el token actual es válido
- * @returns {Promise<Object>} Respuesta del servidor
- */
-export const verifyToken = async () => {
-  try {
-    return await fetchAPI('/user/verify-token');
-  } catch (error) {
-    console.error('Error al verificar token:', error);
+    console.error('Error en getCurrentUser:', error);
     throw error;
   }
 };
