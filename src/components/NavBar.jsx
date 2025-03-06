@@ -105,31 +105,52 @@ export default function Navbar() {
 
   // Función mejorada para renderizar avatar con diagnóstico
   const renderUserAvatar = (user) => {
-    console.log("🖼️ Renderizando avatar de usuario");
+    // Evitar renderizado si no hay usuario
+    if (!user) return null;
     
-    // Buscar la imagen en todas las fuentes posibles (con prioridad)
-    const profileImage = user?.profileImage || user?.profilePic || localStorage.getItem('profilePic') || localStorage.getItem('profilePic_local') || null;
+    // Obtener la URL de la imagen desde diversas fuentes
+    let profileImageUrl = '';
     
-    // Mostrar todas las fuentes posibles para diagnóstico
-    console.log("🔍 Fuentes de imagen disponibles:");
-    console.log("  - user.profileImage:", user?.profileImage || "no disponible");
-    console.log("  - user.profilePic:", user?.profilePic || "no disponible");
-    console.log("  - localStorage.profilePic:", localStorage.getItem('profilePic') || "no disponible");
-    console.log("  - localStorage.profilePic_local:", localStorage.getItem('profilePic_local') || "no disponible");
-    console.log("  - Imagen seleccionada:", profileImage);
+    // Si user.profilePic es un objeto con src
+    if (user.profilePic && user.profilePic.src) {
+      profileImageUrl = user.profilePic.src;
+    } 
+    // Si user.profilePic es directamente una URL
+    else if (typeof user.profilePic === 'string') {
+      profileImageUrl = user.profilePic;
+    }
+    // Si hay imagen en localStorage (recuperarla y parsear si es necesario)
+    else {
+      const localStorageImg = localStorage.getItem('profilePic');
+      if (localStorageImg) {
+        try {
+          const parsedImg = JSON.parse(localStorageImg);
+          profileImageUrl = parsedImg.src || '';
+        } catch (e) {
+          // Si no es JSON, podría ser directamente una URL
+          profileImageUrl = localStorageImg;
+        }
+      }
+    }
+    
+    // Usar imagen de respaldo si existe
+    if (!profileImageUrl) {
+      const backupImg = localStorage.getItem('profilePic_local');
+      if (backupImg) profileImageUrl = backupImg;
+    }
     
     // Añadir timestamp para evitar caché
-    const imageUrl = profileImage ? `${profileImage}?t=${Date.now()}` : null;
+    const imageUrl = profileImageUrl ? `${profileImageUrl}?t=${Date.now()}` : null;
     
     if (imageUrl) {
-      console.log("✅ Usando imagen:", imageUrl);
+      console.log("✅ Usando imagen:", imageUrl.substring(0, 50) + "...");
       return (
         <img
           className="h-8 w-8 rounded-full object-cover"
           src={imageUrl}
           alt={`${user?.name || 'Usuario'}`}
           onError={(e) => {
-            console.log("❌ Error cargando imagen en NavBar:", e.target.src);
+            console.log("❌ Error cargando imagen en NavBar:", e.target.src.substring(0, 50) + "...");
             handleImageError(e);
           }}
           data-type="profile"

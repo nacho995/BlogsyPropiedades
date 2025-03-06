@@ -138,36 +138,35 @@ export function UserProvider({ children }) {
   }, [logout]); // Ahora logout ya existe
   
   // Función de login
-  const login = (userData) => {
-    // Guardar en localStorage
-    localStorage.setItem("token", userData.token || "");
-    localStorage.setItem("name", userData.name || "");
-    
-    // Guardar la imagen de perfil (considerar ambas propiedades)
-    const profilePic = userData.profileImage || userData.profilePic || "";
-    localStorage.setItem("profilePic", profilePic);
-    
-    // Guardar timestamp para control de sincronización
-    const timestamp = new Date().toISOString();
-    
-    // Guardar usuario completo con datos actualizados
-    localStorage.setItem("user", JSON.stringify({
-      ...userData,
-      profilePic, // Asegurar consistencia
-      lastUpdated: timestamp
-    }));
-    
-    // Actualizar estado
-    setUser({
-      token: userData.token,
-      name: userData.name,
-      profilePic: profilePic,
-      profileImage: userData.profileImage, // Mantener ambas propiedades
-      isAdmin: userData.isAdmin || false,
-      email: userData.email || "",
-      lastUpdated: timestamp
-    });
-    setIsAuthenticated(true);
+  const login = async (credentials) => {
+    try {
+      const result = await fetchAPI('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(credentials)
+      });
+      
+      if (result.token) {
+        // Guardar como JSON para objetos complejos
+        localStorage.setItem('token', result.token);
+        localStorage.setItem('user', JSON.stringify(result.user));
+        
+        // Si hay profilePic como objeto, guardar serializado
+        if (result.user.profilePic) {
+          localStorage.setItem('profilePic', JSON.stringify(result.user.profilePic));
+        }
+        
+        setUser({
+          token: result.token,
+          ...result.user
+        });
+        
+        setIsAuthenticated(true);
+        return true;
+      }
+    } catch (error) {
+      console.error('Error al iniciar sesión:', error);
+      return false;
+    }
   };
   
   // Comprobar si hay imágenes nuevas cada cierto tiempo
@@ -186,28 +185,25 @@ export function UserProvider({ children }) {
       
       try {
         // Intentar obtener datos del servidor
-        console.log("📡 Solicitando datos actualizados con token:", user.token ? "Disponible" : "No disponible");
-        
         const datos = await fetch(`${import.meta.env.VITE_API_PUBLIC_API_URL}/user/me`, {
           headers: {
             'Authorization': `Bearer ${user.token}`
           }
         });
         
-        console.log("📡 Respuesta al verificar actualizaciones:", datos.status, datos.statusText);
-        
         // Si la respuesta es correcta
         if (datos.ok) {
           const datosUsuario = await datos.json();
-          console.log("✅ Datos actualizados recibidos:", datosUsuario);
           
-          // Mostrar estado actual para comparación
-          console.log("🔍 Comparando imágenes:");
-          console.log("  - Actual:", user.profilePic);
-          console.log("  - Nueva:", datosUsuario.profilePic);
+          // Verificar si hay cambios en la imagen de perfil - COMPARAR URLS, NO OBJETOS
+          const imagenActual = user.profilePic?.src || '';
+          const imagenNueva = datosUsuario.profilePic?.src || '';
           
-          // Verificar si hay cambios en la imagen de perfil
-          if (datosUsuario.profilePic && datosUsuario.profilePic !== user.profilePic) {
+          console.log("🔍 Comparando URLs de imágenes:");
+          console.log("  - Actual:", imagenActual);
+          console.log("  - Nueva:", imagenNueva);
+          
+          if (datosUsuario.profilePic && imagenActual !== imagenNueva) {
             console.log("🔄 ¡Nueva imagen de perfil detectada!");
             
             // Actualizar estado
@@ -220,15 +216,9 @@ export function UserProvider({ children }) {
               };
             });
             
-            // Actualizar localStorage
-            localStorage.setItem('profilePic', datosUsuario.profilePic);
+            // Guardar en localStorage como string JSON
+            localStorage.setItem('profilePic', JSON.stringify(datosUsuario.profilePic));
             console.log("📦 Actualizado localStorage con nueva imagen");
-            
-            // Verificar si se guardó correctamente
-            setTimeout(() => {
-              console.log("🔍 Verificando localStorage después de actualizar:");
-              console.log("  - profilePic:", localStorage.getItem('profilePic'));
-            }, 100);
           } else {
             console.log("✓ No hay cambios en la imagen de perfil");
           }
