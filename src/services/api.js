@@ -231,9 +231,7 @@ export const resetPassword = async (token, password, passwordConfirm) => {
 };
 
 /**
- * Actualiza el perfil del usuario
- * @param {Object} userData - Datos del usuario a actualizar
- * @returns {Promise<Object>} - Datos actualizados del usuario
+ * Actualiza el perfil del usuario, asegurando que la imagen se suba correctamente
  */
 export const updateProfile = async (userData) => {
   const formData = new FormData();
@@ -243,14 +241,18 @@ export const updateProfile = async (userData) => {
   }
   
   if (userData.profilePic && userData.profilePic instanceof File) {
+    // Añadir metadata para asegurar que el servidor lo procese correctamente
     formData.append('profilePic', userData.profilePic);
+    console.log("Subiendo imagen de perfil:", userData.profilePic.name);
   }
   
   try {
-    // Usar token desde localStorage
     const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error("No hay token disponible");
+    }
     
-    // No incluir Content-Type con FormData
+    // Usar fetch directamente para tener más control
     const response = await fetch(`${API_URL}/user/update-profile`, {
       method: 'POST',
       headers: {
@@ -264,12 +266,31 @@ export const updateProfile = async (userData) => {
       throw new Error(`Error al actualizar perfil: ${errorText}`);
     }
     
-    return await response.json();
+    const result = await response.json();
+    
+    // Aquí está la clave: actualizar inmediatamente localStorage
+    if (result.profilePic) {
+      localStorage.setItem('profilePic', result.profilePic);
+      
+      // También actualizar el objeto user en localStorage
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          user.profilePic = result.profilePic;
+          localStorage.setItem('user', JSON.stringify(user));
+        } catch (e) {
+          console.error("Error al actualizar user en localStorage:", e);
+        }
+      }
+    }
+    
+    return result;
   } catch (error) {
     console.error('Error al actualizar perfil:', error);
     throw error;
   }
-};
+}
 
 /**
  * Función para subir imágenes de blogs

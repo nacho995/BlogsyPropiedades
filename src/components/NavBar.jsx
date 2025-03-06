@@ -131,7 +131,7 @@ export default function Navbar() {
                     <span className="sr-only">Open user menu</span>
                     <img
                       className="h-8 w-8 rounded-full"
-                      src={user?.profilePic || IMG_DEFAULTS.profile}
+                      src={user?.profilePic ? `${user.profilePic}?t=${Date.now()}` : IMG_DEFAULTS.profile}
                       alt=""
                       onError={handleImageError}
                       data-type="profile"

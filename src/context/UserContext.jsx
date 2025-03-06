@@ -42,7 +42,7 @@ export function UserProvider({ children }) {
     };
   }, []);
   
-  // Simplificar la verificación de token inicial
+  // Mejorar la verificación inicial para obtener siempre la imagen más reciente
   useEffect(() => {
     const verificarToken = async () => {
       const token = localStorage.getItem('token');
@@ -50,28 +50,37 @@ export function UserProvider({ children }) {
       if (!token) return;
       
       try {
+        // Siempre consultar al servidor para obtener datos actualizados
         const response = await fetch(`${import.meta.env.VITE_API_PUBLIC_API_URL}/user/me`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
         });
         
-        // Solo actualizar datos del usuario si todo está bien
         if (response.ok) {
           const userData = await response.json();
+          
+          // Actualizar todos los datos, incluida la imagen de perfil
           setUser({
             token,
-            ...userData,
-            // Asegurar que tengamos estos campos
-            name: userData.name || localStorage.getItem("name") || "",
-            profilePic: userData.profilePic || localStorage.getItem("profilePic") || ""
+            ...userData
           });
+          
+          // Guardar también en localStorage para tener respaldo
+          localStorage.setItem("profilePic", userData.profilePic || "");
+          localStorage.setItem("name", userData.name || "");
+          
           setIsAuthenticated(true);
         }
-        // No cerrar sesión automáticamente si hay error
       } catch (error) {
-        console.error("Error al verificar token (posible problema de red):", error);
-        // No cerrar sesión por errores de red
+        console.error("Error al verificar datos de usuario:", error);
+        // En caso de error, usar datos de respaldo del localStorage
+        setUser({
+          token,
+          name: localStorage.getItem("name") || "",
+          profilePic: localStorage.getItem("profilePic") || ""
+        });
+        setIsAuthenticated(true);
       }
     };
     

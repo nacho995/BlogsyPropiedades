@@ -39,7 +39,8 @@ export default function CambiarPerfil() {
       login({
         ...user,
         name: result.name || user.name,
-        profilePic: result.profilePic || user.profilePic
+        profilePic: result.profilePic || user.profilePic,
+        _updatedAt: new Date().toISOString()
       });
       
       setMessage('Perfil actualizado correctamente');
