@@ -4,6 +4,8 @@ import { Link, useParams } from "react-router-dom";
 import { Dialog } from "@headlessui/react";
 import { getBlogById, updateBlogPost, deleteBlogPost, uploadImageBlog } from "../services/api";
 import { useUser } from "../context/UserContext";
+import { FiCalendar, FiClock, FiUser, FiTag, FiX, FiUpload } from 'react-icons/fi';
+import toast from 'react-hot-toast';
 
 export default function BlogDetail() {
   const { id } = useParams();
@@ -15,6 +17,8 @@ export default function BlogDetail() {
   const [previewUrls, setPreviewUrls] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
   // Obtener el usuario actual
   const { user } = useUser();
@@ -23,29 +27,30 @@ export default function BlogDetail() {
     const fetchBlog = async () => {
       try {
         const data = await getBlogById(id);
+        console.log("Datos del blog recibidos:", data);
         
-        // Mejorar el manejo de imágenes
+        // Normalizar el formato de las imágenes
         let blogImages = [];
         
-        // Si hay una imagen en formato antiguo (objeto image)
-        if (data.image && data.image.src) {
-          blogImages.push({
-            src: data.image.src,
-            alt: data.image.alt || "Imagen del blog"
-          });
+        // Manejar imagen principal
+        if (data.image && typeof data.image === 'object' && data.image.src) {
+          blogImages.push(data.image);
+          console.log("Imagen principal añadida:", data.image);
         }
         
-        // Si hay un array de imágenes (formato nuevo)
+        // Manejar imágenes adicionales si existen
         if (data.images && Array.isArray(data.images) && data.images.length > 0) {
-          // Si las imágenes son strings, convertirlas a objetos
-          const formattedImages = data.images.map(img => {
+          console.log("Imágenes adicionales encontradas en data.images:", data.images);
+          const additionalImages = data.images.map(img => {
             if (typeof img === 'string') {
               return { src: img, alt: "Imagen del blog" };
+            } else if (typeof img === 'object' && img.src) {
+              return img;
             }
-            return img;
+            return { src: img, alt: "Imagen del blog" };
           });
-          
-          blogImages = [...blogImages, ...formattedImages];
+          console.log("Imágenes adicionales procesadas:", additionalImages);
+          blogImages = [...blogImages, ...additionalImages];
         }
         
         const formattedData = {
@@ -53,16 +58,15 @@ export default function BlogDetail() {
           images: blogImages
         };
         
+        console.log("Blog formateado con todas las imágenes:", formattedData);
+        console.log("Número total de imágenes:", blogImages.length);
         setBlog(formattedData);
         setEditedBlog(formattedData);
-        
-        // Crear URLs de previsualización si existen imágenes
-        if (blogImages.length > 0) {
-          const urls = blogImages.map(img => img.src);
-          setPreviewUrls(urls);
-        }
       } catch (error) {
         console.error("Error al obtener el blog:", error);
+        toast.error('Error al cargar el blog');
+      } finally {
+        setLoading(false);
       }
     };
     fetchBlog();
@@ -78,38 +82,61 @@ export default function BlogDetail() {
 
   const handleSave = async () => {
     try {
-      console.log("Datos a enviar:", editedBlog);
+      console.log("Preparando datos para guardar...");
+      console.log("Estado actual del blog editado:", editedBlog);
+      
+      // Asegurarse de que tenemos un array de imágenes
+      const allImages = editedBlog.images || [];
+      console.log("Todas las imágenes disponibles:", allImages);
+      
+      // Separar la imagen principal y las imágenes adicionales
+      const mainImage = allImages[0] || { src: "", alt: "" };
+      const additionalImages = allImages.slice(1) || [];
+      
+      console.log("Imagen principal:", mainImage);
+      console.log("Imágenes adicionales:", additionalImages);
       
       // Preparar los datos según la estructura esperada por el backend
       const dataToSend = {
-        ...editedBlog,
-        // Mantener la estructura original del blog
-        image: {
-          src: editedBlog.images && editedBlog.images.length > 0 
-            ? editedBlog.images[0].src 
-            : "",
-          alt: editedBlog.images && editedBlog.images.length > 0 
-            ? editedBlog.images[0].alt || "Imagen del blog"
-            : "Imagen del blog"
-        }
+        title: editedBlog.title,
+        content: editedBlog.content,
+        description: editedBlog.description,
+        category: editedBlog.category,
+        tags: editedBlog.tags,
+        // Enviar la imagen principal en el campo image
+        image: mainImage,
+        // Enviar las imágenes adicionales como array de URLs en el campo images
+        images: additionalImages.map(img => img.src)
       };
-      
-      // Eliminar campos que puedan causar problemas
-      delete dataToSend._id;  // No enviar el ID en el cuerpo
-      delete dataToSend.__v;  // No enviar la versión de MongoDB
-      delete dataToSend.createdAt;  // No enviar la fecha de creación
-      delete dataToSend.updatedAt;  // No enviar la fecha de actualización
       
       console.log("Datos preparados para enviar:", dataToSend);
       
       const result = await updateBlogPost(id, dataToSend);
       console.log("Respuesta del servidor:", result);
       
-      setBlog(editedBlog);
-      setIsEditing(false);
-      setIsOpen(false);
+      if (result) {
+        toast.success('Blog actualizado correctamente');
+        
+        // Reconstruir el estado con todas las imágenes
+        const updatedBlog = {
+          ...result,
+          images: [
+            result.image, // Imagen principal
+            ...(result.images || []).map(imgUrl => ({ // Imágenes adicionales
+              src: imgUrl,
+              alt: "Imagen del blog"
+            }))
+          ].filter(img => img && img.src) // Filtrar imágenes válidas
+        };
+        
+        console.log("Blog actualizado con todas las imágenes:", updatedBlog);
+        setBlog(updatedBlog);
+        setEditedBlog(updatedBlog);
+        setIsEditing(false);
+      }
     } catch (error) {
       console.error("Error al guardar cambios:", error);
+      toast.error('Error al guardar los cambios');
     }
   };
 
@@ -161,301 +188,411 @@ export default function BlogDetail() {
 
   const handleImageUpload = async (files) => {
     try {
-      const formData = new FormData();
-      files.forEach(file => {
-        formData.append('images', file);
+      setUploading(true);
+      setUploadError(null);
+
+      // Convertir FileList a Array
+      const fileArray = Array.from(files);
+      
+      // Validar cada archivo
+      const invalidFiles = fileArray.filter(file => !file.type.startsWith('image/'));
+      if (invalidFiles.length > 0) {
+        throw new Error('Solo se permiten archivos de imagen');
+      }
+
+      // Subir cada imagen y obtener sus URLs
+      const uploadPromises = fileArray.map(async (file) => {
+        const result = await uploadImageBlog(file);
+        return {
+          src: result.secure_url || result.imageUrl,
+          alt: file.name,
+          public_id: result.public_id
+        };
       });
 
-      const response = await fetch(`${API_BASE_URL}/upload-images`, {
-        method: 'POST',
-        body: formData
-      });
+      const uploadedImages = await Promise.all(uploadPromises);
 
-      if (!response.ok) throw new Error('Error al subir imágenes');
+      // Actualizar el estado con las nuevas imágenes
+      setEditedBlog(prev => ({
+        ...prev,
+        images: [...(prev.images || []), ...uploadedImages]
+      }));
 
-      const data = await response.json();
-      return data.imageUrls;
+      // Actualizar las URLs de vista previa
+      setPreviewUrls(prev => [...prev, ...uploadedImages.map(img => img.src)]);
+
+      toast.success('Imágenes subidas correctamente');
     } catch (error) {
       console.error('Error al subir imágenes:', error);
-      throw error;
-    }
-  };
-
-  // Función para manejar la subida de archivos
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setUploading(true);
-    setUploadError(null);
-
-    try {
-      console.log("Subiendo archivo...");
-      
-      // Usar la función de la API para subir la imagen
-      const result = await uploadImageBlog(file, user?.token);
-      
-      console.log("Resultado de la subida:", result);
-      
-      // Verificar si tenemos una URL de imagen en cualquier formato posible
-      let imageUrl = null;
-      if (result.imageUrl) {
-        imageUrl = result.imageUrl;
-      } else if (result.url) {
-        imageUrl = result.url;
-      } else if (result.secure_url) {
-        imageUrl = result.secure_url;
-      } else if (result.path) {
-        imageUrl = result.path;
-      }
-      
-      if (imageUrl) {
-        // Añadir la nueva imagen al blog
-        const newImages = editedBlog.images ? [...editedBlog.images] : [];
-        newImages.push({
-          src: imageUrl,
-          alt: file.name || "Imagen subida"
-        });
-        
-        setEditedBlog({ ...editedBlog, images: newImages });
-        
-        // Añadir URL a la previsualización
-        setPreviewUrls(prev => [...prev, imageUrl]);
-      } else {
-        throw new Error("No se recibió URL de imagen del servidor");
-      }
-    } catch (error) {
-      console.error("Error detallado:", error);
-      setUploadError("Error al subir la imagen. Inténtalo de nuevo.");
+      setUploadError(error.message);
+      toast.error(`Error al subir imágenes: ${error.message}`);
     } finally {
       setUploading(false);
     }
   };
 
-  if (!blog) {
-    return <p className="text-center text-gray-500">Cargando...</p>;
+  const handleSaveChanges = async () => {
+    try {
+      // Validar campos requeridos
+      if (!editedBlog.title || !editedBlog.description || !editedBlog.content) {
+        toast.error('Por favor completa todos los campos requeridos');
+        return;
+      }
+
+      // Asegurarse de que las imágenes tengan el formato correcto
+      const formattedImages = editedBlog.images.map(img => {
+        if (typeof img === 'string') {
+          return { src: img, alt: editedBlog.title };
+        }
+        return img;
+      });
+
+      const updatedBlog = {
+        ...editedBlog,
+        images: formattedImages
+      };
+
+      const response = await updateBlogPost(id, updatedBlog);
+      setBlog(response.blog);
+      setIsEditing(false);
+      toast.success('Blog actualizado correctamente');
+    } catch (error) {
+      console.error('Error al actualizar el blog:', error);
+      toast.error('Error al actualizar el blog');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
   }
 
+  if (!blog) {
+    return (
+      <div className="text-center py-12">
+        <h2 className="text-2xl font-bold text-gray-800">Blog no encontrado</h2>
+      </div>
+    );
+  }
+
+  // Función para manejar la navegación de imágenes
+  const nextImage = () => {
+    if (blog.images && blog.images.length > 0) {
+      setCurrentImageIndex((prevIndex) => 
+        prevIndex === blog.images.length - 1 ? 0 : prevIndex + 1
+      );
+    }
+  };
+
+  const prevImage = () => {
+    if (blog.images && blog.images.length > 0) {
+      setCurrentImageIndex((prevIndex) => 
+        prevIndex === 0 ? blog.images.length - 1 : prevIndex - 1
+      );
+    }
+  };
+
+  // Obtener todas las imágenes disponibles
+  const allImages = blog.images || (blog.image ? [blog.image.src] : []);
+
   return (
-    <div className="bg-gradient-to-br from-blue-900 to-black bg-fixed p-6">
-      <div className="max-w-2xl mx-auto p-6 bg-gradient-to-bl from-white to-blue-900 rounded-lg shadow-md">
-        {/* Título */}
-        <h1 className="text-3xl font-bold mb-4">
-          {isEditing ? (
-            <input
-              type="text"
-              name="title"
-              value={editedBlog.title || ""}
-              onChange={handleChange}
-              className="w-full border p-2 rounded"
-            />
-          ) : (
-            blog.title
-          )}
-        </h1>
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      {!isEditing ? (
+        <article className="bg-white rounded-2xl shadow-xl overflow-hidden">
+          {/* Carrusel de imágenes */}
+          <div className="relative h-[400px] bg-gray-100">
+            {blog.images && blog.images.length > 0 ? (
+              <>
+                <img
+                  src={blog.images[currentImageIndex]?.src || ''}
+                  alt={blog.images[currentImageIndex]?.alt || `Imagen ${currentImageIndex + 1} del blog`}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    console.error("Error al cargar la imagen:", e);
+                    e.target.onerror = null;
+                    e.target.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjQwMCIgdmlld0JveD0iMCAwIDgwMCA0MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjgwMCIgaGVpZ2h0PSI0MDAiIGZpbGw9IiNFNUU3RUIiLz48dGV4dCB4PSI0MDAiIHk9IjIwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiM0QjU1NjMiPkltYWdlbiBubyBkaXNwb25pYmxlPC90ZXh0Pjwvc3ZnPg==";
+                  }}
+                />
+                {blog.images.length > 1 && (
+                  <>
+                    <button
+                      onClick={prevImage}
+                      className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition-all"
+                    >
+                      ←
+                    </button>
+                    <button
+                      onClick={nextImage}
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition-all"
+                    >
+                      →
+                    </button>
+                    <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
+                      {blog.images.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setCurrentImageIndex(index)}
+                          className={`w-2 h-2 rounded-full transition-all ${
+                            index === currentImageIndex ? 'bg-white' : 'bg-white bg-opacity-50'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-500">
+                <div className="text-center">
+                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="mt-2">No hay imágenes disponibles</p>
+                </div>
+              </div>
+            )}
+          </div>
 
-        {/* Descripción */}
-        <div className="mb-4">
-          <label className="block font-semibold">Descripción:</label>
-          <textarea
-            name="description"
-            value={editedBlog.description || ""}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-            readOnly={!isEditing}
-          />
-        </div>
-
-
-        {/* Autor */}
-        <div className="mb-4">
-          <label className="block font-semibold">Autor:</label>
-          <input
-            type="text"
-            name="author"
-            value={editedBlog.author || ""}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-            readOnly={!isEditing}
-          />
-        </div>
-
-        {/* Categoría */}
-        <div className="mb-4">
-          <label className="block font-semibold">Categoría:</label>
-          <input
-            type="text"
-            name="category"
-            value={editedBlog.category || ""}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-            readOnly={!isEditing}
-          />
-        </div>
-
-        {/* Contenido */}
-        <div className="mb-4">
-          <label className="block font-semibold">Contenido:</label>
-          <textarea
-            name="content"
-            value={editedBlog.content || ""}
-            onChange={handleChange}
-            className="w-full border p-2 rounded h-32"
-            readOnly={!isEditing}
-          />
-        </div>
-
-        {/* Tags */}
-        <div className="mb-4">
-          <label className="block font-semibold">Tags (separados por coma):</label>
-          <input
-            type="text"
-            name="tags"
-            value={editedBlog.tags ? editedBlog.tags.join(', ') : ''}
-            onChange={handleTagsChange}
-            className="w-full border p-2 rounded"
-            readOnly={!isEditing}
-          />
-        </div>
-
-        {/* Tiempo de lectura */}
-        <div className="mb-4">
-          <label className="block font-semibold">Tiempo de lectura:</label>
-          <input
-            type="text"
-            name="readTime"
-            value={editedBlog.readTime || ""}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-            readOnly={!isEditing}
-          />
-        </div>
-
-
-        {/* Sección de imágenes actualizada */}
-        <div className="mb-4">
-          <label className="block font-semibold mb-2">Imágenes:</label>
-          {editedBlog.images && editedBlog.images.length > 0 ? (
-            <div className="grid grid-cols-2 gap-4">
-              {editedBlog.images.map((img, idx) => (
-                <div key={idx} className="relative border p-2 rounded">
+          {/* Miniaturas de imágenes */}
+          {blog.images && blog.images.length > 1 && (
+            <div className="flex overflow-x-auto p-4 space-x-2">
+              {blog.images.map((img, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentImageIndex(index)}
+                  className={`flex-shrink-0 ${
+                    currentImageIndex === index ? 'ring-2 ring-blue-500' : ''
+                  }`}
+                >
                   <img
-                    src={img.src || "/placeholder.png"}
-                    alt={img.alt || "Imagen"}
-                    className="w-full h-auto rounded object-cover"
-                    style={{ height: "200px" }}
+                    src={img.src}
+                    alt={img.alt || `Miniatura ${index + 1}`}
+                    className="h-20 w-20 object-cover rounded"
                     onError={(e) => {
-                      console.error(`Error cargando imagen: ${img.src}`);
-                      e.target.src = "/placeholder.png";
-                      e.target.alt = "Imagen no disponible";
+                      e.target.onerror = null;
+                      e.target.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAiIGhlaWdodD0iODAiIGZpbGw9IiNFNUU3RUIiLz48cGF0aCBkPSJNNDAgMzBDNDAgMzMuMzEzNyAzNy4zMTM3IDM2IDM0IDM2QzMwLjY4NjMgMzYgMjggMzMuMzEzNyAyOCAzMEMyOCAyNi42ODYzIDMwLjY4NjMgMjQgMzQgMjRDMzcuMzEzNyAyNCA0MCAyNi42ODYzIDQwIDMwWiIgZmlsbD0iIzlDQTNBRiIvPjxwYXRoIGQ9Ik01NiA1Mkw0MCA0MEwyNCA1Mkg1NloiIGZpbGw9IiM5Q0EzQUYiLz48cGF0aCBkPSJNNjQgNTJMNDggMzZMMjQgNjRINjRWNTJaIiBmaWxsPSIjOUNBM0FGIi8+PC9zdmc+";
                     }}
                   />
-                  {isEditing && (
-                    <button
-                      onClick={() => handleDeleteImage(idx)}
-                      className="mt-2 bg-red-600 text-white px-2 py-1 rounded w-full"
-                    >
-                      Eliminar
-                    </button>
-                  )}
-                </div>
+                </button>
               ))}
             </div>
-          ) : (
-            <p className="text-gray-500">No hay imágenes disponibles.</p>
           )}
-          
-          {/* Mostrar las imágenes de previsualización para nuevas subidas */}
-          {isEditing && previewUrls.length > 0 && (
-            <div className="mt-4">
-              <label className="block font-semibold mb-2">Previsualización de nuevas imágenes:</label>
-              <div className="grid grid-cols-2 gap-4">
-                {previewUrls.map((url, idx) => (
-                  <div key={idx} className="relative border p-2 rounded">
-                    <img
-                      src={url}
-                      alt={`Vista previa ${idx + 1}`}
-                      className="w-full h-auto rounded object-cover"
-                      style={{ height: "200px" }}
-                    />
-                  </div>
-                ))}
+
+          <div className="p-8">
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">{blog.title}</h1>
+            
+            <div className="flex flex-wrap gap-4 text-gray-600 mb-8">
+              <div className="flex items-center">
+                <FiCalendar className="mr-2" />
+                <span>{new Date(blog.createdAt).toLocaleDateString()}</span>
               </div>
-            </div>
-          )}
-          
-          {isEditing && (
-            <div className="mt-4 space-y-2">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileUpload}
-                className="hidden"
-                id="file-upload"
-              />
-              <label
-                htmlFor="file-upload"
-                className="bg-blue-500 text-white px-4 py-2 rounded cursor-pointer hover:bg-blue-600 inline-block"
-              >
-                {uploading ? "Subiendo..." : "Subir imagen desde ordenador"}
-              </label>
-              {uploadError && (
-                <p className="text-red-500 mt-2">{uploadError}</p>
+              <div className="flex items-center">
+                <FiClock className="mr-2" />
+                <span>{blog.readTime || '5'} min de lectura</span>
+              </div>
+              <div className="flex items-center">
+                <FiUser className="mr-2" />
+                <span>{blog.author}</span>
+              </div>
+              {blog.category && (
+                <div className="flex items-center">
+                  <FiTag className="mr-2" />
+                  <span>{blog.category}</span>
+                </div>
               )}
             </div>
-          )}
-        </div>
 
-        {/* Botones de acción */}
-        <div className="mt-6 flex gap-4">
-          {!isEditing ? (
-            <button
-              onClick={handleEdit}
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
-            >
-              Modificar
-            </button>
-          ) : (
-            <button
-              onClick={openModifiedModal}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700"
-            >
-              Guardar cambios
-            </button>
-          )}
-        </div>
+            <div className="prose max-w-none">
+              <div dangerouslySetInnerHTML={{ __html: blog.content }} />
+            </div>
+            
+            {blog.tags && blog.tags.length > 0 && (
+              <div className="mt-8 pt-4 border-t">
+                <h3 className="text-lg font-semibold mb-2">Etiquetas:</h3>
+                <div className="flex flex-wrap gap-2">
+                  {blog.tags.map((tag, index) => (
+                    <span
+                      key={index}
+                      className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
-        {/* Modal de confirmación */}
-        <Dialog
-          open={isOpen}
-          onClose={() => setIsOpen(false)}
-          className="fixed inset-0 flex items-center justify-center p-4"
-        >
-          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
-            <Dialog.Title className="text-lg font-semibold">
-              Confirmar modificación
-            </Dialog.Title>
-            <Dialog.Description className="mt-2">
-              ¿Estás seguro de que quieres guardar los cambios?
-            </Dialog.Description>
-            <div className="mt-4 flex justify-end gap-2">
+            {/* Botones de acción */}
+            {user && (user.role === 'admin' || user.role === 'ADMIN') && (
+              <div className="flex justify-end gap-4 mt-6">
+                <button
+                  onClick={handleEdit}
+                  className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+                >
+                  Editar Blog
+                </button>
+              </div>
+            )}
+          </div>
+        </article>
+      ) : (
+        /* Modo de edición */
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          <h2 className="text-2xl font-bold mb-6">Editar Blog</h2>
+          
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Título
+              </label>
+              <input
+                type="text"
+                name="title"
+                value={editedBlog.title || ''}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border rounded-md"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Descripción
+              </label>
+              <input
+                type="text"
+                name="description"
+                value={editedBlog.description || ''}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border rounded-md"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Categoría
+              </label>
+              <input
+                type="text"
+                name="category"
+                value={editedBlog.category || ''}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border rounded-md"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Contenido
+              </label>
+              <textarea
+                name="content"
+                value={editedBlog.content || ''}
+                onChange={handleChange}
+                rows="10"
+                className="w-full px-3 py-2 border rounded-md"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Imágenes del Blog
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {editedBlog.images?.map((img, index) => (
+                  <div key={index} className="relative group">
+                    <img
+                      src={img.src}
+                      alt={img.alt || `Imagen ${index + 1}`}
+                      className="w-full h-32 object-cover rounded-lg shadow-md"
+                    />
+                    <button
+                      onClick={() => {
+                        setEditedBlog(prev => ({
+                          ...prev,
+                          images: prev.images.filter((_, i) => i !== index)
+                        }));
+                      }}
+                      className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <FiX />
+                    </button>
+                  </div>
+                ))}
+                <div className="flex items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById('image-upload').click()}
+                    className="flex flex-col items-center"
+                  >
+                    <FiUpload className="w-8 h-8 text-gray-400" />
+                    <span className="mt-2 text-sm text-gray-500">Subir imagen</span>
+                  </button>
+                  <input
+                    id="image-upload"
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload(e.target.files)}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Etiquetas (separadas por comas)
+              </label>
+              <input
+                type="text"
+                value={editedBlog.tags ? editedBlog.tags.join(', ') : ''}
+                onChange={handleTagsChange}
+                className="w-full px-3 py-2 border rounded-md"
+              />
+            </div>
+
+            <div className="flex justify-end gap-4 pt-6">
               <button
-                onClick={() => setIsOpen(false)}
-                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                onClick={() => setIsEditing(false)}
+                className="px-6 py-2 border rounded-lg hover:bg-gray-100"
               >
                 Cancelar
               </button>
-              <Link
-                to={"/ver-blogs"}
-                onClick={handleSave}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              <button
+                onClick={handleSaveChanges}
+                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
               >
-                Guardar cambios
-              </Link>
+                Guardar Cambios
+              </button>
             </div>
           </div>
-        </Dialog>
-      </div>
+        </div>
+      )}
+
+      {/* Modal para vista ampliada de imágenes */}
+      <Dialog
+        open={isOpen}
+        onClose={() => setIsOpen(false)}
+        className="fixed inset-0 z-50 flex items-center justify-center"
+      >
+        <Dialog.Overlay className="fixed inset-0 bg-black opacity-75" />
+        <div className="relative z-50 max-w-4xl w-full mx-4">
+          <img
+            src={blog.images?.[currentImageIndex]?.src}
+            alt={blog.images?.[currentImageIndex]?.alt || `Imagen ${currentImageIndex + 1}`}
+            className="w-full h-auto max-h-[80vh] object-contain rounded-lg"
+          />
+          <button
+            onClick={() => setIsOpen(false)}
+            className="absolute top-4 right-4 text-white bg-black/50 p-2 rounded-full hover:bg-black/75"
+          >
+            <FiX className="w-6 h-6" />
+          </button>
+        </div>
+      </Dialog>
     </div>
   );
 }

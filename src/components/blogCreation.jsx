@@ -420,8 +420,17 @@ function getFromLocalStorage(key, defaultValue) {
   const stored = localStorage.getItem(key);
   if (!stored) return defaultValue;
   try {
-    return JSON.parse(stored);
-  } catch {
+    const parsedValue = JSON.parse(stored);
+    
+    // Si esperamos un array (basado en defaultValue) pero no recibimos uno, devolver el valor por defecto
+    if (Array.isArray(defaultValue) && !Array.isArray(parsedValue)) {
+      console.warn(`Se esperaba un array para ${key}, pero se recibió:`, parsedValue);
+      return defaultValue;
+    }
+    
+    return parsedValue;
+  } catch (error) {
+    console.error(`Error al parsear ${key} desde localStorage:`, error);
     return defaultValue;
   }
 }
@@ -436,23 +445,35 @@ export default function BlogCreation() {
     getFromLocalStorage('blog_currentStep', 1)
   );
   
-  const [formData, setFormData] = useState(() => 
-    getFromLocalStorage('blog_formData', {
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    content: '',
+    category: 'Inmobiliaria',
+    tags: [],
+    url: '',
+    image: {
+      src: '',
+      alt: ''
+    },
+    images: [], // Asegurarnos de que images siempre sea un array
+    readTime: '5',
+    button: {
       title: '',
-      subtitle: '',
-      content: '',
-      category: 'Inmobiliaria',
-      tags: [],
-      image: '',
-      author: ''
-    })
-  );
+      variant: 'primary',
+      size: 'medium',
+      iconRight: ''
+    }
+  });
   
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [previewImage, setPreviewImage] = useState(() => 
     getFromLocalStorage('blog_previewImage', '')
+  );
+  const [previewImages, setPreviewImages] = useState(() => 
+    getFromLocalStorage('blog_previewImages', [])
   );
   const [tagInput, setTagInput] = useState('');
   
@@ -468,6 +489,56 @@ export default function BlogCreation() {
   useEffect(() => {
     saveToLocalStorage('blog_previewImage', previewImage);
   }, [previewImage]);
+  
+  useEffect(() => {
+    saveToLocalStorage('blog_previewImages', previewImages);
+  }, [previewImages]);
+  
+  // Efecto para sincronizar la imagen del formulario con la previsualización
+  useEffect(() => {
+    // Si estamos en el paso de la imagen
+    if (currentStep === 3) {
+      console.log("Paso 3 activo - Verificando sincronización de imagen");
+      
+      // Si hay una imagen en el formData pero no hay previsualización
+      if (formData.image && !previewImage) {
+        console.log("Sincronizando previsualización con la imagen del formulario:", formData.image);
+        setPreviewImage(formData.image);
+      } 
+      // Si hay previsualización pero no hay imagen en formData
+      else if (!formData.image && previewImage && !previewImage.startsWith('blob:')) {
+        // Si la previsualización es una URL válida (no un blob temporal), actualizar formData
+        console.log("Sincronizando formData con la previsualización:", previewImage);
+        setFormData({
+          ...formData,
+          image: previewImage
+        });
+        
+        // Actualizar localStorage
+        localStorage.setItem('blog_formData', JSON.stringify({
+          ...formData,
+          image: previewImage
+        }));
+      }
+      
+      // Verificar si hay una imagen guardada en localStorage pero no en el estado
+      const savedPreviewImage = localStorage.getItem('blog_previewImage');
+      const savedFormData = JSON.parse(localStorage.getItem('blog_formData') || '{}');
+      
+      if (!previewImage && savedPreviewImage) {
+        console.log("Recuperando previsualización desde localStorage");
+        setPreviewImage(savedPreviewImage);
+      }
+      
+      if (!formData.image && savedFormData.image) {
+        console.log("Recuperando imagen desde localStorage");
+        setFormData(prevFormData => ({
+          ...prevFormData,
+          image: savedFormData.image
+        }));
+      }
+    }
+  }, [currentStep, formData.image, previewImage]);
   
   // Limpiar localStorage al montar el componente (opcional)
   useEffect(() => {
@@ -492,13 +563,14 @@ export default function BlogCreation() {
   }, []);
   
   // Manejo de cambios simple
-  function handleChange(e) {
+  const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
+    console.log(`Campo ${name} actualizado:`, value);
+    setFormData(prevData => ({
+      ...prevData,
       [name]: value
-    });
-  }
+    }));
+  };
   
   // Navegación entre pasos muy simplificada
   function nextStep() {
@@ -535,510 +607,570 @@ export default function BlogCreation() {
   }
   
   // Subir imagen
-  async function handleImageUpload(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    // Generar preview temporal
-    const previewUrl = URL.createObjectURL(file);
-    setPreviewImage(previewUrl);
-    
+  const handleImageUpload = async (files) => {
     try {
       setUploadingImage(true);
       setError(null);
+
+      // Convertir FileList a Array
+      const fileArray = Array.from(files);
       
-      // Subir imagen al servidor
-      const result = await uploadImageBlog(file, user?.token);
-      
-      if (result && result.imageUrl) {
-        setFormData({
-          ...formData,
-          image: result.imageUrl
-        });
-        toast.success('Imagen subida correctamente');
-      } else {
-        throw new Error('No se pudo obtener la URL de la imagen');
+      // Validar cada archivo
+      const invalidFiles = fileArray.filter(file => !file.type.startsWith('image/'));
+      if (invalidFiles.length > 0) {
+        throw new Error('Solo se permiten archivos de imagen');
       }
-    } catch (err) {
-      console.error('Error al subir imagen:', err);
-      setError('Error al subir la imagen');
+
+      // Subir cada imagen y obtener sus URLs
+      const uploadPromises = fileArray.map(async (file) => {
+        const result = await uploadImageBlog(file);
+        return {
+          src: result.secure_url || result.imageUrl,
+          alt: file.name,
+          public_id: result.public_id
+        };
+      });
+
+      const uploadedImages = await Promise.all(uploadPromises);
+
+      // Actualizar el estado con las nuevas imágenes
+      setFormData(prev => ({
+        ...prev,
+        images: [...(prev.images || []), ...uploadedImages]
+      }));
+
+      // Actualizar las URLs de vista previa
+      const newPreviewUrls = uploadedImages.map(img => img.src);
+      setPreviewImages(prev => [...prev, ...newPreviewUrls]);
+
+      toast.success('Imágenes subidas correctamente');
+    } catch (error) {
+      console.error('Error al subir imágenes:', error);
+      setError(error.message);
+      toast.error(`Error al subir imágenes: ${error.message}`);
     } finally {
       setUploadingImage(false);
     }
-  }
+  };
   
   function removeImage() {
-    setPreviewImage('');
-    setFormData({
-      ...formData,
-      image: ''
-    });
+    console.log("Eliminando imagen de previsualización");
+    
+    try {
+      // Si no hay imágenes adicionales, no permitir eliminar la imagen principal
+      if (!Array.isArray(formData.images) || formData.images.length === 0) {
+        console.warn("No se puede eliminar la única imagen disponible");
+        toast.warning("No se puede eliminar la única imagen disponible");
+        return;
+      }
+      
+      // Si hay una URL de objeto, liberarla para evitar fugas de memoria
+      if (previewImage && previewImage.startsWith('blob:')) {
+        URL.revokeObjectURL(previewImage);
+        console.log("URL de objeto liberada:", previewImage);
+      }
+      
+      // Si hay imágenes adicionales, usar la primera como imagen principal
+      const newMainImage = formData.images[0];
+      
+      // Limpiar estados
+      setPreviewImage(newMainImage);
+      setFormData(prevFormData => ({
+        ...prevFormData,
+        image: {
+          src: newMainImage,
+          alt: prevFormData.title || 'Imagen del blog'
+        }
+      }));
+      
+      // Limpiar el input de archivo para permitir seleccionar el mismo archivo nuevamente
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+        console.log("Input de archivo limpiado");
+      }
+      
+      // Actualizar localStorage
+      localStorage.setItem('blog_previewImage', newMainImage);
+      
+      // Actualizar formData en localStorage
+      const currentFormData = JSON.parse(localStorage.getItem('blog_formData') || '{}');
+      localStorage.setItem('blog_formData', JSON.stringify({
+        ...currentFormData,
+        image: {
+          src: newMainImage,
+          alt: currentFormData.title || 'Imagen del blog'
+        }
+      }));
+      
+      console.log("Imagen principal actualizada a:", newMainImage);
+      toast.info('Imagen principal actualizada');
+    } catch (error) {
+      console.error("Error al actualizar la imagen principal:", error);
+      toast.error('Error al actualizar la imagen principal');
+    }
   }
   
   // Enviar formulario
-  async function handleSubmit(e) {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    setLoading(true);
-    setError(null);
+    console.log('Iniciando envío del formulario:', formData);
     
     try {
-      // Datos básicos
-      const blogData = {
-        title: formData.title,
-        subtitle: formData.subtitle,
-        content: formData.content || `<p>${formData.subtitle}</p>`,
-        description: formData.subtitle,
-        category: formData.category,
-        tags: formData.tags,
-        author: formData.author || user?.name || 'Anónimo',
-        readTime: Math.max(1, Math.ceil(formData.content.length / 1000)),
-        image: {
-          src: formData.image || '',
-          alt: formData.title || 'Imagen del blog'
+        setLoading(true);
+        setError(null);
+
+        // Validar campos requeridos
+        if (!formData.title?.trim()) {
+            throw new Error('El título es obligatorio');
         }
-      };
-      
-      const response = await createBlogPost(blogData);
-      console.log("Blog creado:", response);
-      
-      // Limpiar localStorage al finalizar con éxito
-      localStorage.removeItem('blog_currentStep');
-      localStorage.removeItem('blog_formData');
-      localStorage.removeItem('blog_previewImage');
-      
-      toast.success('Blog creado con éxito');
-      navigate('/blogs');
-    } catch (err) {
-      console.error('Error al crear blog:', err);
-      
-      // Mensaje más descriptivo basado en el error
-      if (err.message.includes('500')) {
-        setError('Error en el servidor. Verifica que todos los campos obligatorios estén completos.');
-      } else if (err.message.includes('401')) {
-        setError('No estás autorizado para crear blogs. Por favor, inicia sesión nuevamente.');
-      } else {
-        setError(`Error al crear el blog: ${err.message}`);
-      }
-      
-      // Notificación de error
-      toast.error('No se pudo crear el blog');
+        if (!formData.description?.trim()) {
+            throw new Error('La descripción es obligatoria');
+        }
+        if (!formData.content?.trim()) {
+            throw new Error('El contenido es obligatorio');
+        }
+
+        // Validar que haya al menos una imagen
+        if (!formData.images || formData.images.length === 0) {
+            throw new Error('Debes subir al menos una imagen');
+        }
+
+        // Asegurarse de que hay una imagen principal
+        if (!formData.image || !formData.image.src) {
+            // Si no hay imagen principal, usar la primera imagen
+            formData.image = formData.images[0];
+        }
+
+        // Preparar los datos para enviar
+        const blogData = {
+            ...formData,
+            // Asegurarse de que la imagen principal esté definida
+            image: formData.image,
+            // Asegurarse de que las imágenes estén en el formato correcto
+            images: formData.images.map(img => ({
+                src: img.src,
+                alt: img.alt || formData.title
+            }))
+        };
+
+        console.log('Enviando datos del blog:', blogData);
+        const result = await createBlogPost(blogData);
+        console.log('Blog creado exitosamente:', result);
+        
+        toast.success('¡Blog publicado exitosamente!');
+        // Limpiar el formulario y localStorage
+        resetForm();
+        // Redirigir a la página de blogs
+        navigate('/blogs');
+    } catch (error) {
+        console.error('Error al crear el blog:', error);
+        setError(error.message || 'Error al crear el blog');
+        toast.error(error.message || 'Error al crear el blog');
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  }
+};
   
   // Movemos el ref al nivel superior del componente
   const quillRef = useRef(null);
   
+  // Añadir el manejador para el contenido del editor
+  const handleEditorChange = (content) => {
+    console.log('Contenido del editor actualizado:', content);
+    setFormData(prevData => ({
+      ...prevData,
+      content: content
+    }));
+  };
+  
   // Actualiza la función renderStep para manejar correctamente todos los pasos
   function renderStep() {
-    console.log("Renderizando paso:", currentStep);
+    console.log('Renderizando paso:', currentStep);
     
-    if (currentStep === 1) {
-      return (
-        <div className="space-y-6">
-          <h2 className="text-2xl font-bold text-blue-800 mb-6">Información básica</h2>
-          
-          <div className="mb-6">
-            <label className="block text-gray-700 font-semibold mb-2">
-              Título
-            </label>
-            <input
-              type="text"
-              name="title"
-              value={formData.title}
-              onChange={handleChange}
-              className="w-full border-2 border-blue-200 p-3 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 transition"
-              placeholder="Ej: Guía completa sobre hipotecas en Madrid"
-            />
-          </div>
-          
-          <div className="mb-6">
-            <label className="block text-gray-700 font-semibold mb-2">
-              Subtítulo
-            </label>
-            <input
-              type="text"
-              name="subtitle"
-              value={formData.subtitle}
-              onChange={handleChange}
-              className="w-full border-2 border-blue-200 p-3 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 transition"
-              placeholder="Ej: Todo lo que necesitas saber antes de solicitar tu préstamo"
-            />
-          </div>
-          
-          <div className="mb-6">
-            <label className="block text-gray-700 font-semibold mb-2">
-              Categoría
-            </label>
-            <select
-              name="category"
-              value={formData.category}
-              onChange={handleChange}
-              className="w-full border-2 border-blue-200 p-3 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 transition"
-            >
-              <option value="Inmobiliaria">Inmobiliaria</option>
-              <option value="Finanzas">Finanzas</option>
-              <option value="Legal">Legal</option>
-              <option value="Consejos">Consejos y tips</option>
-              <option value="Mercado">Análisis de mercado</option>
-              <option value="Inversión">Inversión</option>
-            </select>
-          </div>
-          
-          <div className="mb-6">
-            <label className="block text-gray-700 font-semibold mb-2">
-              Autor
-            </label>
-            <input
-              type="text"
-              name="author"
-              value={formData.author}
-              onChange={handleChange}
-              className="w-full border-2 border-blue-200 p-3 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 transition"
-              placeholder="Tu nombre o el nombre del autor"
-            />
-          </div>
-          
-          <div className="mb-6">
-            <label className="block text-gray-700 font-semibold mb-2">
-              Etiquetas
-            </label>
-            <div className="flex">
-              <input
-                type="text"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                className="flex-1 border-2 border-blue-200 p-3 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 transition"
-                placeholder="Añade una etiqueta y presiona Enter"
-              />
-              <button
-                type="button"
-                onClick={addTag}
-                className="ml-2 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {formData.tags.map((tag, index) => (
-                <div
-                  key={index}
-                  className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full flex items-center"
-                >
-                  <span>{tag}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeTag(index)}
-                    className="ml-2 text-blue-600 hover:text-blue-800"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          <div className="flex justify-end mt-8">
-            <button
-              type="button"
-              onClick={nextStep}
-              className="px-5 py-2 bg-blue-600 text-white rounded-lg font-medium shadow-sm hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300"
-            >
-              Siguiente
-            </button>
-          </div>
-        </div>
-      );
-    } else if (currentStep === 2) {
-      return (
-        <div className="space-y-6">
-          <h2 className="text-2xl font-bold text-blue-800 mb-6">Contenido del blog</h2>
-          
-          {/* Plantillas profesionales */}
-          <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-2">
-              Plantillas profesionales
-            </label>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <button
-                type="button"
-                onClick={() => loadTemplate('standardArticle')}
-                className="bg-white border-2 border-blue-200 hover:border-blue-500 p-3 rounded-lg text-left transition"
-              >
-                <div className="font-medium text-blue-800">Artículo estándar</div>
-                <div className="text-xs text-gray-500">Estructura básica con introducción, desarrollo y conclusión</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => loadTemplate('realEstateAnalysis')}
-                className="bg-white border-2 border-blue-200 hover:border-blue-500 p-3 rounded-lg text-left transition"
-              >
-                <div className="font-medium text-blue-800">Análisis inmobiliario</div>
-                <div className="text-xs text-gray-500">Incluye tablas comparativas y análisis de zonas</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => loadTemplate('calculationGuide')}
-                className="bg-white border-2 border-blue-200 hover:border-blue-500 p-3 rounded-lg text-left transition"
-              >
-                <div className="font-medium text-blue-800">Guía de cálculos</div>
-                <div className="text-xs text-gray-500">Formato ideal para explicar fórmulas y ejemplos</div>
-              </button>
-            </div>
-          </div>
-          
-          {/* Editor mejorado con referencia moderna */}
-          <div className="mb-6">
-            <label className="block text-gray-700 font-semibold mb-2">
-              Contenido
-            </label>
-            <div className="border border-gray-300 rounded-lg overflow-hidden quill-container">
-              <ReactQuill
-                ref={quillRef}
-                value={formData.content}
-                onChange={(content) => setFormData({...formData, content})}
-                modules={modules}
-                formats={formats}
-                className="min-h-[400px]"
-                preserveWhitespace={true}
-                theme="snow"
-                placeholder="Escribe el contenido del blog aquí..."
-                bounds=".quill-container"
-              />
-              
-              {/* Botones para insertar elementos */}
-              <div className="mt-4">
-                <div className="flex flex-wrap gap-2 mb-2">
-                  <h3 className="w-full text-sm text-gray-600 font-medium mb-1">Añadir títulos:</h3>
-                  <button
-                    type="button"
-                    onClick={() => insertSpecialBlock('title-main')}
-                    className="text-sm bg-indigo-100 text-indigo-800 px-3 py-1 rounded hover:bg-indigo-200 flex items-center gap-1"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-                    </svg>
-                    Título Principal
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => insertSpecialBlock('title-section')}
-                    className="text-sm bg-indigo-100 text-indigo-800 px-3 py-1 rounded hover:bg-indigo-200 flex items-center gap-1"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-                    </svg>
-                    Título de Sección
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => insertSpecialBlock('title-subsection')}
-                    className="text-sm bg-indigo-100 text-indigo-800 px-3 py-1 rounded hover:bg-indigo-200 flex items-center gap-1"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M3 5a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-                    </svg>
-                    Subtítulo
-                  </button>
-                </div>
-                
-                <div className="flex flex-wrap gap-2 mb-2">
-                  <h3 className="w-full text-sm text-gray-600 font-medium mb-1">Añadir bloques especiales:</h3>
-                  <button
-                    type="button"
-                    onClick={() => insertSpecialBlock('formula')}
-                    className="text-sm bg-blue-100 text-blue-800 px-3 py-1 rounded hover:bg-blue-200 flex items-center gap-1"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M4.649 3.084A1 1 0 015.163 4.4 13.95 13.95 0 004 10c0 1.993.416 3.886 1.164 5.6a1 1 0 01-1.832.8A15.95 15.95 0 012 10c0-2.274.475-4.44 1.332-6.4a1 1 0 011.317-.516zM12.96 7a3 3 0 00-2.342 1.126l-.328.41-.111-.279A2 2 0 008.323 7H8a1 1 0 000 2h.323l.532 1.33-1.035 1.295a1 1 0 01-.781.375H7a1 1 0 100 2h.039a3 3 0 002.342-1.126l.328-.41.111.279A2 2 0 0011.677 14H12a1 1 0 100-2h-.323l-.532-1.33 1.035-1.295A1 1 0 0112.961 9H13a1 1 0 100-2h-.039z" clipRule="evenodd" />
-                    </svg>
-                    Bloque de cálculo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => insertSpecialBlock('highlight')}
-                    className="text-sm bg-yellow-100 text-yellow-800 px-3 py-1 rounded hover:bg-yellow-200 flex items-center gap-1"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                    Bloque destacado
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => insertSpecialBlock('note')}
-                    className="text-sm bg-green-100 text-green-800 px-3 py-1 rounded hover:bg-green-200 flex items-center gap-1"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                    Bloque de nota
-                  </button>
-                </div>
-                
-                <div className="flex flex-wrap gap-2">
-                  <h3 className="w-full text-sm text-gray-600 font-medium mb-1">Elementos adicionales:</h3>
-                  <button
-                    type="button"
-                    onClick={() => insertSpecialBlock('quote')}
-                    className="text-sm bg-purple-100 text-purple-800 px-3 py-1 rounded hover:bg-purple-200 flex items-center gap-1"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H6zM9 8H4v2h5V8z" clipRule="evenodd" />
-                    </svg>
-                    Cita o testimonio
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => insertSpecialBlock('pro-table')}
-                    className="text-sm bg-gray-100 text-gray-800 px-3 py-1 rounded hover:bg-gray-200 flex items-center gap-1"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M5 4a3 3 0 00-3 3v6a3 3 0 003 3h10a3 3 0 003-3V7a3 3 0 00-3-3H5zm-1 9v-1h5v2H5a1 1 0 01-1-1zm7 1h4a1 1 0 001-1v-1h-5v2zm0-4h5V8h-5v2z" clipRule="evenodd" />
-                    </svg>
-                    Tabla
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => insertSpecialBlock('first-paragraph')}
-                    className="text-sm bg-orange-100 text-orange-800 px-3 py-1 rounded hover:bg-orange-200 flex items-center gap-1"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
-                      <path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" />
-                    </svg>
-                    Párrafo inicial
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => insertSpecialBlock('emphasis-paragraph')}
-                    className="text-sm bg-orange-100 text-orange-800 px-3 py-1 rounded hover:bg-orange-200 flex items-center gap-1"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h7a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-                    </svg>
-                    Párrafo enfatizado
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => insertSpecialBlock('separator')}
-                    className="text-sm bg-orange-100 text-orange-800 px-3 py-1 rounded hover:bg-orange-200 flex items-center gap-1"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-                    </svg>
-                    Separador decorativo
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex justify-between mt-8">
-            <button
-              type="button"
-              onClick={prevStep}
-              className="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium shadow-sm hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300"
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              onClick={nextStep}
-              className="px-5 py-2 bg-blue-600 text-white rounded-lg font-medium shadow-sm hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300"
-            >
-              Siguiente
-            </button>
-          </div>
-        </div>
-      );
-    } else if (currentStep === 3) {
-      return (
-        <div className="space-y-6">
-          <h2 className="text-2xl font-bold text-blue-800 mb-6">Imagen destacada</h2>
-          
-          <div className="mb-6">
-            <label className="block text-gray-700 font-semibold mb-2">
-              Imagen de portada
-            </label>
-            <div className="mt-2">
-              <div className="flex items-center justify-center w-full">
-                <label className="flex flex-col w-full h-64 border-2 border-blue-200 border-dashed hover:border-blue-500 hover:bg-blue-50 rounded-lg cursor-pointer transition-all">
-                  <div className="flex flex-col items-center justify-center pt-7">
-                    {!previewImage ? (
-                      <>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 text-blue-400 group-hover:text-blue-600" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                        </svg>
-                        <p className="pt-1 text-sm tracking-wider text-gray-600 group-hover:text-blue-600">
-                          Selecciona una imagen
-                        </p>
-                      </>
-                    ) : (
-                      <div className="relative w-full h-full">
-                        <img 
-                          src={previewImage} 
-                          alt="Preview" 
-                          className="absolute inset-0 w-full h-full object-contain p-4"
+    switch (currentStep) {
+        case 1:
+            return (
+                <div className="space-y-6">
+                    <h2 className="text-2xl font-bold text-blue-800 mb-6">Información básica</h2>
+                    
+                    <div className="mb-6">
+                        <label className="block text-gray-700 font-semibold mb-2">
+                            Título
+                        </label>
+                        <input
+                            type="text"
+                            name="title"
+                            value={formData.title}
+                            onChange={handleChange}
+                            className="w-full border-2 border-blue-200 p-3 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 transition"
+                            placeholder="Ej: Guía completa sobre hipotecas en Madrid"
                         />
-                        <button
-                          type="button"
-                          onClick={removeImage}
-                          className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 transition"
+                    </div>
+                    
+                    <div className="mb-6">
+                        <label className="block text-gray-700 font-semibold mb-2">
+                            Descripción
+                        </label>
+                        <textarea
+                            name="description"
+                            value={formData.description}
+                            onChange={handleChange}
+                            className="w-full border-2 border-blue-200 p-3 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 transition"
+                            rows="3"
+                            placeholder="Breve descripción del contenido del blog..."
+                        />
+                    </div>
+                    
+                    <div className="mb-6">
+                        <label className="block text-gray-700 font-semibold mb-2">
+                            Categoría
+                        </label>
+                        <select
+                            name="category"
+                            value={formData.category}
+                            onChange={handleChange}
+                            className="w-full border-2 border-blue-200 p-3 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 transition"
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
+                            <option value="Inmobiliaria">Inmobiliaria</option>
+                            <option value="Finanzas">Finanzas</option>
+                            <option value="Legal">Legal</option>
+                            <option value="Consejos">Consejos y tips</option>
+                            <option value="Mercado">Análisis de mercado</option>
+                            <option value="Inversión">Inversión</option>
+                        </select>
+                    </div>
+                    
+                    <div className="flex justify-end">
+                        <button
+                            type="button"
+                            onClick={nextStep}
+                            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700 transition"
+                        >
+                            Siguiente
                         </button>
-                      </div>
-                    )}
-                  </div>
-                  <input 
-                    type="file" 
-                    className="opacity-0" 
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    ref={fileInputRef}
-                  />
-                </label>
-              </div>
-              {uploadingImage && <p className="text-blue-500 mt-2">Subiendo imagen...</p>}
-            </div>
-          </div>
-          
-          <div className="flex justify-between mt-8">
-            <button
-              type="button"
-              onClick={prevStep}
-              className="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium shadow-sm hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300"
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={loading}
-              className="px-5 py-2 bg-green-600 text-white rounded-lg font-medium shadow-sm hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300 disabled:opacity-50"
-            >
-              {loading ? 'Publicando...' : 'Publicar blog'}
-            </button>
-          </div>
-        </div>
-      );
-    } else {
-      console.error("Paso no válido:", currentStep);
-      // Manejar caso de error - redirigir al paso 1
-      setCurrentStep(1);
-      return <div>Redirigiendo...</div>;
+                    </div>
+                </div>
+            );
+        case 2:
+            return (
+                <div className="space-y-6">
+                    <h2 className="text-2xl font-bold text-blue-800 mb-6">Contenido del blog</h2>
+                    
+                    {/* Plantillas profesionales */}
+                    <div className="mb-4">
+                        <label className="block text-gray-700 font-semibold mb-2">
+                            Plantillas profesionales
+                        </label>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <button
+                                type="button"
+                                onClick={() => loadTemplate('standardArticle')}
+                                className="bg-white border-2 border-blue-200 hover:border-blue-500 p-3 rounded-lg text-left transition"
+                            >
+                                <div className="font-medium text-blue-800">Artículo estándar</div>
+                                <div className="text-xs text-gray-500">Estructura básica con introducción, desarrollo y conclusión</div>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => loadTemplate('realEstateAnalysis')}
+                                className="bg-white border-2 border-blue-200 hover:border-blue-500 p-3 rounded-lg text-left transition"
+                            >
+                                <div className="font-medium text-blue-800">Análisis inmobiliario</div>
+                                <div className="text-xs text-gray-500">Incluye tablas comparativas y análisis de zonas</div>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => loadTemplate('calculationGuide')}
+                                className="bg-white border-2 border-blue-200 hover:border-blue-500 p-3 rounded-lg text-left transition"
+                            >
+                                <div className="font-medium text-blue-800">Guía de cálculos</div>
+                                <div className="text-xs text-gray-500">Formato ideal para explicar fórmulas y ejemplos</div>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    {/* Editor mejorado con referencia moderna */}
+                    <div className="mb-6">
+                        <label className="block text-gray-700 font-semibold mb-2">
+                            Contenido
+                        </label>
+                        <div className="border border-gray-300 rounded-lg overflow-hidden quill-container">
+                            <ReactQuill
+                                ref={quillRef}
+                                value={formData.content || ''}
+                                onChange={handleEditorChange}
+                                modules={modules}
+                                formats={formats}
+                                className="min-h-[400px]"
+                                preserveWhitespace={true}
+                                theme="snow"
+                                placeholder="Escribe el contenido del blog aquí..."
+                                bounds=".quill-container"
+                            />
+                            
+                            {/* Botones para insertar elementos */}
+                            <div className="mt-4">
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                    <h3 className="w-full text-sm text-gray-600 font-medium mb-1">Añadir títulos:</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => insertSpecialBlock('title-main')}
+                                        className="text-sm bg-indigo-100 text-indigo-800 px-3 py-1 rounded hover:bg-indigo-200 flex items-center gap-1"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                        Título Principal
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => insertSpecialBlock('title-section')}
+                                        className="text-sm bg-indigo-100 text-indigo-800 px-3 py-1 rounded hover:bg-indigo-200 flex items-center gap-1"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                        Título de Sección
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => insertSpecialBlock('title-subsection')}
+                                        className="text-sm bg-indigo-100 text-indigo-800 px-3 py-1 rounded hover:bg-indigo-200 flex items-center gap-1"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M3 5a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                        Subtítulo
+                                    </button>
+                                </div>
+                                
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                    <h3 className="w-full text-sm text-gray-600 font-medium mb-1">Añadir bloques especiales:</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => insertSpecialBlock('formula')}
+                                        className="text-sm bg-blue-100 text-blue-800 px-3 py-1 rounded hover:bg-blue-200 flex items-center gap-1"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M4.649 3.084A1 1 0 015.163 4.4 13.95 13.95 0 004 10c0 1.993.416 3.886 1.164 5.6a1 1 0 01-1.832.8A15.95 15.95 0 012 10c0-2.274.475-4.44 1.332-6.4a1 1 0 011.317-.516zM12.96 7a3 3 0 00-2.342 1.126l-.328.41-.111-.279A2 2 0 008.323 7H8a1 1 0 000 2h.323l.532 1.33-1.035 1.295a1 1 0 01-.781.375H7a1 1 0 100 2h.039a3 3 0 002.342-1.126l.328-.41.111.279A2 2 0 0011.677 14H12a1 1 0 100-2h-.323l-.532-1.33 1.035-1.295A1 1 0 0112.961 9H13a1 1 0 100-2h-.039z" clipRule="evenodd" />
+                                        </svg>
+                                        Bloque de cálculo
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => insertSpecialBlock('highlight')}
+                                        className="text-sm bg-yellow-100 text-yellow-800 px-3 py-1 rounded hover:bg-yellow-200 flex items-center gap-1"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
+                                        Bloque destacado
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => insertSpecialBlock('note')}
+                                        className="text-sm bg-green-100 text-green-800 px-3 py-1 rounded hover:bg-green-200 flex items-center gap-1"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
+                                        Bloque de nota
+                                    </button>
+                                </div>
+                                
+                                <div className="flex flex-wrap gap-2">
+                                    <h3 className="w-full text-sm text-gray-600 font-medium mb-1">Elementos adicionales:</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => insertSpecialBlock('quote')}
+                                        className="text-sm bg-purple-100 text-purple-800 px-3 py-1 rounded hover:bg-purple-200 flex items-center gap-1"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H6zM9 8H4v2h5V8z" clipRule="evenodd" />
+                                        </svg>
+                                        Cita o testimonio
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => insertSpecialBlock('pro-table')}
+                                        className="text-sm bg-gray-100 text-gray-800 px-3 py-1 rounded hover:bg-gray-200 flex items-center gap-1"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M5 4a3 3 0 00-3 3v6a3 3 0 003 3h10a3 3 0 003-3V7a3 3 0 00-3-3H5zm-1 9v-1h5v2H5a1 1 0 01-1-1zm7 1h4a1 1 0 001-1v-1h-5v2zm0-4h5V8h-5v2z" clipRule="evenodd" />
+                                        </svg>
+                                        Tabla
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => insertSpecialBlock('first-paragraph')}
+                                        className="text-sm bg-orange-100 text-orange-800 px-3 py-1 rounded hover:bg-orange-200 flex items-center gap-1"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
+                                            <path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" />
+                                        </svg>
+                                        Párrafo inicial
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => insertSpecialBlock('emphasis-paragraph')}
+                                        className="text-sm bg-orange-100 text-orange-800 px-3 py-1 rounded hover:bg-orange-200 flex items-center gap-1"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h7a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                        Párrafo enfatizado
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => insertSpecialBlock('separator')}
+                                        className="text-sm bg-orange-100 text-orange-800 px-3 py-1 rounded hover:bg-orange-200 flex items-center gap-1"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                        Separador decorativo
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="flex justify-between mt-8">
+                        <button
+                            type="button"
+                            onClick={prevStep}
+                            className="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium shadow-sm hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300"
+                        >
+                            Anterior
+                        </button>
+                        <button
+                            type="button"
+                            onClick={nextStep}
+                            className="px-5 py-2 bg-blue-600 text-white rounded-lg font-medium shadow-sm hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300"
+                        >
+                            Siguiente
+                        </button>
+                    </div>
+                </div>
+            );
+        case 3:
+            return (
+                <div className="space-y-6">
+                    <div className="bg-white p-6 rounded-lg shadow-lg">
+                        <h3 className="text-xl font-semibold mb-4">Imágenes del Blog</h3>
+                        
+                        {/* Input para subir imágenes */}
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Subir Imágenes
+                            </label>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                onChange={handleMultipleImageUpload}
+                                ref={fileInputRef}
+                                className="hidden"
+                                disabled={uploadingImage}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-center hover:border-blue-500 hover:text-blue-500 transition-colors"
+                                disabled={uploadingImage}
+                            >
+                                {uploadingImage ? (
+                                    <span className="flex items-center justify-center">
+                                        <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                        Subiendo...
+                                    </span>
+                                ) : (
+                                    <span className="flex items-center justify-center">
+                                        <FiUpload className="mr-2" />
+                                        Seleccionar Imágenes
+                                    </span>
+                                )}
+                            </button>
+                        </div>
+
+                        {/* Previsualización de imágenes */}
+                        {formData.images && formData.images.length > 0 && (
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                                {formData.images.map((img, index) => (
+                                    <div key={index} className="relative group">
+                                        <img
+                                            src={img.src}
+                                            alt={img.alt || 'Imagen del blog'}
+                                            className="w-full h-40 object-cover rounded-lg"
+                                        />
+                                        <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setAsMainImage(index)}
+                                                className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600"
+                                                title="Establecer como imagen principal"
+                                            >
+                                                <FiEdit size={16} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeSpecificImage(index)}
+                                                className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600"
+                                                title="Eliminar imagen"
+                                            >
+                                                <FiX size={16} />
+                                            </button>
+                                        </div>
+                                        {formData.image?.src === img.src && (
+                                            <div className="absolute top-2 left-2 bg-blue-500 text-white px-2 py-1 rounded-md text-xs">
+                                                Principal
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Botones de navegación */}
+                    <div className="flex justify-between mt-6">
+                        <button
+                            type="button"
+                            onClick={prevStep}
+                            className="px-6 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                        >
+                            Anterior
+                        </button>
+                        <button
+                            type="submit"
+                            onClick={handleSubmit}
+                            className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors duration-200 ease-in-out flex items-center justify-center"
+                            disabled={uploadingImage}
+                        >
+                            {loading ? (
+                                <>
+                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Publicando...
+                                </>
+                            ) : (
+                                'Publicar Blog'
+                            )}
+                        </button>
+                    </div>
+                </div>
+            );
+        
+        default:
+            return null;
     }
-  }
+}
   
   // Actualiza la función insertSpecialBlock para usar los nuevos estilos dinámicos
   function insertSpecialBlock(blockType) {
@@ -1174,8 +1306,19 @@ export default function BlogCreation() {
       content: '',
       category: 'Inmobiliaria',
       tags: [],
-      image: '',
-      author: ''
+      url: '', // Nuevo campo
+      image: {
+        src: '',
+        alt: ''
+      },
+      images: [], // Asegurarnos de que images siempre sea un array
+      readTime: '5',
+      button: {  // Nuevo campo
+        title: '',
+        variant: 'primary',
+        size: 'medium',
+        iconRight: ''
+      }
     });
     setPreviewImage('');
     setTagInput('');
@@ -1183,6 +1326,181 @@ export default function BlogCreation() {
   }
   
   // Puedes llamar a esta función después de una publicación exitosa o cuando un usuario inicie un nuevo blog
+  
+  const handleMultipleImageUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    
+    setUploadingImage(true);
+    setError(null);
+    
+    try {
+        // Filtrar y validar archivos
+        const validFiles = files.filter(file => {
+            if (file.size > 10 * 1024 * 1024) {
+                toast.warning(`La imagen ${file.name} es demasiado grande (máx. 10MB)`);
+                return false;
+            }
+            if (!file.type.startsWith('image/')) {
+                toast.warning(`El archivo ${file.name} no es una imagen válida`);
+                return false;
+            }
+            return true;
+        });
+
+        if (validFiles.length === 0) {
+            throw new Error('No hay imágenes válidas para subir');
+        }
+
+        // Subir cada imagen individualmente
+        const uploadPromises = validFiles.map(async (file) => {
+            const formData = new FormData();
+            formData.append('image', file);
+            formData.append('title', 'Imagen de blog');
+            formData.append('description', 'Imagen subida desde el formulario de blog');
+            
+            try {
+                console.log(`Subiendo archivo: ${file.name}`);
+                const result = await uploadImageBlog(formData);
+                console.log('Resultado de subida de imagen:', result);
+                return result;
+            } catch (error) {
+                console.error(`Error al subir imagen ${file.name}:`, error);
+                toast.error(`Error al subir ${file.name}`);
+                throw error;
+            }
+        });
+
+        const results = await Promise.all(uploadPromises);
+        console.log('Resultados de subida de imágenes:', results);
+        
+        // Filtrar resultados válidos
+        const validResults = results.filter(result => result && result.src);
+        
+        if (validResults.length === 0) {
+            throw new Error('No se pudo subir ninguna imagen correctamente');
+        }
+        
+        // Actualizar el estado con las nuevas imágenes
+        setFormData(prev => ({
+            ...prev,
+            images: [...(prev.images || []), ...validResults],
+            // Si no hay imagen principal, usar la primera imagen subida
+            image: prev.image?.src ? prev.image : validResults[0]
+        }));
+
+        toast.success(`${validResults.length} ${validResults.length === 1 ? 'imagen subida' : 'imágenes subidas'} correctamente`);
+    } catch (error) {
+        console.error('Error al subir imágenes:', error);
+        setError(`Error al subir las imágenes: ${error.message}`);
+        toast.error('Error al subir las imágenes');
+    } finally {
+        setUploadingImage(false);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    }
+};
+  
+  // Función auxiliar para asegurar el formato correcto de una imagen
+  const formatImageObject = (img, altText = '') => {
+      if (typeof img === 'string') {
+          return {
+              src: img,
+              alt: altText || 'Imagen del blog'
+          };
+      }
+      if (typeof img === 'object' && img !== null && typeof img.src === 'string') {
+          return {
+              src: img.src,
+              alt: img.alt || altText || 'Imagen del blog'
+          };
+      }
+      return null;
+  };
+
+  // Función para establecer una imagen como principal
+  const setAsMainImage = (index) => {
+      try {
+          setFormData(prevData => {
+              const images = Array.isArray(prevData.images) ? prevData.images : [];
+              if (!images[index]) {
+                  throw new Error('Imagen no encontrada');
+              }
+
+              const selectedImage = formatImageObject(images[index], prevData.title);
+              if (!selectedImage) {
+                  throw new Error('Formato de imagen inválido');
+              }
+
+              // Actualizar el estado con el nuevo formato
+              return {
+                  ...prevData,
+                  image: selectedImage,
+                  images: images.map(img => formatImageObject(img, prevData.title)).filter(img => img !== null)
+              };
+          });
+
+          // Actualizar localStorage
+          const currentFormData = JSON.parse(localStorage.getItem('blog_formData') || '{}');
+          if (currentFormData.images && currentFormData.images[index]) {
+              const selectedImage = formatImageObject(currentFormData.images[index], currentFormData.title);
+              localStorage.setItem('blog_formData', JSON.stringify({
+                  ...currentFormData,
+                  image: selectedImage
+              }));
+          }
+
+          toast.success('Imagen principal actualizada');
+      } catch (error) {
+          console.error('Error al establecer la imagen principal:', error);
+          toast.error('Error al establecer la imagen principal');
+      }
+  };
+
+  // Función para eliminar una imagen específica
+  const removeSpecificImage = (index) => {
+      try {
+          setFormData(prevData => {
+              const images = Array.isArray(prevData.images) ? [...prevData.images] : [];
+              
+              // No permitir eliminar la última imagen
+              if (images.length <= 1) {
+                  throw new Error('No se puede eliminar la única imagen disponible');
+              }
+
+              // Si la imagen a eliminar es la principal, actualizar la imagen principal
+              const isMainImage = prevData.image?.src === images[index]?.src;
+              images.splice(index, 1);
+
+              return {
+                  ...prevData,
+                  images: images.map(img => formatImageObject(img, prevData.title)).filter(img => img !== null),
+                  // Si era la imagen principal, usar la primera imagen disponible
+                  image: isMainImage ? formatImageObject(images[0], prevData.title) : prevData.image
+              };
+          });
+
+          // Actualizar localStorage
+          const currentFormData = JSON.parse(localStorage.getItem('blog_formData') || '{}');
+          if (Array.isArray(currentFormData.images)) {
+              const images = [...currentFormData.images];
+              const isMainImage = currentFormData.image?.src === images[index]?.src;
+              images.splice(index, 1);
+              
+              localStorage.setItem('blog_formData', JSON.stringify({
+                  ...currentFormData,
+                  images: images.map(img => formatImageObject(img, currentFormData.title)).filter(img => img !== null),
+                  image: isMainImage ? formatImageObject(images[0], currentFormData.title) : currentFormData.image
+              }));
+          }
+
+          toast.success('Imagen eliminada');
+      } catch (error) {
+          console.error('Error al eliminar la imagen:', error);
+          toast.error(error.message || 'Error al eliminar la imagen');
+      }
+  };
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
@@ -1233,7 +1551,7 @@ export default function BlogCreation() {
         )}
         
         {/* Formulario */}
-        <form className="px-8 pb-8" onSubmit={(e) => e.preventDefault()}>
+        <form className="px-8 pb-8" onSubmit={handleSubmit}>
           {renderStep()}
         </form>
       </div>

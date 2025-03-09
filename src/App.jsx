@@ -20,9 +20,9 @@ import PropertyDetail from './components/PropertyDetail';
 function App() {
     return (
         <BrowserRouter>
-            <UserProvider>
-                <ImageLoader />
-                <div className="App">
+            <div className="App">
+                <UserProvider>
+                    <ImageLoader />
                     <Navbar />
                     <Routes>
                         <Route path="/" element={<Principal />} />
@@ -36,8 +36,8 @@ function App() {
                         <Route path="/property/:id" element={<PropertyDetail/>} />
                     </Routes>
                     <Toaster position="top-right" />
-                </div>
-            </UserProvider>
+                </UserProvider>
+            </div>
         </BrowserRouter>
     );
 }

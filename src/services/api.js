@@ -1,7 +1,10 @@
 // src/services/api.js
 
 // Configuración base
-const API_URL = import.meta.env.VITE_API_PUBLIC_API_URL || 'http://localhost:4000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+// Asegurarse de que la URL no termine en /
+const BASE_URL = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
 
 /**
  * Función para realizar peticiones HTTP con fetch
@@ -13,46 +16,38 @@ const fetchAPI = async (endpoint, options = {}) => {
   // Añadir token de autenticación si existe
   const token = localStorage.getItem('token');
   const headers = {
-    'Content-Type': 'application/json',
     ...options.headers
   };
   
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
+
+  // No añadir Content-Type para FormData
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
   
-  const url = `${API_URL}${endpoint}`;
+  const url = `${BASE_URL}${endpoint}`;
   
   try {
     console.log(`Realizando petición ${options.method || 'GET'} a ${url}`);
+    console.log('Headers:', headers);
+    if (options.body) {
+      console.log('Body:', options.body instanceof FormData ? 'FormData' : options.body);
+    }
     
     const response = await fetch(url, {
       ...options,
-      headers
+      headers,
+      credentials: 'include'
     });
     
     // Verificar si la respuesta es exitosa
     if (!response.ok) {
-      // Clonar la respuesta antes de leerla para evitar el error "body stream already read"
-      const clonedResponse = response.clone();
-      
-      // Intentar obtener el mensaje de error del servidor
-      let errorMessage;
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || errorData.error || `Error ${response.status}: ${response.statusText}`;
-      } catch (e) {
-        // Si no podemos obtener un JSON, intentamos obtener el texto
-        try {
-          errorMessage = await clonedResponse.text();
-        } catch (textError) {
-          // Si todo falla, usamos el status y statusText
-          errorMessage = `Error ${response.status}: ${response.statusText}`;
-        }
-      }
-      
-      console.error(`Error en respuesta del servidor (${response.status}):`, errorMessage);
-      throw new Error(errorMessage);
+      const errorText = await response.text();
+      console.error(`Error en respuesta del servidor (${response.status}):`, errorText);
+      throw new Error(errorText || `Error ${response.status}: ${response.statusText}`);
     }
     
     // Verificar si la respuesta está vacía
@@ -75,10 +70,65 @@ const fetchAPI = async (endpoint, options = {}) => {
  */
 export const createBlogPost = async (data) => {
   try {
-    return await fetchAPI('/blog', {
+    // Validar campos requeridos
+    if (!data.title || !data.description || !data.content) {
+      throw new Error('Faltan campos requeridos (título, descripción o contenido)');
+    }
+
+    // Preparar los datos del blog
+    const blogData = {
+      title: data.title,
+      description: data.description,
+      content: data.content,
+      author: data.author || 'Anónimo',
+      category: data.category || 'General',
+      tags: Array.isArray(data.tags) ? data.tags : [],
+      readTime: data.readTime || "5"
+    };
+
+    // Manejar la imagen principal
+    if (data.image && typeof data.image === 'object' && data.image.src) {
+      blogData.image = {
+        src: data.image.src,
+        alt: data.image.alt || data.title
+      };
+    } else if (data.images && data.images.length > 0) {
+      // Si no hay imagen principal pero hay imágenes, usar la primera como principal
+      blogData.image = {
+        src: data.images[0].src,
+        alt: data.images[0].alt || data.title
+      };
+    } else {
+      blogData.image = {
+        src: "",
+        alt: data.title
+      };
+    }
+
+    // Manejar el array de imágenes
+    if (Array.isArray(data.images) && data.images.length > 0) {
+      blogData.images = data.images.map(img => ({
+        src: img.src,
+        alt: img.alt || data.title
+      }));
+    } else {
+      blogData.images = [];
+    }
+
+    console.log("Datos del blog preparados para enviar:", blogData);
+
+    const result = await fetchAPI('/blog', {
       method: 'POST',
-      body: JSON.stringify(data)
+      body: JSON.stringify(blogData)
     });
+
+    if (!result) {
+      throw new Error('No se recibió respuesta del servidor');
+    }
+
+    console.log("Respuesta del servidor al crear blog:", result);
+    return result;
+    
   } catch (error) {
     console.error('Error al crear blog:', error);
     throw error;
@@ -91,7 +141,69 @@ export const createBlogPost = async (data) => {
  */
 export const getBlogPosts = async () => {
   try {
-    return await fetchAPI('/blog');
+    console.log("Obteniendo blogs del servidor...");
+    const blogs = await fetchAPI('/blog');
+    console.log("Blogs recibidos del servidor:", blogs);
+    
+    // Verificar la estructura de cada blog y procesar las imágenes
+    if (Array.isArray(blogs)) {
+      return blogs.map(blog => {
+        console.log(`Blog ${blog._id} - Procesando...`);
+        console.log(`Blog ${blog._id} - Imagen original:`, blog.image);
+        console.log(`Blog ${blog._id} - Imágenes originales:`, blog.images);
+        
+        let processedImages = [];
+        
+        // Procesar imágenes del array images
+        if (blog.images && Array.isArray(blog.images)) {
+          processedImages = blog.images
+            .filter(img => img !== null && img !== undefined)
+            .map(img => {
+              // Si la imagen es un string, convertirla a objeto
+              if (typeof img === 'string') {
+                return { src: img, alt: blog.title || 'Imagen del blog' };
+              }
+              // Si la imagen es un objeto, verificar su estructura
+              if (img && typeof img === 'object') {
+                if (img.url) return { src: img.url, alt: img.alt || blog.title || 'Imagen del blog' };
+                if (img.path) return { src: img.path, alt: img.alt || blog.title || 'Imagen del blog' };
+                if (img.src) return img;
+              }
+              return null;
+            })
+            .filter(img => img !== null && img.src && img.src.trim() !== '');
+        }
+
+        // Procesar imagen principal si existe y no está en el array de imágenes
+        if (blog.image) {
+          let mainImage;
+          if (typeof blog.image === 'string') {
+            mainImage = { src: blog.image, alt: blog.title || 'Imagen principal' };
+          } else if (typeof blog.image === 'object') {
+            mainImage = blog.image.url ? { src: blog.image.url, alt: blog.image.alt || blog.title } :
+                       blog.image.path ? { src: blog.image.path, alt: blog.image.alt || blog.title } :
+                       blog.image.src ? blog.image : null;
+          }
+          
+          if (mainImage && mainImage.src && mainImage.src.trim() !== '') {
+            // Verificar si la imagen principal ya existe en el array
+            const mainImageExists = processedImages.some(img => img.src === mainImage.src);
+            if (!mainImageExists) {
+              processedImages.unshift(mainImage);
+            }
+          }
+        }
+
+        console.log(`Blog ${blog._id} - Imágenes procesadas:`, processedImages);
+        
+        return {
+          ...blog,
+          images: processedImages
+        };
+      });
+    }
+    
+    return [];
   } catch (error) {
     console.error('Error al obtener blogs:', error);
     throw error;
@@ -105,8 +217,17 @@ export const getBlogPosts = async () => {
  */
 export const deleteBlogPost = async (id) => {
   try {
+    // Obtener el token del localStorage
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No hay token de autenticación disponible');
+    }
+
     return await fetchAPI(`/blog/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
   } catch (error) {
     console.error(`Error al eliminar blog ${id}:`, error);
@@ -261,7 +382,7 @@ export const updateProfile = async (userData, token) => {
     
     console.log("Actualizando perfil con token:", authToken);
     
-    const response = await fetch(`${API_URL}/user/update-profile`, {
+    const response = await fetch(`${BASE_URL}/user/update-profile`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${authToken}`
@@ -283,41 +404,30 @@ export const updateProfile = async (userData, token) => {
 };
 
 /**
- * Función para subir imágenes de blogs
- * @param {File} file - Archivo de imagen a subir
- * @param {string} token - Token de autenticación opcional
- * @returns {Promise<Object>} - Promise que se resuelve con la URL de la imagen subida
+ * Sube una imagen para un blog.
+ * @param {FormData} formData - FormData que contiene la imagen y metadatos
+ * @returns {Promise<Object>} - Retorna un objeto con la URL de la imagen
  */
-export const uploadImageBlog = async (file, token) => {
-  const formData = new FormData();
-  formData.append('file', file);
-  
+export const uploadImageBlog = async (formData) => {
   try {
-    const headers = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+    console.log('Subiendo imagen para blog...');
     
-    console.log("Subiendo imagen de blog a:", `${API_URL}/blog/upload`);
-    
-    const response = await fetch(`${API_URL}/blog/upload`, {
+    const result = await fetchAPI('/blog/upload', {
       method: 'POST',
-      headers,
       body: formData
     });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Respuesta de error del servidor:", errorText);
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
+
+    if (!result || !result.imageUrl) {
+      throw new Error('No se recibió una URL de imagen válida del servidor');
     }
-    
-    const data = await response.json();
-    console.log("Respuesta exitosa del servidor:", data);
-    
-    return data;
+
+    // Normalizar el resultado para que coincida con el formato esperado
+    return {
+      src: result.imageUrl,
+      alt: formData.get('title') || 'Imagen del blog'
+    };
   } catch (error) {
-    console.error('Error al subir imagen de blog:', error);
+    console.error('Error al subir imagen:', error);
     throw error;
   }
 };
@@ -330,7 +440,16 @@ export const uploadImageBlog = async (file, token) => {
  */
 export const uploadFile = async (file, token) => {
   const formData = new FormData();
-  formData.append('images', file);
+  formData.append('file', file);
+  
+  // Añadir campos requeridos para la validación del modelo
+  formData.append('title', 'Título temporal');
+  formData.append('description', 'Descripción temporal');
+  formData.append('price', '0');
+  formData.append('bedrooms', '0');
+  formData.append('bathrooms', '0');
+  formData.append('area', '0');
+  formData.append('location', 'Ubicación temporal');
   
   try {
     const headers = {};
@@ -338,15 +457,57 @@ export const uploadFile = async (file, token) => {
       headers['Authorization'] = `Bearer ${token}`;
     }
     
-    // No hay una ruta específica para subir archivos en propertyRouter
-    // Debe usarse la ruta principal con propiedad vacía
-    console.log("Subiendo archivo a:", `${API_URL}/property`);
+    // Intentar primero con la ruta de subida específica
+    console.log("Intentando subir archivo a:", `${BASE_URL}/property/upload`);
     
-    const response = await fetch(`${API_URL}/property`, {
-      method: 'POST',
-      headers,
-      body: formData
-    });
+    let response;
+    let usePropertyRoute = false;
+    
+    try {
+      // Intentar con la ruta de subida específica
+      response = await fetch(`${BASE_URL}/property/upload`, {
+        method: 'POST',
+        headers,
+        body: formData
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Respuesta exitosa del servidor (property/upload):", data);
+        return data;
+      }
+    } catch (err) {
+      console.log("Error con property/upload, intentando con blog/upload:", err);
+      usePropertyRoute = true;
+    }
+    
+    // Si falla, intentar con la ruta de blog
+    if (usePropertyRoute || !response || !response.ok) {
+      console.log("Intentando con ruta alternativa:", `${BASE_URL}/blog/upload`);
+      
+      response = await fetch(`${BASE_URL}/blog/upload`, {
+        method: 'POST',
+        headers,
+        body: formData
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Respuesta exitosa del servidor (blog/upload):", data);
+        return data;
+      }
+    }
+    
+    // Si ambas rutas fallan, intentar con la ruta principal
+    if (!response || !response.ok) {
+      console.log("Intentando con ruta principal:", `${BASE_URL}/property`);
+      
+      response = await fetch(`${BASE_URL}/property`, {
+        method: 'POST',
+        headers,
+        body: formData
+      });
+    }
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -370,13 +531,52 @@ export const uploadFile = async (file, token) => {
  */
 export const createPropertyPost = async (data) => {
   try {
-    console.log("Enviando datos de propiedad al servidor:", data);
+    // Validar que todos los campos requeridos estén presentes
+    const requiredFields = ['title', 'description', 'price', 'location', 'bedrooms', 'bathrooms', 'area'];
+    const missingFields = requiredFields.filter(field => !data[field]);
     
-    // Volver a la ruta original
-    return await fetchAPI('/property', {
+    if (missingFields.length > 0) {
+      throw new Error(`Faltan campos requeridos: ${missingFields.join(', ')}`);
+    }
+    
+    // Asegurarse de que los campos numéricos sean números
+    const propertyData = {
+      ...data,
+      price: parseFloat(data.price) || 0,
+      bedrooms: parseInt(data.bedrooms) || 0,
+      bathrooms: parseInt(data.bathrooms) || 0,
+      area: parseFloat(data.area) || 0
+    };
+    
+    // Asegurarse de que las imágenes estén en el formato correcto
+    if (propertyData.images && Array.isArray(propertyData.images)) {
+      propertyData.images = propertyData.images.map(img => {
+        if (typeof img === 'string') {
+          return { src: img, alt: 'Imagen de propiedad' };
+        }
+        if (typeof img === 'object' && img !== null) {
+          return {
+            src: img.src || img.url || img.secure_url || img.imageUrl,
+            alt: img.alt || 'Imagen de propiedad'
+          };
+        }
+        return null;
+      }).filter(img => img !== null);
+    }
+    
+    console.log('Enviando datos de propiedad al servidor:', propertyData);
+    
+    const response = await fetchAPI('/property', {
       method: 'POST',
-      body: JSON.stringify(data)
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(propertyData)
     });
+
+    console.log('Respuesta del servidor:', response);
+    return response;
+    
   } catch (error) {
     console.error('Error detallado al crear propiedad:', error);
     throw error;
@@ -385,7 +585,43 @@ export const createPropertyPost = async (data) => {
 
 export const getPropertyPosts = async () => {
   try {
-    return await fetchAPI('/property');
+    console.log("Obteniendo propiedades del servidor...");
+    const properties = await fetchAPI('/property');
+    console.log("Propiedades recibidas del servidor:", properties);
+    
+    // Verificar la estructura de cada propiedad y corregir las imágenes si es necesario
+    if (Array.isArray(properties)) {
+      return properties.map(property => {
+        console.log(`Propiedad ${property._id} - Procesando...`);
+        console.log(`Propiedad ${property._id} - Imágenes originales:`, property.images);
+        
+        // Corregir el array de imágenes si es necesario
+        if (!property.images || !Array.isArray(property.images)) {
+          console.log(`Propiedad ${property._id} - Inicializando array de imágenes vacío`);
+          property.images = [];
+        } else {
+          // Filtrar imágenes no válidas
+          property.images = property.images.filter(img => {
+            if (!img || typeof img !== 'object' || !img.src) {
+              return false;
+            }
+            
+            const src = img.src;
+            return typeof src === 'string' && 
+                   src.trim() !== '' && 
+                   src !== '""' && 
+                   src !== '"' && 
+                   src !== "''";
+          });
+        }
+        
+        console.log(`Propiedad ${property._id} - Imágenes corregidas:`, property.images);
+        
+        return property;
+      });
+    }
+    
+    return properties;
   } catch (error) {
     console.error('Error al obtener propiedades:', error);
     throw error;
@@ -575,6 +811,58 @@ export const syncProfileImage = async () => {
     return handleResponse(response);
   } catch (error) {
     console.error('Error syncing profile image:', error);
+    throw error;
+  }
+};
+
+/**
+ * Función para subir imágenes de propiedades
+ * @param {File} file - Archivo de imagen a subir
+ * @param {string} token - Token de autenticación opcional
+ * @returns {Promise<Object>} - Promise que se resuelve con la URL de la imagen subida
+ */
+export const uploadImageProperty = async (formData) => {
+  try {
+    const token = localStorage.getItem('token');
+    const headers = {
+      'Authorization': `Bearer ${token}`
+    };
+    
+    console.log("Token de autorización:", token);
+    console.log("Subiendo imagen de propiedad a:", `${BASE_URL}/property/upload-image`);
+    console.log("FormData contenido:", Array.from(formData.entries()));
+    
+    const response = await fetch(`${BASE_URL}/property/upload-image`, {
+      method: 'POST',
+      headers: headers,
+      body: formData,
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Respuesta de error del servidor:", errorText);
+      console.error("Status:", response.status);
+      console.error("StatusText:", response.statusText);
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log("Respuesta exitosa del servidor:", data);
+    
+    if (!data.imageUrl && !data.url && !data.secure_url) {
+      throw new Error('No se pudo obtener una URL válida de la imagen');
+    }
+    
+    const imageUrl = data.imageUrl || data.url || data.secure_url;
+    
+    return {
+      src: imageUrl.replace('http://', 'https://'),
+      alt: 'Imagen de propiedad'
+    };
+    
+  } catch (error) {
+    console.error('Error al subir imagen de propiedad:', error);
     throw error;
   }
 };

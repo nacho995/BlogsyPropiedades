@@ -55,17 +55,204 @@ function Principal() {
   // Imagen de perfil por defecto
   const defaultProfilePic = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80";
 
-  // Función simplificada similar a SeeBlogs
+  // Función para obtener la URL de la imagen de un blog
   const getImageUrl = (blog) => {
-    return blog.image && blog.image.src 
-      ? blog.image.src 
-      : 'https://cdn.jsdelivr.net/gh/twbs/icons@main/icons/image.svg';
+    console.log(`Obteniendo URL de imagen para blog:`, blog.title || 'sin título');
+    
+    // Caso 1: La imagen es un objeto con src
+    if (blog.image && typeof blog.image === 'object' && blog.image.src) {
+      const imageUrl = blog.image.src;
+      console.log(`Imagen es un objeto con src:`, imageUrl);
+      
+      // Verificar si la URL es válida
+      if (typeof imageUrl === 'string' && 
+          imageUrl.trim() !== '' && 
+          imageUrl !== '""' && 
+          imageUrl !== '"' && 
+          imageUrl !== "''") {
+        
+        // Verificar si es una URL de placeholder
+        if (imageUrl.includes('placeholder.com') || imageUrl.includes('via.placeholder')) {
+          console.log(`URL de placeholder detectada, usando imagen por defecto`);
+          return null;
+        }
+        
+        return imageUrl;
+      }
+    }
+    
+    // Caso 2: La imagen es una cadena directamente
+    if (blog.image && typeof blog.image === 'string') {
+      const imageUrl = blog.image;
+      console.log(`Imagen es una cadena:`, imageUrl);
+      
+      // Verificar si la URL es válida
+      if (imageUrl.trim() !== '' && 
+          imageUrl !== '""' && 
+          imageUrl !== '"' && 
+          imageUrl !== "''") {
+        
+        // Verificar si es una URL de placeholder
+        if (imageUrl.includes('placeholder.com') || imageUrl.includes('via.placeholder')) {
+          console.log(`URL de placeholder detectada, usando imagen por defecto`);
+          return null;
+        }
+        
+        return imageUrl;
+      }
+    }
+    
+    // Caso 3: Intentar con el array de imágenes
+    if (blog.images && Array.isArray(blog.images) && blog.images.length > 0) {
+      const firstImage = blog.images[0];
+      console.log(`Intentando con la primera imagen del array:`, firstImage);
+      
+      // Si la primera imagen es un objeto con src
+      if (typeof firstImage === 'object' && firstImage.src) {
+        const imageUrl = firstImage.src;
+        
+        // Verificar si la URL es válida
+        if (typeof imageUrl === 'string' && 
+            imageUrl.trim() !== '' && 
+            imageUrl !== '""' && 
+            imageUrl !== '"' && 
+            imageUrl !== "''") {
+          
+          // Verificar si es una URL de placeholder
+          if (imageUrl.includes('placeholder.com') || imageUrl.includes('via.placeholder')) {
+            console.log(`URL de placeholder detectada, usando imagen por defecto`);
+            return null;
+          }
+          
+          return imageUrl;
+        }
+      }
+      
+      // Si la primera imagen es una cadena
+      if (typeof firstImage === 'string') {
+        const imageUrl = firstImage;
+        
+        // Verificar si la URL es válida
+        if (imageUrl.trim() !== '' && 
+            imageUrl !== '""' && 
+            imageUrl !== '"' && 
+            imageUrl !== "''") {
+          
+          // Verificar si es una URL de placeholder
+          if (imageUrl.includes('placeholder.com') || imageUrl.includes('via.placeholder')) {
+            console.log(`URL de placeholder detectada, usando imagen por defecto`);
+            return null;
+          }
+          
+          return imageUrl;
+        }
+      }
+    }
+    
+    // Si no hay imagen válida, devolver null
+    console.log(`No se encontró ninguna imagen válida`);
+    return null;
   };
 
   const getPropertyImageUrl = (property) => {
-    return property.image && property.image.src 
-      ? property.image.src 
-      : 'https://cdn.jsdelivr.net/gh/twbs/icons@main/icons/house.svg';
+    console.log(`Obteniendo URL de imagen para propiedad:`, property.title || 'sin título');
+    
+    // Caso 1: Verificar si hay imágenes en el array
+    if (property.images && Array.isArray(property.images) && property.images.length > 0) {
+      const firstImage = property.images[0];
+      console.log(`Primera imagen del array:`, firstImage);
+      
+      // Si la primera imagen es un objeto con src
+      if (typeof firstImage === 'object' && firstImage.src) {
+        const imageUrl = firstImage.src;
+        
+        // Verificar si la URL es válida
+        if (typeof imageUrl === 'string' && 
+            imageUrl.trim() !== '' && 
+            imageUrl !== '""' && 
+            imageUrl !== '"' && 
+            imageUrl !== "''") {
+          
+          // Verificar si es una URL de placeholder
+          if (imageUrl.includes('placeholder.com') || imageUrl.includes('via.placeholder')) {
+            console.log(`URL de placeholder detectada, usando imagen por defecto`);
+            return null;
+          }
+          
+          return imageUrl;
+        }
+      }
+      
+      // Si la primera imagen es una cadena
+      if (typeof firstImage === 'string') {
+        const imageUrl = firstImage;
+        
+        // Verificar si la URL es válida
+        if (imageUrl.trim() !== '' && 
+            imageUrl !== '""' && 
+            imageUrl !== '"' && 
+            imageUrl !== "''") {
+          
+          // Verificar si es una URL de placeholder
+          if (imageUrl.includes('placeholder.com') || imageUrl.includes('via.placeholder')) {
+            console.log(`URL de placeholder detectada, usando imagen por defecto`);
+            return null;
+          }
+          
+          return imageUrl;
+        }
+      }
+    }
+    
+    // Caso 2: Verificar si hay una imagen principal
+    if (property.image) {
+      console.log(`Intentando con la imagen principal:`, property.image);
+      
+      // Si la imagen principal es un objeto con src
+      if (typeof property.image === 'object' && property.image.src) {
+        const imageUrl = property.image.src;
+        
+        // Verificar si la URL es válida
+        if (typeof imageUrl === 'string' && 
+            imageUrl.trim() !== '' && 
+            imageUrl !== '""' && 
+            imageUrl !== '"' && 
+            imageUrl !== "''") {
+          
+          // Verificar si es una URL de placeholder
+          if (imageUrl.includes('placeholder.com') || imageUrl.includes('via.placeholder')) {
+            console.log(`URL de placeholder detectada, usando imagen por defecto`);
+            return null;
+          }
+          
+          return imageUrl;
+        }
+      }
+      
+      // Si la imagen principal es una cadena
+      if (typeof property.image === 'string') {
+        const imageUrl = property.image;
+        
+        // Verificar si la URL es válida
+        if (imageUrl.trim() !== '' && 
+            imageUrl !== '""' && 
+            imageUrl !== '"' && 
+            imageUrl !== "''") {
+          
+          // Verificar si es una URL de placeholder
+          if (imageUrl.includes('placeholder.com') || imageUrl.includes('via.placeholder')) {
+            console.log(`URL de placeholder detectada, usando imagen por defecto`);
+            return null;
+          }
+          
+          return imageUrl;
+        }
+      }
+    }
+    
+    // Si no hay imagen válida, devolver null
+    console.log(`No se encontró ninguna imagen válida`);
+    return null;
   };
 
   // Función para corregir URLs HTTP a HTTPS
@@ -191,15 +378,22 @@ function Principal() {
                         style={{ animationDelay: `${index * 0.1}s` }}
                       >
                         <div className="h-48 overflow-hidden">
-                          <img 
-                            src={imageUrl}
-                            alt={blog.title} 
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              console.log(`Error cargando imagen para blog ${blog.title}`);
-                              e.target.src = 'https://cdn.jsdelivr.net/gh/twbs/icons@main/icons/image.svg'; 
-                            }}
-                          />
+                          {imageUrl ? (
+                            <img 
+                              src={imageUrl}
+                              alt={blog.title} 
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                console.log(`Error cargando imagen para blog ${blog.title}`);
+                                e.target.style.display = 'none';
+                                e.target.parentNode.innerHTML = '<div class="flex items-center justify-center w-full h-full bg-gray-100"><span class="text-gray-400">Imagen no disponible</span></div>';
+                              }}
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center w-full h-full bg-gray-100">
+                              <span className="text-gray-400">Imagen no disponible</span>
+                            </div>
+                          )}
                         </div>
                         <div className="p-6">
                           <h3 className="font-bold text-xl mb-2 text-white">{blog.title}</h3>
@@ -241,15 +435,22 @@ function Principal() {
                         style={{ animationDelay: `${index * 0.1}s` }}
                       >
                         <div className="h-48 overflow-hidden">
-                          <img 
-                            src={imageUrl}
-                            alt={property.title} 
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              console.log(`Error cargando imagen para propiedad ${property.title}`);
-                              e.target.src = 'https://cdn.jsdelivr.net/gh/twbs/icons@main/icons/house.svg';
-                            }}
-                          />
+                          {imageUrl ? (
+                            <img 
+                              src={imageUrl}
+                              alt={property.title} 
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                console.log(`Error cargando imagen para propiedad ${property.title}`);
+                                e.target.style.display = 'none';
+                                e.target.parentNode.innerHTML = '<div class="flex items-center justify-center w-full h-full bg-gray-100"><span class="text-gray-400">Imagen no disponible</span></div>';
+                              }}
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center w-full h-full bg-gray-100">
+                              <span className="text-gray-400">Imagen no disponible</span>
+                            </div>
+                          )}
                         </div>
                         <div className="p-6">
                           <div className="flex justify-between items-center mb-2">

@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createPropertyPost, uploadFile } from '../services/api';
+import { createPropertyPost, uploadImageProperty } from '../services/api';
 import { useUser } from '../context/UserContext';
 import { motion } from 'framer-motion';
 import { FiUpload, FiHome, FiDollarSign, FiMapPin, FiUser, FiDroplet, FiSquare, FiTag, FiList, FiX, FiPlus } from 'react-icons/fi';
 import { BiBed, BiBath } from 'react-icons/bi';
+import { toast } from 'react-hot-toast';
 
 // Inyecta global CSS para la animación de shake (puedes moverlo a tu archivo global si lo prefieres)
 const globalStyles = `
@@ -49,14 +50,25 @@ export default function PropertyCreation() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    address: '',
     price: '',
-    location: '',
+    images: [],
     bedrooms: '',
     bathrooms: '',
     area: '',
+    typeProperty: 'Propiedad',
+    m2: '',
+    priceM2: '',
+    rooms: '',
+    wc: '',
+    piso: '',
+    tags: [],
+    template: 'default',
+    location: '',
     propertyType: 'Venta',
     features: [],
-    images: []
+    status: 'Disponible',
+    featured: false
   });
   
   const [uploadedImages, setUploadedImages] = useState([]);
@@ -100,61 +112,104 @@ export default function PropertyCreation() {
   // Manejar la subida de imágenes
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
-    if (files.length === 0) return;
+    if (!files.length) return;
     
     setUploadingImages(true);
-    
-    // Crear previsualizaciones
-    const newPreviewImages = files.map(file => URL.createObjectURL(file));
-    setPreviewImages([...previewImages, ...newPreviewImages]);
+    setError(null);
     
     try {
-      // Subir cada imagen y obtener las URLs
-      const uploadPromises = files.map(file => uploadFile(file, user?.token));
-      const results = await Promise.all(uploadPromises);
-      
-      // Extraer las URLs de las imágenes subidas
-      const imageUrls = results.map(result => {
-        if (result.imageUrl) return result.imageUrl;
-        if (result.url) return result.url;
-        if (result.secure_url) return result.secure_url;
-        if (result.path) return result.path;
-        return null;
-      }).filter(url => url !== null);
-      
-      // Actualizar el estado con las nuevas imágenes
-      setUploadedImages([...uploadedImages, ...imageUrls]);
-      
-      // Actualizar el formData
-      setFormData({
-        ...formData,
-        images: [...formData.images, ...imageUrls]
-      });
-      
+        // Filtrar y validar archivos
+        const validFiles = files.filter(file => {
+            if (file.size > 10 * 1024 * 1024) {
+                toast.warning(`La imagen ${file.name} es demasiado grande (máx. 10MB)`);
+                return false;
+            }
+            if (!file.type.startsWith('image/')) {
+                toast.warning(`El archivo ${file.name} no es una imagen válida`);
+                return false;
+            }
+            return true;
+        });
+
+        if (validFiles.length === 0) {
+            throw new Error('No hay imágenes válidas para subir');
+        }
+
+        // Subir cada imagen individualmente
+        const uploadPromises = validFiles.map(async (file) => {
+            const formData = new FormData();
+            formData.append('image', file);
+            
+            // Agregar campos adicionales que pueda requerir el backend
+            formData.append('title', 'Imagen de propiedad');
+            formData.append('description', 'Imagen subida desde el formulario de propiedades');
+            
+            try {
+                console.log(`Subiendo archivo: ${file.name}`);
+                const result = await uploadImageProperty(formData);
+                console.log('Resultado de subida de imagen:', result);
+                return result;
+            } catch (error) {
+                console.error(`Error al subir imagen ${file.name}:`, error);
+                toast.error(`Error al subir ${file.name}`);
+                throw error;
+            }
+        });
+
+        const results = await Promise.all(uploadPromises);
+        console.log('Resultados de subida de imágenes:', results);
+        
+        // Filtrar resultados válidos
+        const validResults = results.filter(result => result && result.src);
+        
+        if (validResults.length === 0) {
+            throw new Error('No se pudo subir ninguna imagen correctamente');
+        }
+        
+        // Actualizar el estado con las nuevas imágenes
+        setUploadedImages(prev => [...prev, ...validResults]);
+        setPreviewImages(prev => [...prev, ...validResults]);
+        
+        // Actualizar formData con las nuevas imágenes
+        setFormData(prev => ({
+            ...prev,
+            images: [...(prev.images || []), ...validResults]
+        }));
+
+        toast.success(`${validResults.length} ${validResults.length === 1 ? 'imagen subida' : 'imágenes subidas'} correctamente`);
     } catch (error) {
-      console.error('Error al subir imágenes:', error);
-      setError('Error al subir las imágenes. Por favor, inténtalo de nuevo.');
+        console.error('Error al subir imágenes:', error);
+        setError(`Error al subir las imágenes: ${error.message}`);
+        toast.error('Error al subir las imágenes');
     } finally {
-      setUploadingImages(false);
+        setUploadingImages(false);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
     }
   };
   
-  // Eliminar una imagen
+  // Eliminar una imagen específica
   const removeImage = (index) => {
-    const newPreviewImages = [...previewImages];
-    const newUploadedImages = [...uploadedImages];
-    const newFormDataImages = [...formData.images];
-    
-    newPreviewImages.splice(index, 1);
-    newUploadedImages.splice(index, 1);
-    newFormDataImages.splice(index, 1);
-    
-    setPreviewImages(newPreviewImages);
-    setUploadedImages(newUploadedImages);
-    setFormData({
-      ...formData,
-      images: newFormDataImages
-    });
+    try {
+        // No permitir eliminar la última imagen si es la única
+        if (formData.images.length <= 1) {
+            toast.warning('No se puede eliminar la única imagen disponible');
+            return;
+        }
+
+        setUploadedImages(prev => prev.filter((_, i) => i !== index));
+        setPreviewImages(prev => prev.filter((_, i) => i !== index));
+        setFormData(prev => ({
+            ...prev,
+            images: prev.images.filter((_, i) => i !== index)
+        }));
+
+        toast.success('Imagen eliminada');
+    } catch (error) {
+        console.error('Error al eliminar la imagen:', error);
+        toast.error('Error al eliminar la imagen');
+    }
   };
   
   // Avanzar al siguiente paso
@@ -174,36 +229,81 @@ export default function PropertyCreation() {
     setError(null);
     
     try {
-      // Incluir todos los campos en la solicitud
-      const propertyData = {
-        title: formData.title,
-        description: formData.description,
-        price: parseFloat(formData.price) || 0,
-        location: formData.location,
-        bedrooms: parseInt(formData.bedrooms) || 0,
-        bathrooms: parseInt(formData.bathrooms) || 0,
-        area: parseFloat(formData.area) || 0,
-        propertyType: formData.propertyType,
-        features: formData.features,
-        images: formData.images,
-        owner: user?.name || 'Usuario Anónimo'
-      };
-      
-      console.log("Datos completos que se enviarán al servidor:", propertyData);
-      
-      // Crear la propiedad
-      const response = await createPropertyPost(propertyData);
-      console.log("Respuesta del servidor:", response);
-      
-      // Redireccionar a la página de propiedades
-      navigate('/propiedades');
+        // Validar campos requeridos
+        const requiredFields = [
+            { name: 'title', label: 'Título' },
+            { name: 'description', label: 'Descripción' },
+            { name: 'price', label: 'Precio' },
+            { name: 'location', label: 'Ubicación' },
+            { name: 'bedrooms', label: 'Dormitorios' },
+            { name: 'bathrooms', label: 'Baños' },
+            { name: 'area', label: 'Área' }
+        ];
+        
+        const missingFields = requiredFields.filter(field => !formData[field.name]);
+        
+        if (missingFields.length > 0) {
+            throw new Error(`Por favor, completa los siguientes campos: ${missingFields.map(f => f.label).join(', ')}`);
+        }
+
+        if (!formData.images || formData.images.length === 0) {
+            throw new Error('Por favor, sube al menos una imagen');
+        }
+
+        // Asegurarnos de que las imágenes estén en el formato correcto
+        const validImages = Array.isArray(formData.images) 
+            ? formData.images.map(img => {
+                if (typeof img === 'string') {
+                    return {
+                        src: img,
+                        alt: 'Imagen de la propiedad'
+                    };
+                }
+                if (typeof img === 'object' && img !== null && typeof img.src === 'string') {
+                    return {
+                        src: img.src,
+                        alt: img.alt || 'Imagen de la propiedad'
+                    };
+                }
+                return null;
+            }).filter(img => img !== null)
+            : [];
+
+        if (validImages.length === 0) {
+            throw new Error('No hay imágenes válidas para la propiedad');
+        }
+
+        // Preparar los datos según el esquema
+        const propertyData = {
+            ...formData,
+            m2: formData.area,
+            rooms: formData.bedrooms,
+            wc: formData.bathrooms,
+            address: formData.location,
+            // Asegurar que los campos numéricos sean números
+            price: Number(formData.price),
+            bedrooms: Number(formData.bedrooms),
+            bathrooms: Number(formData.bathrooms),
+            area: Number(formData.area),
+            // Usar las imágenes validadas
+            images: validImages
+        };
+        
+        console.log('Enviando datos de la propiedad:', propertyData);
+        
+        const response = await createPropertyPost(propertyData);
+        console.log('Respuesta del servidor:', response);
+        
+        toast.success('¡Propiedad creada exitosamente!');
+        navigate('/propiedades');
     } catch (err) {
-      console.error('Error detallado al crear la propiedad:', err);
-      setError(`Error al crear la propiedad: ${err.message}`);
+        console.error('Error detallado al crear la propiedad:', err);
+        setError(`Error al crear la propiedad: ${err.message}`);
+        toast.error(`Error al crear la propiedad: ${err.message}`);
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+};
   
   // Renderizar el paso actual
   const renderStep = () => {
@@ -484,10 +584,18 @@ export default function PropertyCreation() {
                   <div className="grid grid-cols-3 gap-4">
                     {previewImages.map((preview, index) => (
                       <div key={index} className="relative group">
+                        {index === 0 && (
+                          <span className="absolute top-2 left-2 bg-blue-500 text-white px-2 py-1 rounded text-sm">
+                            Principal
+                          </span>
+                        )}
                         <img
-                          src={preview}
-                          alt={`Imagen ${index + 1}`}
+                          src={preview.src}
+                          alt={preview.alt}
                           className="w-full h-40 object-cover rounded-lg shadow-md"
+                          onError={(e) => {
+                            e.target.src = "https://via.placeholder.com/400x300?text=Error+al+cargar+imagen";
+                          }}
                         />
                         <button
                           type="button"
