@@ -16,5 +16,17 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
+    assetsDir: 'assets',
+    sourcemap: true,
+  },
+  base: '/',
+  server: {
+    port: 5173,
+    host: true
   }
 })
