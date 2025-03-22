@@ -1,0 +1,31 @@
+Configuración de Cloudflare para blog.realestategozamadrid.com
+
+1. Inicia sesión en tu cuenta de Cloudflare.
+
+2. Selecciona el dominio realestategozamadrid.com.
+
+3. Ve a la sección "DNS" en el panel lateral.
+
+4. Haz clic en "Agregar registro" y configura lo siguiente:
+   - Tipo: CNAME
+   - Nombre: blog
+   - Destino: [URL de tu aplicación en AWS Amplify o Elastic Beanstalk]
+   - Proxy: Activado (recomendado para obtener los beneficios de seguridad de Cloudflare)
+   - TTL: Auto
+
+5. Guarda el registro.
+
+6. Ve a la sección "SSL/TLS" en el panel lateral.
+   - Asegúrate de que el modo SSL esté configurado como "Flexible" o "Full" (preferiblemente "Full").
+
+7. Ve a la sección "Page Rules" y crea una regla para redirigir todo el tráfico HTTP a HTTPS:
+   - URL: http://blog.realestategozamadrid.com/*
+   - Configuración: Always Use HTTPS
+
+8. Guarda la regla.
+
+9. (Opcional) Configura la caché de Cloudflare para mejorar el rendimiento:
+   - Ve a la sección "Caching" en el panel lateral.
+   - Configura las reglas de caché según tus necesidades.
+
+10. Verifica que el subdominio funcione correctamente visitando blog.realestategozamadrid.com. 

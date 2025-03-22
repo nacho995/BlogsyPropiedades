@@ -22,11 +22,12 @@ export default defineConfig({
       },
     },
     assetsDir: 'assets',
-    sourcemap: true,
+    sourcemap: false,
   },
   base: '/',
   server: {
     port: 5173,
-    host: true
+    host: true,
+    cors: true
   }
 })

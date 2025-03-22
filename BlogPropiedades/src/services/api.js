@@ -815,251 +815,45 @@ export const deleteData = async (endpoint) => {
 };
 
 /**
- * Sincroniza la imagen de perfil del usuario con el servidor
- * @returns {Promise<string|null>} - URL de la imagen de perfil o null si no hay
+ * Sincroniza la imagen de perfil con el servidor
+ * @param {string} [newImage] - Nueva imagen en base64 para actualizar
+ * @returns {Promise<Object>} - Objeto con la URL de la imagen
  */
-export const syncProfileImage = async () => {
-  // Verificar si hay un token disponible
-  const token = localStorage.getItem('token');
-  if (!token) {
-    console.log('No hay token disponible para sincronizar imagen de perfil');
-    return null;
-  }
-  
-  // Verificar si hay una sincronización en progreso para evitar múltiples llamadas
-  if (window._syncProfileImageInProgress) {
-    console.log('Ya hay una sincronización de imagen en progreso, esperando...');
-    try {
-      // Esperar a que termine la sincronización actual
-      await new Promise(resolve => {
-        const checkInterval = setInterval(() => {
-          if (!window._syncProfileImageInProgress) {
-            clearInterval(checkInterval);
-            resolve();
-          }
-        }, 100);
+export const syncProfileImage = async (newImage = null) => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No hay token de autenticación');
+    }
+
+    if (newImage) {
+      // Si hay una nueva imagen, usar el endpoint de actualización de perfil
+      const formData = new FormData();
+      formData.append('profilePic', newImage);
+
+      const response = await fetchAPI('/user/update-profile', {
+        method: 'POST',
+        body: formData
       });
       
-      // Devolver la imagen actual en localStorage
-      const currentImage = localStorage.getItem('profilePic') || 
-                          localStorage.getItem('profilePic_local') || 
-                          localStorage.getItem('profilePic_base64');
-      return currentImage;
-    } catch (error) {
-      console.error('Error al esperar sincronización:', error);
-      return null;
-    }
-  }
-  
-  // Marcar que hay una sincronización en progreso
-  window._syncProfileImageInProgress = true;
-  
-  try {
-    console.log('Sincronizando imagen de perfil con el servidor...');
-    
-    // Obtener datos del usuario
-    let userData;
-    try {
-      userData = await fetchAPI('/user/me');
-      console.log('Datos de usuario recibidos:', userData);
-    } catch (error) {
-      console.error('Error al obtener datos del usuario:', error);
-      // Usar imagen local como respaldo
-      const localImage = localStorage.getItem('profilePic_local') || 
-                        localStorage.getItem('profilePic_base64');
-      window._syncProfileImageInProgress = false;
-      return localImage;
-    }
-    
-    // Extraer la URL de la imagen según la estructura del esquema
-    let imageUrl = null;
-    
-    // Verificar si existe profilePic.src (estructura principal)
-    if (userData.profilePic && userData.profilePic.src) {
-      imageUrl = userData.profilePic.src;
-      console.log('Imagen encontrada en profilePic.src:', imageUrl);
-    } 
-    // Verificar si profilePic es un string directo
-    else if (userData.profilePic && typeof userData.profilePic === 'string') {
-      imageUrl = userData.profilePic;
-      console.log('Imagen encontrada como string en profilePic:', imageUrl);
-    }
-    // Verificar si existe profileImage.url (estructura alternativa)
-    else if (userData.profileImage && userData.profileImage.url) {
-      imageUrl = userData.profileImage.url;
-      console.log('Imagen encontrada en profileImage.url:', imageUrl);
-    }
-    
-    // Si tenemos una URL válida
-    if (imageUrl) {
-      // Importar las funciones de utilidad para manejar imágenes
-      const { validateAndProcessImage, ensureHttps, fallbackImageBase64 } = await import('../utils/profileUtils');
-      
-      // Convertir a HTTPS si es necesario
-      imageUrl = ensureHttps(imageUrl);
-      
-      // Verificar si la URL es accesible antes de intentar procesarla
-      const isAccessible = await checkImageAccessibility(imageUrl);
-      
-      if (isAccessible) {
-        // Validar y procesar la imagen (convertir a base64 si es necesario)
-        try {
-          const processedImage = await validateAndProcessImage(imageUrl);
-          
-          // Guardar en localStorage
-          localStorage.setItem('profilePic', processedImage);
-          console.log('Imagen de perfil procesada y guardada en localStorage');
-          
-          // Guardar también como copia local para respaldo
-          localStorage.setItem('profilePic_local', processedImage);
-          console.log('Imagen guardada como copia local de respaldo');
-          
-          // Notificar a otros componentes
-          window.dispatchEvent(new CustomEvent('profileImageUpdated', { 
-            detail: { imageUrl: processedImage } 
-          }));
-          
-          window._syncProfileImageInProgress = false;
-          return processedImage;
-        } catch (error) {
-          console.error('Error al procesar la imagen:', error);
-          
-          // Si falla el procesamiento, intentar usar la imagen local como respaldo
-          const localImage = localStorage.getItem('profilePic_local') || 
-                            localStorage.getItem('profilePic_base64');
-          
-          if (localImage) {
-            localStorage.setItem('profilePic', localImage);
-            
-            // Notificar a otros componentes
-            window.dispatchEvent(new CustomEvent('profileImageUpdated', { 
-              detail: { imageUrl: localImage } 
-            }));
-            
-            window._syncProfileImageInProgress = false;
-            return localImage;
-          }
-          
-          // Si no hay imagen local, usar la imagen por defecto
-          localStorage.setItem('profilePic', fallbackImageBase64);
-          localStorage.setItem('profilePic_local', fallbackImageBase64);
-          localStorage.setItem('profilePic_base64', fallbackImageBase64);
-          
-          // Notificar a otros componentes
-          window.dispatchEvent(new CustomEvent('profileImageUpdated', { 
-            detail: { imageUrl: fallbackImageBase64 } 
-          }));
-          
-          window._syncProfileImageInProgress = false;
-          return fallbackImageBase64;
-        }
-      } else {
-        console.log('La URL de la imagen no es accesible:', imageUrl);
-        
-        // Intentar usar la imagen local guardada como respaldo
-        const localImage = localStorage.getItem('profilePic_local') || 
-                          localStorage.getItem('profilePic_base64');
-        
-        if (localImage) {
-          console.log('Usando imagen local guardada como respaldo');
-          localStorage.setItem('profilePic', localImage);
-          
-          // Notificar a otros componentes
-          window.dispatchEvent(new CustomEvent('profileImageUpdated', { 
-            detail: { imageUrl: localImage } 
-          }));
-          
-          window._syncProfileImageInProgress = false;
-          return localImage;
-        }
-        
-        // Si no hay imagen local, usar la imagen por defecto
-        localStorage.setItem('profilePic', fallbackImageBase64);
-        localStorage.setItem('profilePic_local', fallbackImageBase64);
-        localStorage.setItem('profilePic_base64', fallbackImageBase64);
-        
-        // Notificar a otros componentes
-        window.dispatchEvent(new CustomEvent('profileImageUpdated', { 
-          detail: { imageUrl: fallbackImageBase64 } 
-        }));
-        
-        window._syncProfileImageInProgress = false;
-        return fallbackImageBase64;
-      }
+      console.log('Respuesta al actualizar imagen:', response);
+      return {
+        imageUrl: response.profilePic || response.profileImage || response.imageUrl
+      };
     } else {
-      console.log('No se encontró imagen de perfil en los datos del usuario');
+      // Si no hay nueva imagen, obtener los datos actuales del usuario
+      const response = await fetchAPI('/user/me');
       
-      // Intentar usar la imagen local guardada como respaldo
-      const localImage = localStorage.getItem('profilePic_local') || 
-                        localStorage.getItem('profilePic_base64');
-      
-      if (localImage) {
-        console.log('Usando imagen local guardada como respaldo');
-        localStorage.setItem('profilePic', localImage);
-        
-        // Notificar a otros componentes
-        window.dispatchEvent(new CustomEvent('profileImageUpdated', { 
-          detail: { imageUrl: localImage } 
-        }));
-        
-        window._syncProfileImageInProgress = false;
-        return localImage;
-      }
-      
-      // Si no hay imagen local, usar la imagen por defecto
-      const { fallbackImageBase64 } = await import('../utils/profileUtils');
-      localStorage.setItem('profilePic', fallbackImageBase64);
-      localStorage.setItem('profilePic_local', fallbackImageBase64);
-      localStorage.setItem('profilePic_base64', fallbackImageBase64);
-      
-      // Notificar a otros componentes
-      window.dispatchEvent(new CustomEvent('profileImageUpdated', { 
-        detail: { imageUrl: fallbackImageBase64 } 
-      }));
-      
-      window._syncProfileImageInProgress = false;
-      return fallbackImageBase64;
+      console.log('Respuesta al obtener datos de usuario:', response);
+      return {
+        imageUrl: response.profilePic || response.profileImage || response.imageUrl
+      };
     }
   } catch (error) {
-    console.error('Error al sincronizar imagen de perfil:', error);
-    
-    // Intentar usar la imagen local guardada como respaldo
-    const localImage = localStorage.getItem('profilePic_local') || 
-                      localStorage.getItem('profilePic_base64');
-    
-    if (localImage) {
-      console.log('Error al sincronizar, usando imagen local guardada como respaldo');
-      localStorage.setItem('profilePic', localImage);
-      
-      // Notificar a otros componentes
-      window.dispatchEvent(new CustomEvent('profileImageUpdated', { 
-        detail: { imageUrl: localImage } 
-      }));
-      
-      window._syncProfileImageInProgress = false;
-      return localImage;
-    }
-    
-    // Si no hay imagen local, usar la imagen por defecto
-    const { fallbackImageBase64 } = await import('../utils/profileUtils');
-    localStorage.setItem('profilePic', fallbackImageBase64);
-    localStorage.setItem('profilePic_local', fallbackImageBase64);
-    localStorage.setItem('profilePic_base64', fallbackImageBase64);
-    
-    // Notificar a otros componentes
-    window.dispatchEvent(new CustomEvent('profileImageUpdated', { 
-      detail: { imageUrl: fallbackImageBase64 } 
-    }));
-    
-    window._syncProfileImageInProgress = false;
-    return fallbackImageBase64;
-  } finally {
-    // Asegurarse de que se libere el bloqueo incluso si hay errores
-    setTimeout(() => {
-      window._syncProfileImageInProgress = false;
-    }, 1000);
+    console.error('Error en syncProfileImage:', error);
+    throw error;
   }
-}
+};
 
 /**
  * Verifica si una imagen es accesible

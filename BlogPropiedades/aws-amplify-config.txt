@@ -1,0 +1,62 @@
+Configuración de AWS Amplify para blog.realestategozamadrid.com
+
+1. Inicia sesión en la consola de AWS en https://aws.amazon.com/console/
+
+2. Busca y selecciona "AWS Amplify" en el buscador de servicios
+
+3. Haz clic en "Crear nueva aplicación"
+
+4. Selecciona "Implementar sin Git" (Deploy without Git)
+
+5. Configura la aplicación:
+   - Nombre de la aplicación: blog-gozamadrid
+   - Entorno: prod
+
+6. Haz clic en "Crear nueva aplicación"
+
+7. En la siguiente pantalla, haz clic en "Comenzar implementación manual"
+
+8. Sube el archivo ZIP de tu aplicación:
+   - Comprime la carpeta "dist" en un archivo ZIP
+   - Sube el archivo ZIP a través de la interfaz de Amplify
+
+9. Haz clic en "Guardar e implementar"
+
+10. Una vez completada la implementación, ve a la pestaña "Configuración de dominio"
+
+11. Haz clic en "Agregar dominio"
+
+12. Configura el dominio:
+    - Dominio: realestategozamadrid.com
+    - Subdominio: blog
+    - Haz clic en "Configurar dominio"
+
+13. Amplify generará un registro CNAME que deberás agregar a Cloudflare:
+    - Copia el valor del registro CNAME proporcionado por Amplify
+    - Sigue las instrucciones en el archivo cloudflare-dns-config.txt para agregar este registro a Cloudflare
+
+14. Configura redirecciones y reescrituras:
+    - Ve a la pestaña "Redirecciones y reescrituras"
+    - Agrega una regla para manejar rutas de SPA:
+      - Tipo: 404 (Fallback)
+      - Origen: /<*>
+      - Destino: /index.html
+      - Tipo: 200 (Rewrite)
+
+15. Configura variables de entorno:
+    - Ve a la pestaña "Variables de entorno"
+    - Agrega las siguientes variables:
+      - VITE_BACKEND_URL: https://gozamadrid-env.eba-dwhnvgbt.eu-west-3.elasticbeanstalk.com
+      - VITE_API_URL: https://gozamadrid-env.eba-dwhnvgbt.eu-west-3.elasticbeanstalk.com
+      - VITE_API_PUBLIC_API_URL: https://gozamadrid-env.eba-dwhnvgbt.eu-west-3.elasticbeanstalk.com
+
+16. Configura encabezados personalizados:
+    - Ve a la pestaña "Encabezados personalizados"
+    - Agrega los siguientes encabezados para todos los archivos:
+      - Cache-Control: public, max-age=31536000, immutable
+    - Agrega los siguientes encabezados para index.html:
+      - Cache-Control: public, max-age=0, must-revalidate
+
+17. Verifica que la aplicación esté funcionando correctamente visitando la URL proporcionada por Amplify
+
+18. Una vez que la configuración de DNS en Cloudflare esté completa, verifica que el subdominio blog.realestategozamadrid.com funcione correctamente 

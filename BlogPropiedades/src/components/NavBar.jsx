@@ -47,14 +47,31 @@ export default function Navbar() {
   // Definir las rutas de navegación
   const navigation = [
     { name: 'Inicio', href: '/', current: location.pathname === '/' },
-    { name: 'Blogs', href: '/blogs', current: location.pathname === '/blogs' },
+    { name: 'Blogs', href: '/ver-blogs', current: location.pathname === '/ver-blogs' },
     { name: 'Propiedades', href: '/propiedades', current: location.pathname === '/propiedades' },
   ];
   
   // Agregar rutas adicionales si el usuario está autenticado
-  const updatedNavigation = isAuthenticated
-    ? [...navigation, { name: 'Mis Blogs', href: '/mis-blogs', current: location.pathname === '/mis-blogs' }]
-    : navigation;
+  const userRoutes = [
+    { name: 'Añadir Blog', href: '/crear-blog', current: location.pathname === '/crear-blog' },
+  ];
+  
+  // Agregar rutas adicionales si el usuario es administrador
+  const adminRoutes = [
+    { name: 'Añadir Propiedad', href: '/add-property', current: location.pathname === '/add-property' },
+  ];
+
+  // Construir la navegación combinada basada en permisos
+  let updatedNavigation = [...navigation];
+  
+  if (isAuthenticated) {
+    updatedNavigation = [...updatedNavigation, ...userRoutes];
+    
+    // Añadir rutas de administrador si el usuario tiene el rol necesario
+    if (user?.role === 'admin' || user?.isAdmin) {
+      updatedNavigation = [...updatedNavigation, ...adminRoutes];
+    }
+  }
 
   return (
     <Disclosure as="nav" className="bg-black text-white shadow-md">
@@ -140,6 +157,44 @@ export default function Navbar() {
                               </Link>
                             )}
                           </Menu.Item>
+                          
+                          {/* Opciones rápidas de navegación */}
+                          {isAuthenticated && (
+                            <>
+                              <Menu.Item>
+                                {({ active }) => (
+                                  <Link
+                                    to="/crear-blog"
+                                    className={classNames(
+                                      active ? 'bg-gray-100' : '',
+                                      'block px-4 py-2 text-sm text-gray-700'
+                                    )}
+                                  >
+                                    Añadir Blog
+                                  </Link>
+                                )}
+                              </Menu.Item>
+                              
+                              {(user?.role === 'admin' || user?.isAdmin) && (
+                                <Menu.Item>
+                                  {({ active }) => (
+                                    <Link
+                                      to="/add-property"
+                                      className={classNames(
+                                        active ? 'bg-gray-100' : '',
+                                        'block px-4 py-2 text-sm text-gray-700'
+                                      )}
+                                    >
+                                      Añadir Propiedad
+                                    </Link>
+                                  )}
+                                </Menu.Item>
+                              )}
+                              
+                              <div className="border-t border-gray-200 my-1"></div>
+                            </>
+                          )}
+                          
                           <Menu.Item>
                             {({ active }) => (
                               <button
@@ -179,7 +234,7 @@ export default function Navbar() {
 
           {/* Menú móvil */}
           <Disclosure.Panel className="sm:hidden">
-            <div className="px-2 pt-2 pb-3 space-y-1">
+            <div className="space-y-1 px-2 pb-3 pt-2">
               {updatedNavigation.map((item) => (
                 <Disclosure.Button
                   key={item.name}
@@ -199,6 +254,7 @@ export default function Navbar() {
               
               {isAuthenticated ? (
                 <>
+                  <div className="border-t border-gray-700 my-2"></div>
                   <Disclosure.Button
                     as={Link}
                     to="/cambiar-perfil"
