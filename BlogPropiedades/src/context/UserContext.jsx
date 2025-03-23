@@ -199,6 +199,16 @@ export function UserProvider({ children }) {
       try {
         const userData = await getUserProfile(storedToken);
         
+        // Verificar que los datos del usuario son válidos
+        if (!userData || !userData.email) {
+          console.error("⚠️ API devolvió datos de usuario inválidos:", userData);
+          
+          // Intentar recuperar con datos locales
+          await recuperateSession();
+          setLoading(false);
+          return;
+        }
+        
         // Actualizar localStorage con datos básicos
         if (userData.name) localStorage.setItem("name", userData.name);
         if (userData.email) localStorage.setItem("email", userData.email);
@@ -227,40 +237,31 @@ export function UserProvider({ children }) {
         setIsAuthenticated(true);
         setLoading(false);
       } catch (error) {
-        console.error("Error al obtener datos del usuario:", error);
-        // Solo marcar como no autenticado si el error es 401 (no autorizado)
-        if (error.response && error.response.status === 401) {
+        console.error("Error al obtener perfil de usuario:", error);
+        
+        // Si falla la petición al servidor pero tenemos un token, intentar recuperar 
+        // la sesión con los datos almacenados en localStorage
+        if (storedToken) {
+          console.log("Intentando recuperar sesión desde localStorage tras fallo de API");
+          const recovered = await recuperateSession();
+          
+          if (!recovered) {
+            // Si no podemos recuperar la sesión, redirigir al login
+            console.error("No se pudo recuperar sesión, redirigiendo a login");
+            setUser(null);
+            setIsAuthenticated(false);
+          }
+        } else {
           setUser(null);
           setIsAuthenticated(false);
-        } else {
-          // Para otros errores, mantener el estado actual pero actualizar la imagen
-          const storedImage = localStorage.getItem("profilePic") || 
-                             localStorage.getItem("profilePic_local") || 
-                             localStorage.getItem("profilePic_base64") || 
-                             fallbackImageBase64;
-          if (user) {
-            setUser({
-              ...user,
-              profileImage: storedImage
-            });
-          }
         }
+        
         setLoading(false);
       }
-    } catch (error) {
-      console.error("Error al actualizar datos de usuario:", error);
-      // No cerrar sesión automáticamente por errores generales
-      // Solo actualizar la imagen si es necesario
-      const storedImage = localStorage.getItem("profilePic") || 
-                         localStorage.getItem("profilePic_local") || 
-                         localStorage.getItem("profilePic_base64") || 
-                         fallbackImageBase64;
-      if (user) {
-        setUser({
-          ...user,
-          profileImage: storedImage
-        });
-      }
+    } catch (outerError) {
+      console.error("Error crítico en refreshUserData:", outerError);
+      setUser(null);
+      setIsAuthenticated(false);
       setLoading(false);
     }
   };
@@ -316,8 +317,16 @@ export function UserProvider({ children }) {
           }
         } else {
           console.log("ℹ️ No hay token guardado, estableciendo estado como no autenticado");
-          setUser(null);
-          setIsAuthenticated(false);
+          
+          // Aún así, comprobamos si hay datos en localStorage para ofrecer una experiencia mejorada
+          const hasMinimalData = localStorage.getItem('email');
+          if (hasMinimalData) {
+            console.log("ℹ️ Se encontró email en localStorage, intentando recuperación parcial");
+            await recuperateSession();
+          } else {
+            setUser(null);
+            setIsAuthenticated(false);
+          }
         }
       } catch (error) {
         console.error("❌ Error crítico al inicializar usuario:", error);
@@ -368,6 +377,11 @@ export function UserProvider({ children }) {
           setLoading(false);
           setUser(null);
           setIsAuthenticated(false);
+          
+          // Intento final de recuperación con datos locales
+          recuperateSession().catch(() => {
+            console.error("❌ Falló el intento final de recuperación");
+          });
         }
       });
     };
@@ -380,7 +394,9 @@ export function UserProvider({ children }) {
   useEffect(() => {
     if (isAuthenticated) {
       const interval = setInterval(() => {
-        refreshUserData();
+        refreshUserData().catch(error => {
+          console.error("Error al refrescar datos periódicamente:", error);
+        });
       }, 5 * 60 * 1000); // 5 minutos
       
       return () => clearInterval(interval);

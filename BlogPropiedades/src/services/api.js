@@ -13,12 +13,90 @@ const BASE_URL = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
 // Función para manejar errores de conexión con reintentos
 const API_RETRY_COUNT = 3;
 const API_RETRY_DELAY = 1000; // 1 segundo
+const API_TIMEOUT = 30000; // 30 segundos
+
+// Constantes para mensajes de error
+const ERROR_MESSAGES = {
+  NETWORK: "Error de conexión: No se pudo conectar con el servidor. Por favor, verifica tu conexión a internet y vuelve a intentarlo.",
+  TIMEOUT: "Tiempo de espera agotado: El servidor está tardando demasiado en responder. Por favor, inténtalo más tarde.",
+  SERVER: "Error del servidor: Estamos experimentando problemas técnicos. Por favor, inténtalo de nuevo en unos minutos.",
+  AUTHENTICATION: "Error de autenticación: Tu sesión ha expirado o no tienes permiso para realizar esta acción.",
+  VALIDATION: "Error de validación: Por favor, verifica los datos ingresados e intenta nuevamente.",
+  UNKNOWN: "Ocurrió un error inesperado. Por favor, inténtalo de nuevo."
+};
+
+// Estado global de la red para detectar problemas persistentes
+let networkHealthStatus = {
+  lastSuccessfulRequest: null,
+  failedRequestCount: 0,
+  isOfflineMode: false,
+  pendingRequests: [],
+  connectionStatus: navigator.onLine,
+  detectedBackendUrl: null,
+  diagnosticInfo: {
+    lastFailureReason: null,
+    lastFailureTimestamp: null,
+    successRate: 100
+  }
+};
+
+// Escuchar eventos de conexión
+window.addEventListener('online', () => {
+  console.log('🌐 Conexión a internet restablecida');
+  networkHealthStatus.connectionStatus = true;
+  
+  // Intentar procesar solicitudes pendientes
+  if (networkHealthStatus.pendingRequests.length > 0) {
+    console.log(`🔄 Procesando ${networkHealthStatus.pendingRequests.length} solicitudes pendientes`);
+    // Implementar lógica para reenviar solicitudes pendientes si es necesario
+  }
+});
+
+window.addEventListener('offline', () => {
+  console.log('🔌 Conexión a internet perdida');
+  networkHealthStatus.connectionStatus = false;
+  networkHealthStatus.isOfflineMode = true;
+});
 
 // Función auxiliar para esperar un tiempo específico
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Función auxiliar para asegurar URLs correctas
 const ensureProtocol = (url) => sanitizeUrl(url);
+
+// Función para detectar tipo de error y mejorar mensajes
+const getEnhancedErrorMessage = (error, response) => {
+  // Error de red (sin conexión)
+  if (error instanceof TypeError && error.message.includes('fetch')) {
+    return ERROR_MESSAGES.NETWORK;
+  }
+  
+  // Error de tiempo de espera
+  if (error.name === 'AbortError') {
+    return ERROR_MESSAGES.TIMEOUT;
+  }
+  
+  // Error HTTP según código
+  if (response) {
+    // Errores de autenticación
+    if (response.status === 401 || response.status === 403) {
+      return ERROR_MESSAGES.AUTHENTICATION;
+    }
+    
+    // Errores de validación
+    if (response.status === 400 || response.status === 422) {
+      return ERROR_MESSAGES.VALIDATION;
+    }
+    
+    // Errores del servidor
+    if (response.status >= 500) {
+      return ERROR_MESSAGES.SERVER;
+    }
+  }
+  
+  // Error desconocido
+  return error.message || ERROR_MESSAGES.UNKNOWN;
+};
 
 /**
  * Realiza peticiones al API con manejo de errores y reintentos automáticos
@@ -33,6 +111,47 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
         const BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || 
                          'https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
         const FALLBACK_API = import.meta.env.VITE_API_PUBLIC_API_URL;
+        
+        // Verificar estado de conexión
+        if (!navigator.onLine) {
+            console.warn('📡 Dispositivo sin conexión a internet');
+            
+            // Para operaciones de lectura, intentar recuperar de caché si existe
+            const isReadOperation = options.method === 'GET' || !options.method;
+            if (isReadOperation) {
+                const cacheKey = `api_cache_${endpoint}`;
+                const cachedData = localStorage.getItem(cacheKey);
+                
+                if (cachedData) {
+                    try {
+                        const { data, timestamp } = JSON.parse(cachedData);
+                        const cacheAge = Date.now() - timestamp;
+                        const MAX_CACHE_AGE = 3600000; // 1 hora
+                        
+                        if (cacheAge < MAX_CACHE_AGE) {
+                            console.log(`📦 Usando datos en caché para ${endpoint} (${Math.round(cacheAge/1000/60)} min de antigüedad)`);
+                            return data;
+                        }
+                    } catch (e) {
+                        console.error('Error al recuperar datos de caché:', e);
+                    }
+                }
+            }
+            
+            // Si es una operación de escritura o no hay caché, guardar para reintento posterior
+            if (!isReadOperation) {
+                const pendingRequest = {
+                    endpoint,
+                    options,
+                    timestamp: Date.now()
+                };
+                
+                networkHealthStatus.pendingRequests.push(pendingRequest);
+                console.log(`✉️ Solicitud guardada para procesar cuando se recupere la conexión: ${endpoint}`);
+            }
+            
+            throw new Error(ERROR_MESSAGES.NETWORK);
+        }
         
         // Normalizar endpoint
         const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -57,6 +176,9 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
                 console.log(`📦 [${requestId}] Cuerpo: [${typeof options.body}]`);
             }
         }
+        
+        // Registrar la hora de inicio de la petición para medir latencia
+        const startTime = Date.now();
         
         // Configuración por defecto para la solicitud
         const fetchOptions = {
@@ -88,27 +210,66 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
             const response = await fetch(url, fetchOptions);
             clearTimeout(timeoutId);
             
-            console.log(`📥 [${requestId}] Respuesta recibida de: ${url}, Status: ${response.status}`);
+            // Calcular latencia
+            const latencyMs = Date.now() - startTime;
+            console.log(`📥 [${requestId}] Respuesta recibida de: ${url}, Status: ${response.status}, Latencia: ${latencyMs}ms`);
+            
+            // Actualizar estado de la red
+            networkHealthStatus.lastSuccessfulRequest = Date.now();
+            networkHealthStatus.failedRequestCount = 0;
+            
+            // Almacenar en caché si es una operación de lectura exitosa
+            const isReadOperation = options.method === 'GET' || !options.method;
+            if (isReadOperation && response.ok) {
+                try {
+                    const responseClone = response.clone();
+                    const responseData = await responseClone.json();
+                    
+                    const cacheKey = `api_cache_${endpoint}`;
+                    const cacheData = {
+                        data: responseData,
+                        timestamp: Date.now()
+                    };
+                    
+                    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+                } catch (e) {
+                    // Error al almacenar en caché, continuar sin caché
+                    console.warn(`⚠️ No se pudo almacenar en caché: ${e.message}`);
+                }
+            }
 
             // Manejo especial para errores HTTP
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error(`🔥 [${requestId}] Error HTTP ${response.status}: ${errorText}`);
                 
+                // Actualizar información de diagnóstico
+                networkHealthStatus.diagnosticInfo.lastFailureReason = `HTTP ${response.status}`;
+                networkHealthStatus.diagnosticInfo.lastFailureTimestamp = Date.now();
+                
                 // Si es un error 5xx, podemos reintentar
                 if (response.status >= 500 && response.status < 600 && retryCount < API_RETRY_COUNT) {
                     console.log(`🔄 [${requestId}] Reintentando (${retryCount + 1}/${API_RETRY_COUNT}) en ${API_RETRY_DELAY}ms...`);
-                    await sleep(API_RETRY_DELAY);
+                    await sleep(API_RETRY_DELAY * (retryCount + 1)); // Retraso exponencial
                     return fetchAPI(endpoint, options, retryCount + 1);
+                }
+                
+                // Si es un error de autenticación, limpiar token
+                if (response.status === 401) {
+                    console.warn('🔐 Error de autenticación, limpiando credenciales');
+                    // No limpiar todo, solo el token para mantener otros datos
+                    localStorage.removeItem('token');
                 }
                 
                 try {
                     // Intentar parsear como JSON
                     const errorData = JSON.parse(errorText);
-                    throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
+                    const errorMessage = errorData.message || errorData.error || `Error ${response.status}: ${response.statusText}`;
+                    throw new Error(errorMessage);
                 } catch (jsonError) {
                     // Si no es JSON, lanzar error con el texto
-                    throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
+                    const enhancedErrorMessage = getEnhancedErrorMessage({ message: errorText }, response);
+                    throw new Error(enhancedErrorMessage);
                 }
             }
 
@@ -130,23 +291,32 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
                         const responseClone = response.clone();
                         const rawText = await responseClone.text();
                         console.log(`📄 [${requestId}] Respuesta raw en login:`, rawText);
+                        
+                        // Si hay algún header con información útil, registrarlo
+                        console.log(`🔍 [${requestId}] Headers de respuesta:`, Object.fromEntries([...response.headers.entries()]));
                     } catch (textError) {
                         console.error(`🔥 [${requestId}] Error al obtener texto de respuesta:`, textError);
                     }
                     
                     // Verificar si hay un token previo
                     const existingToken = localStorage.getItem('token');
-                    if (existingToken) {
+                    const existingEmail = localStorage.getItem('email');
+                    
+                    if (existingToken && existingEmail) {
                         console.log(`🔑 [${requestId}] Usando token existente para mantener sesión`);
                         return {
                             token: existingToken,
-                            user: { email: localStorage.getItem('email') || 'usuario@example.com' },
-                            _notice: 'Sesión mantenida con token existente'
+                            user: { 
+                                email: existingEmail,
+                                name: localStorage.getItem('username') || 'Usuario',
+                                role: localStorage.getItem('userRole') || 'user'
+                            },
+                            _notice: 'Sesión mantenida con token existente debido a respuesta vacía del servidor'
                         };
                     }
                     
                     // Generar respuesta de error específica para login
-                    throw new Error('El servidor devolvió una respuesta vacía durante el login');
+                    throw new Error('El servidor devolvió una respuesta vacía durante el login. Por favor, inténtalo de nuevo.');
                 }
                 
                 // Determinar el valor de retorno según el tipo esperado
@@ -185,12 +355,12 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
             try {
                 // Intentar parsear la respuesta como JSON
                 const data = await response.json();
-                console.log(`📦 Respuesta parseada:`, typeof data === 'object' ? 'Objeto válido' : `Tipo: ${typeof data}`);
+                console.log(`📦 [${requestId}] Respuesta parseada:`, typeof data === 'object' ? 'Objeto válido' : `Tipo: ${typeof data}`);
                 
                 // Validar que data sea un objeto o array para evitar errores con métodos como map
                 if (data === null) {
-                    console.warn('⚠️ Respuesta JSON nula');
-                    return expectsArray ? [] : {};
+                    console.warn(`⚠️ [${requestId}] Respuesta JSON nula`);
+                    return options.expectsArray ? [] : {};
                 }
                 
                 // Verificar tipo de data para métodos como map
@@ -199,24 +369,24 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
                     return data;
                 } else if (typeof data === 'object') {
                     // Es un objeto, pero si esperamos un array y no lo es, crear un wrapper array
-                    if (expectsArray && !data.items && !data.data && !data.results) {
-                        console.warn('⚠️ Se esperaba un array pero se recibió un objeto, intentando convertir');
+                    if (options.expectsArray && !data.items && !data.data && !data.results) {
+                        console.warn(`⚠️ [${requestId}] Se esperaba un array pero se recibió un objeto, intentando convertir`);
                         
                         // Intentar encontrar un array dentro del objeto
                         for (const key in data) {
                             if (Array.isArray(data[key])) {
-                                console.log(`🔍 Se encontró un array en la propiedad ${key}`);
+                                console.log(`🔍 [${requestId}] Se encontró un array en la propiedad ${key}`);
                                 return data[key];
                             }
                         }
                         
                         // Si el objeto tiene propiedades como id, podría ser un elemento único
                         if (data._id || data.id) {
-                            console.log('🔍 Se encontró un único elemento, devolviendo como array');
+                            console.log(`🔍 [${requestId}] Se encontró un único elemento, devolviendo como array`);
                             return [data];
                         }
                         
-                        console.warn('⚠️ No se encontró un array dentro del objeto, devolviendo array vacío');
+                        console.warn(`⚠️ [${requestId}] No se encontró un array dentro del objeto, devolviendo array vacío`);
                         return [];
                     }
                     
@@ -224,20 +394,20 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
                     return data;
                 } else {
                     // No es ni objeto ni array, crear un wrapper
-                    console.warn(`⚠️ Respuesta con formato inesperado (${typeof data}), creando wrapper`);
-                    return expectsArray ? [] : { value: data, _warning: 'Respuesta con formato no estándar' };
+                    console.warn(`⚠️ [${requestId}] Respuesta con formato inesperado (${typeof data}), creando wrapper`);
+                    return options.expectsArray ? [] : { value: data, _warning: 'Respuesta con formato no estándar' };
                 }
             } catch (error) {
-                console.error('🔥 Error al parsear respuesta JSON:', error);
+                console.error(`🔥 [${requestId}] Error al parsear respuesta JSON:`, error);
                 
                 // Intentar usar respuesta de texto como alternativa
                 try {
                     const textResponse = await response.text();
-                    console.log('📄 Respuesta como texto:', textResponse.substring(0, 100) + '...');
+                    console.log(`📄 [${requestId}] Respuesta como texto:`, textResponse.substring(0, 100) + '...');
                     
                     // Si esperamos un array pero no pudimos parsear la respuesta, devolver array vacío
-                    if (expectsArray) {
-                        console.warn('⚠️ Se esperaba un array pero hubo error al parsear, devolviendo []');
+                    if (options.expectsArray) {
+                        console.warn(`⚠️ [${requestId}] Se esperaba un array pero hubo error al parsear, devolviendo []`);
                         return [];
                     }
                     
@@ -250,46 +420,75 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
                     throw new Error(`Error al procesar la respuesta: ${error.message}`);
                 }
             }
-        } catch (fetchError) {
-            clearTimeout(timeoutId);
+        } catch (error) {
+            // Actualizar estado de la red
+            networkHealthStatus.failedRequestCount++;
+            networkHealthStatus.diagnosticInfo.lastFailureReason = error.message;
+            networkHealthStatus.diagnosticInfo.lastFailureTimestamp = Date.now();
             
-            // Si es un error de tiempo de espera o de red, reintentar
-            if ((fetchError.name === 'AbortError' || 
-                 fetchError.message.includes('network') ||
-                 fetchError.message.includes('Failed to fetch')) && 
-                retryCount < API_RETRY_COUNT) {
-                console.log(`🔄 Error de red, reintentando (${retryCount + 1}/${API_RETRY_COUNT}) en ${API_RETRY_DELAY}ms...`);
-                await sleep(API_RETRY_DELAY);
-                return fetchAPI(endpoint, options, retryCount + 1);
-            }
-            
-            throw fetchError;
-        }
-    } catch (error) {
-        // Si llegamos al máximo de reintentos, intentar usar la API de respaldo
-        if (retryCount >= API_RETRY_COUNT && FALLBACK_API && FALLBACK_API !== BASE_URL) {
-            console.log(`🔄 Usando API de respaldo: ${FALLBACK_API}`);
-            // Crear una nueva URL usando la API de respaldo
-            const fallbackUrl = combineUrls(FALLBACK_API, endpoint);
-            // Usar las mismas opciones pero con la nueva URL
-            try {
-                console.log(`🚀 Enviando solicitud a API de respaldo: ${fallbackUrl}`);
-                const response = await fetch(fallbackUrl, options);
-                // Procesar la respuesta de forma simple
-                if (!response.ok) {
-                    throw new Error(`Error en API de respaldo: ${response.status}`);
+            // Verificar si es un error de abort (timeout)
+            if (error.name === 'AbortError') {
+                console.error(`⏱️ [${requestId}] Error: Tiempo de espera agotado`);
+                
+                // Si hay suficientes intentos, reintentar
+                if (retryCount < API_RETRY_COUNT) {
+                    console.log(`🔄 [${requestId}] Reintentando (${retryCount + 1}/${API_RETRY_COUNT}) después de timeout...`);
+                    await sleep(API_RETRY_DELAY * (retryCount + 1));
+                    return fetchAPI(endpoint, options, retryCount + 1);
                 }
-                return await response.json();
-            } catch (fallbackError) {
-                console.error(`🔥 Error en API de respaldo:`, fallbackError);
-                // Si también falla el respaldo, lanzar el error original
-                console.error(`🔥 Error en fetchAPI (${endpoint}):`, error);
-                throw error;
+                
+                throw new Error(ERROR_MESSAGES.TIMEOUT);
             }
+            
+            // Error de conexión
+            if (error.message.includes('NetworkError') || error.message.includes('fetch')) {
+                console.error(`🌐 [${requestId}] Error de red:`, error);
+                
+                // Si hay suficientes intentos, reintentar
+                if (retryCount < API_RETRY_COUNT) {
+                    console.log(`🔄 [${requestId}] Reintentando (${retryCount + 1}/${API_RETRY_COUNT}) después de error de red...`);
+                    
+                    // Espera exponencial para evitar saturar
+                    await sleep(API_RETRY_DELAY * Math.pow(2, retryCount));
+                    
+                    return fetchAPI(endpoint, options, retryCount + 1);
+                }
+                
+                // Alternativa: probar con el API de respaldo si existe y no lo hemos usado
+                if (FALLBACK_API && BASE_URL !== FALLBACK_API && !options._usedFallback) {
+                    console.log(`🔄 [${requestId}] Intentando con API de respaldo: ${FALLBACK_API}`);
+                    
+                    // Crear nuevas opciones con bandera de fallback
+                    const fallbackOptions = {
+                        ...options,
+                        _usedFallback: true
+                    };
+                    
+                    // Ajustar URL base a la alternativa
+                    const fallbackUrl = endpoint.replace(BASE_URL, FALLBACK_API);
+                    return fetchAPI(fallbackUrl, fallbackOptions, 0);
+                }
+                
+                // Si hemos agotado todos los intentos, lanzar un error más amigable
+                throw new Error(ERROR_MESSAGES.NETWORK);
+            }
+            
+            // Otros errores
+            console.error(`❌ [${requestId}] Error:`, error);
+            
+            // Mejorar el mensaje de error para el usuario
+            const enhancedErrorMessage = getEnhancedErrorMessage(error);
+            throw new Error(enhancedErrorMessage);
         }
+    } catch (finalError) {
+        // Actualizar diagnóstico
+        networkHealthStatus.diagnosticInfo.successRate = Math.max(
+            0, 
+            100 - (networkHealthStatus.failedRequestCount * 10)
+        );
         
-        console.error(`🔥 Error en fetchAPI (${endpoint}):`, error);
-        throw error;
+        console.error(`❌ Error final en fetchAPI:`, finalError);
+        throw finalError;
     }
 };
 
