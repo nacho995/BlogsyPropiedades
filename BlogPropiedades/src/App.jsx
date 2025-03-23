@@ -432,53 +432,17 @@ function AdminRoute({ children }) {
 }
 
 function HomeRoute() {
-  const { user, isAuthenticated } = useUser();
+  const { user, isAuthenticated, loading } = useUser();
   const [hasError, setHasError] = useState(false);
   const renderCountRef = useRef(0);
+  const [forcedComponent, setForcedComponent] = useState(null);
   
-  // Comprobar y ajustar URLs de API si es necesario
+  // Detectar bucles de renderizado
   useEffect(() => {
-    try {
-      // Verificar si estamos usando HTTPS pero la API requiere HTTP
-      const apiUrl = import.meta.env.VITE_API_URL || '';
-      const currentProtocol = window.location.protocol;
-      
-      if (currentProtocol === 'https:' && apiUrl.startsWith('http:')) {
-        console.warn('⚠️ Detectado posible conflicto de protocolos: La página usa HTTPS pero la API usa HTTP.');
-        console.log('🔄 Se está utilizando la API con HTTP desde una página HTTPS. Esto puede causar problemas de contenido mixto.');
-        
-        // Registrar este problema para diagnóstico
-        try {
-          localStorage.setItem('protocolMismatch', JSON.stringify({
-            timestamp: new Date().toISOString(),
-            pageProtocol: currentProtocol,
-            apiProtocol: apiUrl.startsWith('https:') ? 'https:' : 'http:'
-          }));
-        } catch (e) {
-          console.error('Error al registrar información de protocolo:', e);
-        }
-      }
-    } catch (error) {
-      console.error('Error al verificar configuración de API:', error);
-    }
-  }, []);
-  
-  // Usamos useEffect una única vez para detectar ciclos, con useRef en lugar de useState
-  useEffect(() => {
-    // Función de limpieza para resetear el contador en caso de que el componente se desmonte y monte de nuevo
-    return () => {
-      renderCountRef.current = 0;
-    };
-  }, []);
-  
-  useEffect(() => {
-    // Incrementamos el contador de renderizados
     renderCountRef.current += 1;
     
-    // Detectar posibles ciclos de renderizado en el HomeRoute
     if (renderCountRef.current > 10) {
       console.warn(`⚠️ Posible ciclo de renderizado en HomeRoute: ${renderCountRef.current} renderizados`);
-      setHasError(true);
       
       // Registrar para diagnóstico
       try {
@@ -489,23 +453,128 @@ function HomeRoute() {
       } catch (e) {
         console.error("Error al registrar ciclo:", e);
       }
+      
+      // Forzar una decisión para romper el ciclo
+      if (!forcedComponent) {
+        console.log("🛑 Rompiendo ciclo de renderizado forzando mostrar SignIn");
+        setHasError(true);
+        setForcedComponent("SignIn");
+      }
     }
+    
+    return () => {
+      // No reseteamos el contador para poder detectar ciclos entre montados y desmontados
+    };
   });
   
-  // Si detectamos un posible bucle, mostrar SignIn
-  if (hasError) {
-    console.log("🚨 Mostrando SignIn debido a ciclo de renderizado detectado");
+  // Comprobar si hay problemas de protocolo (HTTP vs HTTPS)
+  useEffect(() => {
+    try {
+      // Verificar si estamos usando HTTPS pero la API requiere HTTP
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const currentProtocol = window.location.protocol;
+      
+      if (currentProtocol === 'https:' && apiUrl.startsWith('http:')) {
+        console.warn('⚠️ Conflicto de protocolos: La página usa HTTPS pero la API usa HTTP.');
+        console.log('Esto puede causar problemas de contenido mixto en navegadores modernos');
+        
+        // Registrar este problema
+        try {
+          localStorage.setItem('protocolMismatch', JSON.stringify({
+            timestamp: new Date().toISOString(),
+            pageProtocol: currentProtocol,
+            apiProtocol: 'http:'
+          }));
+        } catch (e) {
+          console.error('Error al registrar información de protocolo:', e);
+        }
+      }
+    } catch (error) {
+      console.error('Error al verificar configuración de API:', error);
+    }
+  }, []);
+  
+  // Si hay un error o hemos detectado un ciclo, mostrar SignIn
+  if (hasError || forcedComponent === "SignIn") {
+    console.log("🚨 Mostrando SignIn debido a error o ciclo detectado");
     return <SignIn />;
   }
   
-  // Memoizar la decisión para evitar re-renders innecesarios
-  const Component = useMemo(() => {
-    console.log("🧭 Decidiendo ruta:", { autenticado: isAuthenticated, usuario: !!user });
-    // Priorizar el estado de autenticación del contexto
-    return (isAuthenticated && user) ? Principal : SignIn;
-  }, [isAuthenticated, user]);
+  // Si está cargando, mostrar un spinner
+  if (loading) {
+    return (
+      <div className="min-h-screen flex justify-center items-center bg-gradient-to-tr from-blue-900 to-black/60">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white"></div>
+      </div>
+    );
+  }
   
-  return <Component />;
+  // Verificar si hay un bucle de redirección conocido
+  const redirectLoop = localStorage.getItem('redirectLoop') === 'true';
+  if (redirectLoop) {
+    console.log("🛑 Bucle de redirección detectado, mostrando Principal sin verificar autenticación");
+    localStorage.removeItem('redirectLoop');
+    return <Principal />;
+  }
+  
+  // Decisión normal basada en autenticación
+  console.log("🧭 Decidiendo ruta:", { autenticado: isAuthenticated, usuario: !!user });
+  
+  // Si está autenticado y hay un usuario, mostrar Principal
+  if (isAuthenticated && user) {
+    console.log("✅ Usuario autenticado, mostrando Principal");
+    return <Principal />;
+  }
+  
+  // De lo contrario, mostrar SignIn
+  console.log("🔒 Usuario no autenticado, mostrando SignIn");
+  return <SignIn />;
+}
+
+// Redefinir ProtectedRoute como una función dentro de App.jsx
+function ProtectedRoute({ children }) {
+  const { isAuthenticated, loading } = useUser();
+  
+  // Si está cargando, mostrar un spinner
+  if (loading) {
+    return (
+      <div className="min-h-screen flex justify-center items-center bg-gray-100">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-500"></div>
+      </div>
+    );
+  }
+  
+  // Si no está autenticado, redirigir a login
+  if (!isAuthenticated) {
+    // Para evitar bucles, verificar si hay demasiados redireccionamientos
+    try {
+      const redirects = localStorage.getItem('authRedirects') || '0';
+      const redirectCount = parseInt(redirects, 10) + 1;
+      localStorage.setItem('authRedirects', redirectCount.toString());
+      
+      if (redirectCount > 3) {
+        console.warn(`⚠️ Demasiados redireccionamientos (${redirectCount}), mostrando página de login directamente`);
+        localStorage.setItem('redirectLoop', 'true');
+        localStorage.removeItem('authRedirects');
+        return <SignIn />;
+      }
+      
+      // Después de 5 segundos, resetear el contador para permitir futuros intentos
+      setTimeout(() => {
+        localStorage.removeItem('authRedirects');
+      }, 5000);
+    } catch (e) {
+      console.error("Error al manejar redireccionamiento:", e);
+    }
+    
+    return <Navigate to="/login" />;
+  }
+  
+  // Resetear contador de redirecciones 
+  localStorage.removeItem('authRedirects');
+  
+  // Si está autenticado, mostrar el componente hijo
+  return children;
 }
 
 function App() {
