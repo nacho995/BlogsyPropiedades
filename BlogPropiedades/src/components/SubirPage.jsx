@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { uploadImageProperty } from '../services/api';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useUser } from '../context/UserContext';
 
 const SubirPage = () => {
   const [file, setFile] = useState(null);
@@ -10,7 +10,7 @@ const SubirPage = () => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated } = useUser();
   const navigate = useNavigate();
 
   useEffect(() => {

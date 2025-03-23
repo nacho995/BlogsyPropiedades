@@ -107,10 +107,9 @@ const getEnhancedErrorMessage = (error, response) => {
  */
 export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     try {
-        // Unificar URL base según la configuración
-        const BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || 
-                         'https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
-        const FALLBACK_API = import.meta.env.VITE_API_PUBLIC_API_URL;
+        // Unificar URL base según la configuración - Siempre usar HTTP (no HTTPS)
+        const BASE_URL = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+        const FALLBACK_API = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
         
         // Verificar estado de conexión
         if (!navigator.onLine) {
@@ -1328,7 +1327,7 @@ export async function getUserProfile(token) {
 // Replace axios with native fetch API
 
 // Define base URL for API requests
-const API_BASE_URL = 'https://your-api-endpoint.com'; // Update with your actual API URL
+const API_BASE_URL = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com'; // Backend API URL
 
 // Helper function to handle fetch responses
 const handleResponse = async (response) => {
@@ -1406,7 +1405,15 @@ export const syncProfileImage = async (newImage = null) => {
   try {
     const token = localStorage.getItem('token');
     if (!token) {
-      throw new Error('No hay token de autenticación');
+      console.log('Sincronización de imagen omitida: No hay token de autenticación');
+      // Devolver un objeto de respuesta en lugar de lanzar error
+      return { 
+        imageUrl: localStorage.getItem('profilePic') || 
+                localStorage.getItem('profilePic_local') || 
+                localStorage.getItem('profilePic_base64') || 
+                null,
+        status: 'token_missing'
+      };
     }
 
     if (newImage) {
@@ -1434,7 +1441,15 @@ export const syncProfileImage = async (newImage = null) => {
     }
   } catch (error) {
     console.error('Error en syncProfileImage:', error);
-    throw error;
+    // Devolver un objeto de respuesta en lugar de propagar el error
+    return { 
+      imageUrl: localStorage.getItem('profilePic') || 
+               localStorage.getItem('profilePic_local') || 
+               localStorage.getItem('profilePic_base64') || 
+               null,
+      error: error.message,
+      status: 'error'
+    };
   }
 };
 

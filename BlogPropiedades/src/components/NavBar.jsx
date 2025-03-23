@@ -16,16 +16,29 @@ export default function Navbar({ showOnlyAuth = false }) {
   const navigate = useNavigate();
   const { isAuthenticated, user, logout } = useUser();
   
-  // Usar el hook personalizado para manejar la imagen de perfil
+  // Gestionar la imagen de perfil sin intentar sincronizar automáticamente
   const { 
     profileImage, 
     isLoading, 
     error, 
-    handleImageError 
+    handleImageError,
+    syncImage 
   } = useProfileImage({
-    autoSync: true,
+    autoSync: false, // Desactivar sincronización automática para evitar errores
     listenForUpdates: true
   });
+  
+  // Intentar cargar la imagen solo cuando el usuario está autenticado
+  useEffect(() => {
+    // Esperar a que se confirme la autenticación antes de intentar sincronizar
+    if (isAuthenticated && user) {
+      // Intentar sincronizar la imagen solo si hay autenticación
+      syncImage().catch(err => {
+        console.warn("Error al sincronizar imagen en NavBar (ignorado):", err);
+        // Ignorar el error para no bloquear la UI
+      });
+    }
+  }, [isAuthenticated, user, syncImage]);
 
   // Verificar token expirado
   useEffect(() => {

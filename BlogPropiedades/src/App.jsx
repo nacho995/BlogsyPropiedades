@@ -1,7 +1,6 @@
 import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { UserProvider, useUser } from './context/UserContext';
-import { AppStateProvider, useAppState } from './context/AppStateContext';
 import Navbar from './components/NavBar';
 import ImageLoader from './components/ImageLoader';
 
@@ -20,7 +19,6 @@ import PropertyDetail from './components/PropertyDetail';
 import SubirPage from './components/SubirPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import DiagnosticPage from './components/DiagnosticPage';
-import DocsPage from './components/DocsPage';
 
 // Detección de ciclos de renderizado
 const RENDER_CYCLE_THRESHOLD = 10; // Número máximo de renderizados en un corto período de tiempo
@@ -72,156 +70,6 @@ function checkRenderCycle() {
   }
   
   return false;
-}
-
-// Componente de barra de estado de la aplicación
-function StatusBar() {
-  const { state } = useAppState();
-  const { user } = useUser();
-  const [showDetails, setShowDetails] = useState(false);
-  
-  // Solo mostrar en modo debug o para administradores
-  if (!state.debugMode && (!user || user.role !== 'admin')) {
-    return null;
-  }
-  
-  // Determinar clases según estado de la red
-  const getNetworkStatusClasses = () => {
-    if (!state.networkStatus.online) {
-      return 'bg-red-500 text-white';
-    }
-    
-    if (!state.networkStatus.apiConnected) {
-      return 'bg-orange-500 text-white';
-    }
-    
-    switch (state.networkStatus.connectionQuality) {
-      case 'poor':
-        return 'bg-yellow-500 text-black';
-      case 'fair':
-        return 'bg-blue-400 text-white';
-      default:
-        return 'bg-green-500 text-white';
-    }
-  };
-  
-  // Determinar clases según uso de memoria
-  const getMemoryStatusClasses = () => {
-    switch (state.memoryUsage.usageLevel) {
-      case 'critical':
-        return 'bg-red-500 text-white';
-      case 'high':
-        return 'bg-yellow-500 text-black';
-      default:
-        return 'bg-green-500 text-white';
-    }
-  };
-  
-  return (
-    <div 
-      className="fixed bottom-0 left-0 right-0 z-50 bg-gray-800 text-white text-xs border-t border-gray-700 px-2 py-1"
-      onClick={() => setShowDetails(!showDetails)}
-    >
-      <div className="flex justify-between items-center">
-        <div className="flex space-x-2 items-center">
-          {/* Estado de red */}
-          <span 
-            className={`px-1 rounded flex items-center ${getNetworkStatusClasses()}`}
-            title="Estado de la red"
-          >
-            {state.networkStatus.online ? (
-              state.networkStatus.apiConnected ? '🌐 Online' : '🔌 API Desconectado'
-            ) : '📶 Offline'}
-          </span>
-          
-          {/* Estado de memoria */}
-          <span 
-            className={`px-1 rounded ${getMemoryStatusClasses()}`}
-            title="Uso de memoria"
-          >
-            💾 {state.memoryUsage.approximateUsageMb || 0}MB
-          </span>
-        </div>
-        
-        <div className="flex space-x-2 items-center">
-          {/* Indicador de modo */}
-          {state.debugMode && (
-            <span className="bg-purple-600 px-1 rounded" title="Modo depuración">
-              🛠️ Debug
-            </span>
-          )}
-          
-          {/* Errores recientes */}
-          {state.errorLog.length > 0 && (
-            <span className="bg-red-600 px-1 rounded" title="Errores recientes">
-              ⚠️ {state.errorLog.length}
-            </span>
-          )}
-          
-          {/* Tiempo de ejecución */}
-          <span className="text-gray-400" title="Tiempo de ejecución">
-            ⏱️ {Math.round((Date.now() - state.diagnostics.appStartTime) / 1000 / 60)}m
-          </span>
-        </div>
-      </div>
-      
-      {/* Panel detallado */}
-      {showDetails && (
-        <div className="mt-1 p-2 bg-gray-900 rounded-md text-xs max-h-40 overflow-y-auto">
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <h5 className="font-bold mb-1 text-gray-400">Red</h5>
-              <p>Estado: {state.networkStatus.online ? 'Conectado' : 'Desconectado'}</p>
-              <p>API: {state.networkStatus.apiConnected ? 'Conectado' : 'Error'}</p>
-              <p>Calidad: {state.networkStatus.connectionQuality}</p>
-              {state.networkStatus.responseTime && (
-                <p>Latencia: {state.networkStatus.responseTime}ms</p>
-              )}
-            </div>
-            
-            <div>
-              <h5 className="font-bold mb-1 text-gray-400">Memoria</h5>
-              <p>Uso: {state.memoryUsage.approximateUsageMb || 0}MB</p>
-              <p>Nivel: {state.memoryUsage.usageLevel}</p>
-              {state.memoryUsage.usagePercentage && (
-                <p>Porcentaje: {state.memoryUsage.usagePercentage}%</p>
-              )}
-            </div>
-            
-            {state.errorLog.length > 0 && (
-              <div className="col-span-2 mt-2">
-                <h5 className="font-bold mb-1 text-gray-400">Errores recientes</h5>
-                <ul className="pl-2 space-y-1">
-                  {state.errorLog.slice(0, 3).map((error, index) => (
-                    <li key={index} className="truncate">
-                      {error.message || 'Error desconocido'}
-                    </li>
-                  ))}
-                  {state.errorLog.length > 3 && (
-                    <li className="text-gray-500">
-                      + {state.errorLog.length - 3} más...
-                    </li>
-                  )}
-                </ul>
-              </div>
-            )}
-            
-            <div className="col-span-2 mt-2 text-right">
-              <a 
-                href="/diagnostico" 
-                className="text-blue-400 hover:text-blue-300"
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-              >
-                Ver panel de diagnóstico
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
 }
 
 // Componente seguro para la aplicación que previene ciclos de renderizado
@@ -632,7 +480,6 @@ function App() {
     
     return (
         <ErrorBoundary>
-          <AppStateProvider>
             <SafeAppContainer>
                 <UserProvider>
                     <div className="min-h-screen bg-gray-100">
@@ -663,15 +510,12 @@ function App() {
                                 <Route path="/property/:id" element={<PropertyDetail/>} />
                                 <Route path="/subir" element={<ProtectedRoute><SubirPage /></ProtectedRoute>} />
                                 <Route path="/diagnostico" element={<AdminRoute><DiagnosticPage /></AdminRoute>} />
-                                <Route path="/documentacion" element={<AdminRoute><DocsPage /></AdminRoute>} />
                                 <Route path="*" element={<Navigate to="/" />} />
                             </Routes>
-                            <StatusBar />
                         </BrowserRouter>
                     </div>
                 </UserProvider>
             </SafeAppContainer>
-          </AppStateProvider>
         </ErrorBoundary>
     );
 }

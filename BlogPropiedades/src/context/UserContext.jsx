@@ -1,5 +1,4 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
-import { useNavigate } from "react-router-dom";
 import { getUserProfile, syncProfileImage } from '../services/api';
 import { fallbackImageBase64, validateAndProcessImage, ensureHttps } from "../utils/profileUtils";
 
@@ -13,7 +12,6 @@ export function UserProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [recoveryAttempted, setRecoveryAttempted] = useState(false);
-  const navigate = useNavigate();
   
   // Función para registrar eventos de autenticación para depuración
   const logAuthEvent = (event, details = {}) => {
@@ -636,6 +634,21 @@ export function UserProvider({ children }) {
     }
   };
   
+  // Sincronización segura de imagen de perfil
+  const safeProfileSync = async () => {
+    try {
+      // Solo intentar sincronizar si hay un token
+      if (localStorage.getItem('token')) {
+        await syncProfileImage();
+      } else {
+        console.log("No se intentó sincronizar la imagen de perfil: no hay token");
+      }
+    } catch (error) {
+      console.warn("Error al sincronizar imagen de perfil (ignorado):", error);
+      // Ignorar errores de sincronización de imagen para evitar bloquear la app
+    }
+  };
+  
   // Función de logout
   const logout = (shouldRedirect = true) => {
     try {
@@ -673,9 +686,10 @@ export function UserProvider({ children }) {
       setUser(null);
       setIsAuthenticated(false);
       
-      // Redirigir a la página de login si se solicita
+      // Redirigir a la página de login utilizando window.location
       if (shouldRedirect) {
-        navigate("/login");
+        // Usar window.location.href en lugar de navigate para evitar problemas con hooks
+        window.location.href = "/login";
       }
       
       return true;
@@ -688,7 +702,7 @@ export function UserProvider({ children }) {
       setIsAuthenticated(false);
       
       if (shouldRedirect) {
-        navigate("/login");
+        window.location.href = "/login";
       }
       
       return false;
@@ -702,7 +716,8 @@ export function UserProvider({ children }) {
     loading,
     login,
     logout,
-    refreshUserData
+    refreshUserData,
+    safeProfileSync
   };
   
   return (

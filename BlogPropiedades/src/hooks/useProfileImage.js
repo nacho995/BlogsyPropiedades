@@ -22,6 +22,25 @@ const useProfileImage = (options = {}) => {
       setIsLoading(true);
       setError(null);
       
+      // Verificar si hay token antes de intentar sincronizar
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.log("No se puede sincronizar imagen: no hay token de autenticación");
+        // Usar imagen en caché o fallback
+        const cachedImage = localStorage.getItem('profilePic') || 
+                          localStorage.getItem('profilePic_local') || 
+                          localStorage.getItem('profilePic_base64');
+        
+        if (cachedImage) {
+          setProfileImage(cachedImage);
+        } else {
+          setProfileImage(fallbackImageBase64);
+        }
+        
+        setIsLoading(false);
+        return;
+      }
+      
       const response = await syncProfileImage();
       
       if (response && response.imageUrl) {
@@ -56,6 +75,12 @@ const useProfileImage = (options = {}) => {
   // Función para actualizar la imagen
   const updateProfileImage = useCallback(async (newImage) => {
     try {
+      // Verificar si hay token antes de intentar actualizar
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No se puede actualizar la imagen: no hay token de autenticación');
+      }
+      
       setIsLoading(true);
       setError(null);
 
@@ -104,24 +129,33 @@ const useProfileImage = (options = {}) => {
   useEffect(() => {
     if (!autoSync) return;
     
-    syncImage();
-    
-    // Sincronizar cada 5 minutos
-    const interval = setInterval(syncImage, 300000);
-    
-    // Sincronizar cuando la pestaña vuelve a estar activa
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        syncImage();
+    // Intentar sincronizar solo si hay token
+    if (localStorage.getItem('token')) {
+      syncImage();
+      
+      // Sincronizar cada 5 minutos solo si hay token
+      const interval = setInterval(() => {
+        if (localStorage.getItem('token')) {
+          syncImage();
+        }
+      }, 300000);
+      
+      // Limpiar intervalo al desmontar
+      return () => clearInterval(interval);
+    } else {
+      // Si no hay token, cargar imagen de caché o fallback
+      const cachedImage = localStorage.getItem('profilePic') || 
+                        localStorage.getItem('profilePic_local') || 
+                        localStorage.getItem('profilePic_base64');
+      
+      if (cachedImage) {
+        setProfileImage(cachedImage);
+      } else {
+        setProfileImage(fallbackImageBase64);
       }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
+      
+      setIsLoading(false);
+    }
   }, [autoSync, syncImage]);
   
   // Efecto para escuchar actualizaciones de otros componentes
