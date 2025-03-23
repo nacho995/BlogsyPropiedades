@@ -36,7 +36,7 @@ export const isImageUrlAccessible = async (url) => {
     'cloudinary.com',
     'res.cloudinary.com',
     'images.unsplash.com',
-    'goza-madrid.onrender.com'
+    'www.realestategozamadrid.com'
   ];
   
   // Verificar si la URL pertenece a un dominio confiable

@@ -63,9 +63,21 @@ export default function Navbar() {
 
   // Imprimir información del usuario para depuración
   console.log("Estado de autenticación:", isAuthenticated);
-  console.log("Información del usuario:", user);
+  console.log("Información del usuario:", JSON.stringify(user, null, 2));
   console.log("Rol del usuario:", user?.role);
   console.log("Es admin:", user?.isAdmin);
+  console.log("Token almacenado:", localStorage.getItem('token'));
+
+  // Decodificar el token para ver su contenido
+  try {
+    const token = localStorage.getItem('token');
+    if (token) {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      console.log("Contenido del token:", payload);
+    }
+  } catch (error) {
+    console.error("Error al decodificar token:", error);
+  }
 
   // Construir la navegación combinada basada en permisos
   let updatedNavigation = [...navigation];

@@ -142,7 +142,7 @@ export const createBlogPost = async (data) => {
 export const getBlogPosts = async () => {
   try {
     console.log("Obteniendo blogs del servidor...");
-    const blogs = await fetchAPI('/blogs');
+    const blogs = await fetchAPI('/blog');
     console.log("Blogs recibidos del servidor:", blogs);
     
     // Verificar la estructura de cada blog y procesar las imágenes
@@ -586,7 +586,7 @@ export const createPropertyPost = async (data) => {
 export const getPropertyPosts = async () => {
   try {
     console.log("Obteniendo propiedades del servidor...");
-    const properties = await fetchAPI('/properties');
+    const properties = await fetchAPI('/property');
     console.log("Propiedades recibidas del servidor:", properties);
     
     // Verificar la estructura de cada propiedad y corregir las imágenes si es necesario
@@ -881,7 +881,7 @@ const checkImageAccessibility = (url) => {
       'cloudinary.com',
       'res.cloudinary.com',
       'images.unsplash.com',
-      'goza-madrid.onrender.com'
+      'www.realestategozamadrid.com'
     ];
     
     // Verificar si la URL pertenece a un dominio confiable
@@ -889,7 +889,7 @@ const checkImageAccessibility = (url) => {
     
     // Si la URL contiene "uploads/properties" y es del servidor, verificar con fetch
     // ya que estos archivos pueden no existir (error 404)
-    if (url.includes('uploads/properties') && url.includes('goza-madrid.onrender.com')) {
+    if (url.includes('uploads/properties') && url.includes('www.realestategozamadrid.com')) {
       console.log('Verificando accesibilidad de imagen en servidor con fetch:', url);
       
       // Usar fetch para verificar si la URL es accesible
