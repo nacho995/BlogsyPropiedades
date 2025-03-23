@@ -45,7 +45,7 @@ export function UserProvider({ children }) {
 
   // Función para intentar recuperar la sesión cuando hay problemas
   const recuperateSession = async () => {
-    console.log("Intentando recuperar sesión...");
+    console.log("🔄 Intentando recuperar sesión...");
     
     try {
       // Verificar si hay datos del usuario en localStorage
@@ -53,12 +53,34 @@ export function UserProvider({ children }) {
       const storedName = localStorage.getItem('name');
       const storedRole = localStorage.getItem('role');
       const storedImage = localStorage.getItem("profilePic") || 
-                          localStorage.getItem("profilePic_local") || 
-                          localStorage.getItem("profilePic_base64") || 
-                          fallbackImageBase64;
+                         localStorage.getItem("profilePic_local") || 
+                         localStorage.getItem("profilePic_base64") || 
+                         fallbackImageBase64;
       
+      console.log("🔍 Datos de recuperación disponibles:", {
+        email: storedEmail ? "Disponible" : "No disponible", 
+        name: storedName ? "Disponible" : "No disponible",
+        role: storedRole ? "Disponible" : "No disponible", 
+        imagen: storedImage ? "Disponible" : "No disponible" 
+      });
+      
+      // Si tenemos un token, pero era inválido, intentar generar uno temporal
+      const storedToken = localStorage.getItem('token');
+      if (storedToken) {
+        console.log("🔑 Encontrado token probablemente inválido o expirado en localStorage");
+        
+        // Limpiar el token inválido
+        try {
+          localStorage.removeItem('token');
+          console.log("🧹 Token inválido eliminado de localStorage");
+        } catch (e) {
+          console.error("❌ Error al eliminar token:", e);
+        }
+      }
+      
+      // Si tenemos email y nombre, podemos reconstruir un usuario básico
       if (storedEmail && storedName) {
-        console.log("Recuperando sesión con datos almacenados localmente");
+        console.log("✅ Datos mínimos encontrados, recuperando sesión básica");
         
         // Crear un objeto de usuario básico
         const recoveredUser = {
@@ -66,18 +88,83 @@ export function UserProvider({ children }) {
           name: storedName,
           role: storedRole || 'user',
           profileImage: storedImage,
-          _recovered: true
+          _recovered: true,
+          _recoveryTime: new Date().toISOString()
         };
+        
+        // Si tenemos credenciales almacenadas, podemos usar un token temporal
+        const tempToken = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        if (storedEmail) {
+          try {
+            localStorage.setItem('tempToken', tempToken);
+            console.log("🔑 Token temporal creado y almacenado");
+          } catch (e) {
+            console.error("❌ Error al almacenar token temporal:", e);
+          }
+        }
         
         setUser(recoveredUser);
         setIsAuthenticated(true);
+        
+        console.log("✅ Sesión básica recuperada con datos locales");
+        
+        // Notificar de la recuperación
+        window.dispatchEvent(new CustomEvent('sessionRecovered', { 
+          detail: { recoveredUser } 
+        }));
+        
         return true;
       }
       
+      // Si no tenemos datos suficientes pero hay al menos un correo
+      if (storedEmail) {
+        console.log("⚠️ Solo tenemos email, no podemos recuperar una sesión completa");
+        
+        // Crear un objeto de usuario muy básico solo para mostrar algo
+        const minimalUser = {
+          email: storedEmail,
+          name: storedEmail.split('@')[0] || "Usuario recuperado",
+          profileImage: fallbackImageBase64,
+          _recovered: true,
+          _minimal: true,
+          _recoveryTime: new Date().toISOString()
+        };
+        
+        // No marcamos como autenticado
+        setUser(minimalUser);
+        setIsAuthenticated(false);
+        
+        // Notificar de la recuperación parcial
+        window.dispatchEvent(new CustomEvent('sessionPartiallyRecovered', { 
+          detail: { minimalUser } 
+        }));
+        
+        return false;
+      }
+      
+      console.log("❌ No hay suficientes datos para recuperar la sesión");
       return false;
     } catch (error) {
-      console.error("Error al recuperar sesión:", error);
-      return false;
+      console.error("❌ Error crítico al recuperar sesión:", error);
+      
+      // Último intento - crear un usuario anónimo
+      try {
+        console.log("🔄 Último intento - creando usuario anónimo temporal");
+        const anonymousUser = {
+          name: "Usuario temporal",
+          profileImage: fallbackImageBase64,
+          _anonymous: true,
+          _recoveryTime: new Date().toISOString()
+        };
+        
+        setUser(anonymousUser);
+        setIsAuthenticated(false);
+        
+        return false;
+      } catch (e) {
+        console.error("❌ Error fatal durante la creación de usuario anónimo:", e);
+        return false;
+      }
     }
   };
 
@@ -183,24 +270,110 @@ export function UserProvider({ children }) {
     const initializeUser = async () => {
       try {
         setLoading(true);
+        console.log("🔄 Iniciando carga de usuario...");
+        
         const storedToken = localStorage.getItem('token');
+        console.log("🔑 Token en localStorage:", storedToken ? `${storedToken.substring(0, 10)}...` : 'No disponible');
         
         if (storedToken) {
-          await refreshUserData();
+          console.log("🔍 Token encontrado, intentando obtener datos de usuario...");
+          
+          // Validar el token antes de usarlo
+          if (!isValidToken(storedToken)) {
+            console.warn("⚠️ Token inválido o expirado en localStorage");
+            
+            // Intentar recuperar la sesión con datos locales
+            const recovered = await recuperateSession();
+            
+            if (recovered) {
+              console.log("✅ Sesión recuperada con datos locales");
+            } else {
+              console.log("❌ No se pudo recuperar la sesión, redirigiendo a login");
+              setUser(null);
+              setIsAuthenticated(false);
+            }
+            
+            setLoading(false);
+            return;
+          }
+          
+          // Intentar refrescar los datos del usuario
+          try {
+            console.log("🔄 Intentando refrescar datos del usuario...");
+            await refreshUserData();
+            console.log("✅ Datos de usuario actualizados correctamente");
+          } catch (refreshError) {
+            console.error("❌ Error al refrescar datos:", refreshError);
+            
+            // Intentar recuperar la sesión como último recurso
+            const recovered = await recuperateSession();
+            
+            if (!recovered) {
+              setUser(null);
+              setIsAuthenticated(false);
+              console.log("❌ No se pudo recuperar la sesión, usuario desconectado");
+            }
+          }
         } else {
+          console.log("ℹ️ No hay token guardado, estableciendo estado como no autenticado");
           setUser(null);
           setIsAuthenticated(false);
-          setLoading(false);
         }
       } catch (error) {
-        console.error("Error al inicializar usuario:", error);
-        setUser(null);
-        setIsAuthenticated(false);
+        console.error("❌ Error crítico al inicializar usuario:", error);
+        
+        // Intentar recuperar la sesión como último recurso
+        try {
+          const recovered = await recuperateSession();
+          
+          if (!recovered) {
+            console.log("❌ No se pudo recuperar la sesión después del error crítico");
+            setUser(null);
+            setIsAuthenticated(false);
+          } else {
+            console.log("✅ Sesión recuperada después del error crítico");
+          }
+        } catch (e) {
+          console.error("❌ Error fatal durante la recuperación de emergencia:", e);
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      } finally {
+        // Garantizar que loading se desactive siempre
         setLoading(false);
+        console.log("🏁 Inicialización de usuario completada, estado:", { 
+          autenticado: isAuthenticated, 
+          usuario: user ? "Disponible" : "No disponible", 
+          cargando: false 
+        });
       }
     };
     
-    initializeUser();
+    // Sistema de reintento en caso de errores de red
+    let initAttempts = 0;
+    const maxAttempts = 3;
+    
+    const attemptInitialization = () => {
+      initAttempts++;
+      console.log(`🔄 Intento de inicialización #${initAttempts}`);
+      
+      initializeUser().catch(error => {
+        console.error(`❌ Error en intento #${initAttempts}:`, error);
+        
+        if (initAttempts < maxAttempts) {
+          console.log(`⏱️ Reintentando en ${initAttempts * 1000}ms...`);
+          setTimeout(attemptInitialization, initAttempts * 1000);
+        } else {
+          console.error("❌ Se agotaron los intentos de inicialización");
+          setLoading(false);
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      });
+    };
+    
+    // Iniciar el proceso
+    attemptInitialization();
   }, []);
 
   // Refrescar datos del usuario cada 5 minutos
