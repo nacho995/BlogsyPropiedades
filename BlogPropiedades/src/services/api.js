@@ -1,25 +1,43 @@
 // src/services/api.js
 
-// Importar la configuración segura de variables de entorno
-import { API_URL as API_URL_SAFE, getApiEndpoint, getBackendUrl } from '../utils/envConfig';
+// Importar la configuración segura de variables de entorno y sanitizador de URLs
+import { API_URL as API_URL_SAFE, FALLBACK_API, getApiEndpoint, getBackendUrl } from '../utils/envConfig';
+import { sanitizeUrl, combineUrls } from '../utils/urlSanitizer';
 
 // Configuración base - Usar la variable segura o un valor predeterminado
-const API_URL = API_URL_SAFE || 'https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+const API_URL = sanitizeUrl(API_URL_SAFE || 'https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com');
 
 // Asegurarse de que la URL no termine en /
 const BASE_URL = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
 
+// Función para manejar errores de conexión con reintentos
+const API_RETRY_COUNT = 3;
+const API_RETRY_DELAY = 1000; // 1 segundo
+
+// Función auxiliar para esperar un tiempo específico
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Función auxiliar para asegurar URLs correctas
+const ensureProtocol = (url) => sanitizeUrl(url);
+
 /**
- * Realiza peticiones al API con manejo de errores
+ * Realiza peticiones al API con manejo de errores y reintentos automáticos
  * @param {string} endpoint - Endpoint de la API
  * @param {Object} options - Opciones de fetch (method, headers, body)
+ * @param {number} retryCount - Número de reintentos si falla (interno)
  * @returns {Promise<any>} - Respuesta de la API
  */
-export const fetchAPI = async (endpoint, options = {}) => {
+export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     try {
-        const url = `${BASE_URL}${endpoint}`;
+        // Validar que la URL sea correcta
+        const url = combineUrls(BASE_URL, endpoint);
         console.log(`🚀 Enviando solicitud a: ${url}`);
-        console.log('Opciones:', JSON.stringify(options, null, 2));
+        
+        if (options.body) {
+            console.log('Opciones:', typeof options.body === 'string' ? 
+                `Contenido JSON (${options.body.length} bytes)` : 
+                JSON.stringify(options, null, 2));
+        }
 
         // Verificar si el endpoint es para obtener un listado (debería devolver un array)
         const expectsArray = endpoint.includes('/property') || 
@@ -47,121 +65,185 @@ export const fetchAPI = async (endpoint, options = {}) => {
             }
         };
 
-        const response = await fetch(url, fetchOptions);
-        console.log(`📥 Respuesta recibida de: ${url}, Status: ${response.status}`);
-
-        // Manejo especial para errores HTTP
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`🔥 Error HTTP ${response.status}: ${errorText}`);
+        // Intento de fetch con timeout
+        const abortController = new AbortController();
+        const timeoutId = setTimeout(() => abortController.abort(), 30000); // 30 segundos
+        
+        try {
+            fetchOptions.signal = abortController.signal;
+            const response = await fetch(url, fetchOptions);
+            clearTimeout(timeoutId);
             
-            try {
-                // Intentar parsear como JSON
-                const errorData = JSON.parse(errorText);
-                throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
-            } catch (jsonError) {
-                // Si no es JSON, lanzar error con el texto
-                throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
-            }
-        }
+            console.log(`📥 Respuesta recibida de: ${url}, Status: ${response.status}`);
 
-        // Para respuestas vacías o con contenido cero
-        const contentLength = response.headers.get('content-length');
-        if (contentLength === '0' || contentLength === null) {
-            console.warn('⚠️ Respuesta con contenido vacío');
-            
-            // Si es endpoint de login y tenemos respuesta vacía, manejar especialmente
-            if (endpoint.includes('/user/login')) {
-                console.warn('⚠️ Respuesta vacía en login, generando respuesta de contingencia');
+            // Manejo especial para errores HTTP
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`🔥 Error HTTP ${response.status}: ${errorText}`);
                 
-                // Verificar si hay un token previo
-                const existingToken = localStorage.getItem('token');
-                if (existingToken) {
-                    console.log('🔑 Usando token existente para mantener sesión');
+                // Si es un error 5xx, podemos reintentar
+                if (response.status >= 500 && response.status < 600 && retryCount < API_RETRY_COUNT) {
+                    console.log(`🔄 Reintentando (${retryCount + 1}/${API_RETRY_COUNT}) en ${API_RETRY_DELAY}ms...`);
+                    await sleep(API_RETRY_DELAY);
+                    return fetchAPI(endpoint, options, retryCount + 1);
+                }
+                
+                try {
+                    // Intentar parsear como JSON
+                    const errorData = JSON.parse(errorText);
+                    throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
+                } catch (jsonError) {
+                    // Si no es JSON, lanzar error con el texto
+                    throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
+                }
+            }
+
+            // Para respuestas vacías o con contenido cero
+            const contentLength = response.headers.get('content-length');
+            if (contentLength === '0' || contentLength === null) {
+                console.warn('⚠️ Respuesta con contenido vacío');
+                
+                // Si es endpoint de login y tenemos respuesta vacía, manejar especialmente
+                if (endpoint.includes('/user/login')) {
+                    console.warn('⚠️ Respuesta vacía en login, generando respuesta de contingencia');
+                    
+                    // Verificar si hay un token previo
+                    const existingToken = localStorage.getItem('token');
+                    if (existingToken) {
+                        console.log('🔑 Usando token existente para mantener sesión');
+                        return {
+                            token: existingToken,
+                            user: { email: localStorage.getItem('email') || 'usuario@example.com' },
+                            _notice: 'Sesión mantenida con token existente'
+                        };
+                    }
+                    
+                    // Generar token temporal
+                    const tempToken = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
                     return {
-                        token: existingToken,
-                        user: { email: localStorage.getItem('email') || 'usuario@example.com' },
-                        _notice: 'Sesión mantenida con token existente'
+                        temporaryToken: tempToken,
+                        user: null,
+                        isTemporary: true,
+                        _notice: 'Sesión temporal creada'
                     };
                 }
                 
-                // Generar token temporal
-                const tempToken = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-                return {
-                    temporaryToken: tempToken,
-                    user: null,
-                    isTemporary: true,
-                    _notice: 'Sesión temporal creada'
-                };
-            }
-            
-            // Si esperamos un array y tenemos respuesta vacía, devolver array vacío
-            if (expectsArray) {
-                console.warn('⚠️ Se esperaba un array pero la respuesta está vacía, devolviendo []');
-                return [];
-            }
-            
-            // Para otros endpoints, devolver objeto vacío
-            return {};
-        }
-
-        try {
-            // Intentar parsear la respuesta como JSON
-            const data = await response.json();
-            console.log(`📦 Respuesta parseada:`, typeof data === 'object' ? 'Objeto válido' : `Tipo: ${typeof data}`);
-            
-            // Validar que data sea un objeto o array para evitar errores con métodos como map
-            if (data === null) {
-                console.warn('⚠️ Respuesta JSON nula');
-                return expectsArray ? [] : {};
-            }
-            
-            // Verificar tipo de data para métodos como map
-            if (Array.isArray(data)) {
-                // Es un array, está bien
-                return data;
-            } else if (typeof data === 'object') {
-                // Es un objeto, pero si esperamos un array y no lo es, crear un wrapper array
-                if (expectsArray && !data.items && !data.data && !data.results) {
-                    console.warn('⚠️ Se esperaba un array pero se recibió un objeto, intentando convertir');
-                    
-                    // Intentar encontrar un array dentro del objeto
-                    for (const key in data) {
-                        if (Array.isArray(data[key])) {
-                            console.log(`🔍 Se encontró un array en la propiedad ${key}`);
-                            return data[key];
-                        }
-                    }
-                    
-                    // Si el objeto tiene propiedades como id, podría ser un elemento único
-                    if (data._id || data.id) {
-                        console.log('🔍 Se encontró un único elemento, devolviendo como array');
-                        return [data];
-                    }
-                    
-                    console.warn('⚠️ No se encontró un array dentro del objeto, devolviendo array vacío');
+                // Si esperamos un array y tenemos respuesta vacía, devolver array vacío
+                if (expectsArray) {
+                    console.warn('⚠️ Se esperaba un array pero la respuesta está vacía, devolviendo []');
                     return [];
                 }
                 
-                // Es un objeto, está bien
-                return data;
-            } else {
-                // No es ni objeto ni array, crear un wrapper
-                console.warn(`⚠️ Respuesta con formato inesperado (${typeof data}), creando wrapper`);
-                return expectsArray ? [] : { value: data, _warning: 'Respuesta con formato no estándar' };
+                // Para otros endpoints, devolver objeto vacío
+                return {};
             }
-        } catch (error) {
-            console.error('🔥 Error al parsear respuesta JSON:', error);
+
+            try {
+                // Intentar parsear la respuesta como JSON
+                const data = await response.json();
+                console.log(`📦 Respuesta parseada:`, typeof data === 'object' ? 'Objeto válido' : `Tipo: ${typeof data}`);
+                
+                // Validar que data sea un objeto o array para evitar errores con métodos como map
+                if (data === null) {
+                    console.warn('⚠️ Respuesta JSON nula');
+                    return expectsArray ? [] : {};
+                }
+                
+                // Verificar tipo de data para métodos como map
+                if (Array.isArray(data)) {
+                    // Es un array, está bien
+                    return data;
+                } else if (typeof data === 'object') {
+                    // Es un objeto, pero si esperamos un array y no lo es, crear un wrapper array
+                    if (expectsArray && !data.items && !data.data && !data.results) {
+                        console.warn('⚠️ Se esperaba un array pero se recibió un objeto, intentando convertir');
+                        
+                        // Intentar encontrar un array dentro del objeto
+                        for (const key in data) {
+                            if (Array.isArray(data[key])) {
+                                console.log(`🔍 Se encontró un array en la propiedad ${key}`);
+                                return data[key];
+                            }
+                        }
+                        
+                        // Si el objeto tiene propiedades como id, podría ser un elemento único
+                        if (data._id || data.id) {
+                            console.log('🔍 Se encontró un único elemento, devolviendo como array');
+                            return [data];
+                        }
+                        
+                        console.warn('⚠️ No se encontró un array dentro del objeto, devolviendo array vacío');
+                        return [];
+                    }
+                    
+                    // Es un objeto, está bien
+                    return data;
+                } else {
+                    // No es ni objeto ni array, crear un wrapper
+                    console.warn(`⚠️ Respuesta con formato inesperado (${typeof data}), creando wrapper`);
+                    return expectsArray ? [] : { value: data, _warning: 'Respuesta con formato no estándar' };
+                }
+            } catch (error) {
+                console.error('🔥 Error al parsear respuesta JSON:', error);
+                
+                // Intentar usar respuesta de texto como alternativa
+                try {
+                    const textResponse = await response.text();
+                    console.log('📄 Respuesta como texto:', textResponse.substring(0, 100) + '...');
+                    
+                    // Si esperamos un array pero no pudimos parsear la respuesta, devolver array vacío
+                    if (expectsArray) {
+                        console.warn('⚠️ Se esperaba un array pero hubo error al parsear, devolviendo []');
+                        return [];
+                    }
+                    
+                    return { 
+                        text: textResponse,
+                        _warning: 'Respuesta no es JSON válido'
+                    };
+                } catch (textError) {
+                    // Si ni siquiera podemos obtener texto, lanzar error
+                    throw new Error(`Error al procesar la respuesta: ${error.message}`);
+                }
+            }
+        } catch (fetchError) {
+            clearTimeout(timeoutId);
             
-            // Si esperamos un array pero no pudimos parsear la respuesta, devolver array vacío
-            if (expectsArray) {
-                console.warn('⚠️ Se esperaba un array pero hubo error al parsear, devolviendo []');
-                return [];
+            // Si es un error de tiempo de espera o de red, reintentar
+            if ((fetchError.name === 'AbortError' || 
+                 fetchError.message.includes('network') ||
+                 fetchError.message.includes('Failed to fetch')) && 
+                retryCount < API_RETRY_COUNT) {
+                console.log(`🔄 Error de red, reintentando (${retryCount + 1}/${API_RETRY_COUNT}) en ${API_RETRY_DELAY}ms...`);
+                await sleep(API_RETRY_DELAY);
+                return fetchAPI(endpoint, options, retryCount + 1);
             }
             
-            throw new Error(`Error al procesar la respuesta: ${error.message}`);
+            throw fetchError;
         }
     } catch (error) {
+        // Si llegamos al máximo de reintentos, intentar usar la API de respaldo
+        if (retryCount >= API_RETRY_COUNT && FALLBACK_API && FALLBACK_API !== BASE_URL) {
+            console.log(`🔄 Usando API de respaldo: ${FALLBACK_API}`);
+            // Crear una nueva URL usando la API de respaldo
+            const fallbackUrl = combineUrls(FALLBACK_API, endpoint);
+            // Usar las mismas opciones pero con la nueva URL
+            try {
+                console.log(`🚀 Enviando solicitud a API de respaldo: ${fallbackUrl}`);
+                const response = await fetch(fallbackUrl, options);
+                // Procesar la respuesta de forma simple
+                if (!response.ok) {
+                    throw new Error(`Error en API de respaldo: ${response.status}`);
+                }
+                return await response.json();
+            } catch (fallbackError) {
+                console.error(`🔥 Error en API de respaldo:`, fallbackError);
+                // Si también falla el respaldo, lanzar el error original
+                console.error(`🔥 Error en fetchAPI (${endpoint}):`, error);
+                throw error;
+            }
+        }
+        
         console.error(`🔥 Error en fetchAPI (${endpoint}):`, error);
         throw error;
     }

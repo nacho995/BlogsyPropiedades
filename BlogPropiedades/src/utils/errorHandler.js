@@ -121,4 +121,41 @@ export const initializeErrorHandlers = () => {
       }
     }
   };
+};
+
+// Función para recuperarse de errores específicos de URL
+export const handleUrlErrors = (urlErrors) => {
+  const isUrlError = Array.isArray(urlErrors) && 
+                     urlErrors.length > 0 && 
+                     urlErrors.some(error => error.includes('URL') && error.includes('válida'));
+  
+  if (isUrlError) {
+    console.warn('⚠️ Detectados errores de formato de URL, aplicando corrección automática...');
+    
+    try {
+      // Registrar el error para diagnóstico
+      const errorData = {
+        type: 'url_validation',
+        errors: urlErrors,
+        timestamp: new Date().toISOString(),
+        url: window.location.href,
+        userAgent: navigator.userAgent
+      };
+      
+      localStorage.setItem('url_errors', JSON.stringify(errorData));
+      
+      // Esperar un momento para que los logs se registren y luego recargar
+      setTimeout(() => {
+        console.log('🔄 Recargando para aplicar corrección de URLs...');
+        window.location.reload();
+      }, 2000);
+      
+      return true; // Error manejado
+    } catch (e) {
+      console.error("Error al manejar errores de URL:", e);
+      return false; // Error no manejado
+    }
+  }
+  
+  return false; // No hay errores de URL
 }; 

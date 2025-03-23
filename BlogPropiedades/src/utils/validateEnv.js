@@ -3,13 +3,17 @@
  * Esto ayuda a detectar configuraciones incorrectas que podrían causar pantallas en blanco
  */
 
+import { sanitizeUrl, extractDomain } from './urlSanitizer';
+
 // Definir valores por defecto para las variables de entorno críticas
 const DEFAULTS = {
   VITE_BACKEND_URL: 'https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com',
   VITE_API_URL: 'https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com',
   VITE_API_PUBLIC_API_URL: 'https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com',
+  VITE_FALLBACK_API: 'https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com',
   VITE_APP_MODE: 'production',
-  VITE_MAIN_DOMAIN: 'realestategozamadrid.com'
+  VITE_MAIN_DOMAIN: 'realestategozamadrid.com',
+  VITE_DEBUG_LEVEL: 'error'
 };
 
 /**
@@ -26,6 +30,16 @@ export const getSafeEnvValue = (key) => {
     if (!value && DEFAULTS[key]) {
       console.warn(`⚠️ Variable ${key} no disponible, usando valor predeterminado`);
       return DEFAULTS[key];
+    }
+    
+    // Si es una URL, asegurarse de que tenga protocolo y formato correcto
+    if (value && (
+      key.includes('URL') || 
+      key.includes('API') ||
+      key.includes('BACKEND')
+    )) {
+      // Sanitizar la URL si es necesario
+      return sanitizeUrl(value);
     }
     
     return value || '';
@@ -55,7 +69,9 @@ export const validateEnvironment = () => {
     // Variables opcionales pero recomendadas
     const recommendedVars = [
       'VITE_APP_MODE',
-      'VITE_MAIN_DOMAIN'
+      'VITE_MAIN_DOMAIN',
+      'VITE_DEBUG_LEVEL',
+      'VITE_FALLBACK_API'
     ];
     
     // Verificar variables requeridas
@@ -68,7 +84,14 @@ export const validateEnvironment = () => {
           (varName.includes('URL') || varName.includes('API')) && 
           !isValidUrl(value)
         ) {
-          issues.push(`La variable de entorno ${varName} no contiene una URL válida: ${value}`);
+          // Intentar sanitizar antes de reportar como error
+          const sanitized = sanitizeUrl(value);
+          if (!isValidUrl(sanitized)) {
+            issues.push(`La variable de entorno ${varName} no contiene una URL válida: ${value}`);
+          } else {
+            // Si se pudo sanitizar, solo advertir
+            warnings.push(`La variable de entorno ${varName} fue corregida a: ${sanitized}`);
+          }
         }
       } catch (err) {
         issues.push(`Error al validar ${varName}: ${err.message}`);
@@ -137,24 +160,14 @@ export const validateEnvironment = () => {
  */
 function isValidUrl(urlString) {
   try {
-    const url = new URL(urlString);
+    // Usar la función sanitizeUrl para asegurar formato correcto
+    const sanitized = sanitizeUrl(urlString);
+    
+    // Verificar que sea una URL válida
+    const url = new URL(sanitized);
     return url.protocol === 'http:' || url.protocol === 'https:';
   } catch {
     return false;
-  }
-}
-
-/**
- * Extrae el dominio base de una URL
- * @param {string} urlString - URL de la que extraer el dominio
- * @returns {string} - Dominio base
- */
-function extractDomain(urlString) {
-  try {
-    const url = new URL(urlString);
-    return url.hostname;
-  } catch {
-    return urlString;
   }
 }
 
@@ -164,14 +177,51 @@ function extractDomain(urlString) {
  */
 export const initEnvValidation = () => {
   try {
+    // Verificar si ya hay una variable guardada para evitar bucles de recarga
+    try {
+      const lastValidation = localStorage.getItem('env_validation');
+      if (lastValidation) {
+        const data = JSON.parse(lastValidation);
+        const now = new Date();
+        const timestamp = new Date(data.timestamp);
+        const diff = now - timestamp;
+        
+        // Si la última validación fue hace menos de 10 segundos y hubo recargas
+        if (diff < 10000 && data.reloadCount && data.reloadCount > 2) {
+          console.warn('⚠️ Múltiples recargas detectadas, omitiendo validación para evitar bucle');
+          return {
+            isValid: true,
+            issues: [],
+            warnings: ['Validación omitida para evitar bucle de recargas'],
+            environment: 'production'
+          };
+        }
+      }
+    } catch (e) {
+      // Ignorar errores al leer localStorage
+    }
+    
     // Ejecutar validación inmediatamente
     const result = validateEnvironment();
     
     // Almacenar resultado para diagnóstico
     if (result.issues.length > 0 || result.warnings.length > 0) {
       try {
+        // Obtener el conteo de recargas previo
+        let reloadCount = 0;
+        try {
+          const lastValidation = localStorage.getItem('env_validation');
+          if (lastValidation) {
+            const data = JSON.parse(lastValidation);
+            reloadCount = data.reloadCount || 0;
+          }
+        } catch (e) {
+          // Ignorar errores
+        }
+        
         localStorage.setItem('env_validation', JSON.stringify({
           timestamp: new Date().toISOString(),
+          reloadCount: reloadCount + 1,
           ...result
         }));
       } catch (e) {

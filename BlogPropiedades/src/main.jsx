@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import React, { useEffect } from "react";
 import App from "./App";
 import "./index.css";
-import { initializeErrorHandlers, logError } from "./utils/errorHandler";
+import { initializeErrorHandlers, logError, handleUrlErrors } from "./utils/errorHandler";
 import { initEnvValidation, getSafeEnvValue } from "./utils/validateEnv";
 
 // Limpiar cualquier error inicial que pueda causar problemas
@@ -41,6 +41,16 @@ try {
 let envValidation;
 try {
   envValidation = initEnvValidation();
+  
+  // Verificar si hay errores específicos de validación de URL y recargar automáticamente
+  if (!envValidation.isValid) {
+    const urlErrors = envValidation.issues.filter(issue => 
+      issue.includes('URL') && issue.includes('no contiene una URL válida')
+    );
+    
+    // Usar la nueva función para manejar errores de URL
+    handleUrlErrors(urlErrors);
+  }
 } catch (e) {
   console.error("Error al validar entorno:", e);
   envValidation = { isValid: false, issues: ["Error en la inicialización"] };
@@ -221,18 +231,18 @@ try {
     newRoot.id = "root";
     document.body.appendChild(newRoot);
   }
-  
-  createRoot(document.getElementById("root")).render(
+
+createRoot(document.getElementById("root")).render(
     getSafeEnvValue('MODE') === 'production' ? (
       <ErrorBoundary>
         <AppContainer />
       </ErrorBoundary>
     ) : (
-      <StrictMode>
+  <StrictMode>
         <ErrorBoundary>
           <AppContainer />
         </ErrorBoundary>
-      </StrictMode>
+  </StrictMode>
     )
   );
 } catch (e) {
