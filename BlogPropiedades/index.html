@@ -5,6 +5,49 @@
     <link rel="icon" type="image/svg+xml" href="/logo.jpg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Creación</title>
+    
+    <!-- Script de recuperación para errores fatales -->
+    <script>
+      // Establecer un tiempo límite para la carga de la aplicación
+      window.appLoadTimeout = setTimeout(function() {
+        // Si después de 10 segundos no se ha cargado contenido, mostrar mensaje de error
+        const rootElement = document.getElementById('root');
+        if (rootElement && (!rootElement.innerHTML || rootElement.innerHTML.trim() === '')) {
+          rootElement.innerHTML = `
+            <div style="max-width: 600px; margin: 50px auto; padding: 20px; text-align: center; font-family: system-ui, -apple-system, sans-serif;">
+              <h1 style="color: #e53e3e;">Error al cargar la aplicación</h1>
+              <p style="margin-bottom: 20px;">Ha ocurrido un error inesperado. Por favor, intente las siguientes acciones:</p>
+              <div style="display: flex; flex-direction: column; gap: 10px; max-width: 300px; margin: 0 auto;">
+                <button onclick="window.location.reload()" style="background: #3182ce; color: white; padding: 10px; border: none; border-radius: 4px; cursor: pointer;">
+                  Recargar página
+                </button>
+                <button onclick="localStorage.clear(); window.location.reload()" style="background: #718096; color: white; padding: 10px; border: none; border-radius: 4px; cursor: pointer;">
+                  Limpiar caché y recargar
+                </button>
+                <a href="/" style="background: #38a169; color: white; padding: 10px; border: none; border-radius: 4px; text-decoration: none;">
+                  Volver a la página principal
+                </a>
+              </div>
+              <p style="margin-top: 20px; font-size: 14px; color: #718096;">
+                Si el problema persiste, por favor contacte con soporte técnico.
+              </p>
+            </div>
+          `;
+        }
+      }, 10000); // 10 segundos
+      
+      // Cancelar el timeout cuando la aplicación se cargue correctamente
+      window.addEventListener('load', function() {
+        if (window.appLoadTimeout) {
+          clearTimeout(window.appLoadTimeout);
+        }
+      });
+      
+      // Manejar errores de JavaScript
+      window.addEventListener('error', function(e) {
+        console.error('Error JavaScript interceptado:', e.error || e.message);
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>

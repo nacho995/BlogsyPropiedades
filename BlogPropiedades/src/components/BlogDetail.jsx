@@ -395,7 +395,7 @@ export default function BlogDetail() {
 
   // Función para manejar la navegación de imágenes
   const nextImage = () => {
-    if (blog.images && Array.isArray(blog.images) && blog.images.length > 0) {
+    if (blog && blog.images && Array.isArray(blog.images) && blog.images.length > 0) {
       setCurrentImageIndex((prevIndex) => 
         prevIndex === blog.images.length - 1 ? 0 : prevIndex + 1
       );
@@ -403,15 +403,16 @@ export default function BlogDetail() {
   };
 
   const prevImage = () => {
-    if (blog.images && Array.isArray(blog.images) && blog.images.length > 0) {
+    if (blog && blog.images && Array.isArray(blog.images) && blog.images.length > 0) {
       setCurrentImageIndex((prevIndex) => 
         prevIndex === 0 ? blog.images.length - 1 : prevIndex - 1
       );
     }
   };
 
-  // Obtener todas las imágenes disponibles
-  const allImages = blog.images || (blog.image ? [blog.image.src] : []);
+  // Obtener todas las imágenes disponibles de manera segura
+  const allImages = blog && blog.images ? blog.images : 
+                    (blog && blog.image && blog.image.src ? [blog.image.src] : []);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -419,7 +420,7 @@ export default function BlogDetail() {
         <article className="bg-white rounded-2xl shadow-xl overflow-hidden">
           {/* Carrusel de imágenes */}
           <div className="relative h-[400px] bg-gray-100">
-            {blog.images && Array.isArray(blog.images) && blog.images.length > 0 ? (
+            {blog && blog.images && Array.isArray(blog.images) && blog.images.length > 0 ? (
               <>
                 <img
                   src={blog.images[currentImageIndex]?.src || ''}
