@@ -16,6 +16,8 @@ import SeeProperty from './components/SeeProperties';
 import CambiarPerfil from './components/CambiarPerfil';
 import PropertyCreation from './components/addProperties';
 import PropertyDetail from './components/PropertyDetail';
+import SubirPage from './pages/SubirPage';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
     return (
@@ -34,6 +36,11 @@ function App() {
                         <Route path="/propiedades" element={<SeeProperty/>} />
                         <Route path="/add-property" element={<PropertyCreation/>} />
                         <Route path="/property/:id" element={<PropertyDetail/>} />
+                        <Route path="/subir" element={
+                            <ProtectedRoute>
+                                <SubirPage />
+                            </ProtectedRoute>
+                        } />
                     </Routes>
                     <Toaster position="top-right" />
                 </UserProvider>

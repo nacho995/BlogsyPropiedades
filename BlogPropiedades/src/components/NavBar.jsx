@@ -11,7 +11,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
 }
 
-export default function Navbar() {
+export default function Navbar({ showOnlyAuth = false }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, user, logout } = useUser();
@@ -54,12 +54,87 @@ export default function Navbar() {
   // Agregar rutas adicionales si el usuario está autenticado
   const userRoutes = [
     { name: 'Añadir Blog', href: '/crear-blog', current: location.pathname === '/crear-blog' },
+    { name: 'Subir Imágenes', href: '/subir', current: location.pathname === '/subir' },
   ];
   
   // Agregar rutas adicionales si el usuario es administrador
   const adminRoutes = [
     { name: 'Añadir Propiedad', href: '/add-property', current: location.pathname === '/add-property' },
   ];
+
+  // Si estamos en el modo showOnlyAuth, mostrar menú simplificado
+  if (showOnlyAuth) {
+    return (
+      <Disclosure as="nav" className="bg-black text-white shadow-md">
+        {({ open }) => (
+          <>
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between h-16">
+                {/* Logo */}
+                <div className="flex">
+                  <Link to="/" className="flex-shrink-0 flex items-center">
+                    <img className="h-8 w-auto" src="/logo.jpg" alt="Logo" />
+                    <span className="ml-2 font-bold text-xl text-white">GozaMadrid - Subir Imágenes</span>
+                  </Link>
+                </div>
+                
+                {/* Perfil de usuario o login */}
+                <div className="flex items-center">
+                  {isAuthenticated ? (
+                    <Menu as="div" className="relative ml-3">
+                      <div>
+                        <Menu.Button className="flex rounded-full bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-800">
+                          <span className="sr-only">Abrir menú de usuario</span>
+                          <img
+                            className="h-8 w-8 rounded-full object-cover"
+                            src={profileImage || fallbackImageBase64}
+                            alt="Foto de perfil"
+                            onError={handleImageError}
+                          />
+                        </Menu.Button>
+                      </div>
+                      <Transition
+                        as={Fragment}
+                        enter="transition ease-out duration-100"
+                        enterFrom="transform opacity-0 scale-95"
+                        enterTo="transform opacity-100 scale-100"
+                        leave="transition ease-in duration-75"
+                        leaveFrom="transform opacity-100 scale-100"
+                        leaveTo="transform opacity-0 scale-95"
+                      >
+                        <Menu.Items className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                          <Menu.Item>
+                            {({ active }) => (
+                              <button
+                                onClick={() => logout(true)}
+                                className={classNames(
+                                  active ? 'bg-gray-100' : '',
+                                  'block w-full text-left px-4 py-2 text-sm text-gray-700'
+                                )}
+                              >
+                                Cerrar Sesión
+                              </button>
+                            )}
+                          </Menu.Item>
+                        </Menu.Items>
+                      </Transition>
+                    </Menu>
+                  ) : (
+                    <Link
+                      to="/login"
+                      className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                    >
+                      Iniciar Sesión
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </Disclosure>
+    );
+  }
 
   // Imprimir información del usuario para depuración
   console.log("Estado de autenticación:", isAuthenticated);
