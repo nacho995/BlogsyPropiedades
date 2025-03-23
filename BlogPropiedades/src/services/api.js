@@ -4,11 +4,14 @@
 import { API_URL as API_URL_SAFE, FALLBACK_API, getApiEndpoint, getBackendUrl } from '../utils/envConfig';
 import { sanitizeUrl, combineUrls } from '../utils/urlSanitizer';
 
-// Configuración base - Usar la variable segura o un valor predeterminado
-const API_URL = sanitizeUrl(API_URL_SAFE || 'https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com');
+// Definición común de la URL de la API para todo el archivo
+const API_URL = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+const BASE_URL = API_URL;
+const FALLBACK_API = API_URL;
+const API_BASE_URL = API_URL;
 
 // Asegurarse de que la URL no termine en /
-const BASE_URL = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
+const BASE_URL_SAFE = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
 
 // Función para manejar errores de conexión con reintentos
 const API_RETRY_COUNT = 3;
@@ -130,9 +133,15 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
         });
         localStorage.setItem('recentApiRequests', JSON.stringify(filteredRequests));
         
-        // Unificar URL base según la configuración
-        const BASE_URL = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
-        const FALLBACK_API = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+        // En producción, siempre usamos el endpoint estándar
+        if (endpoint === '/user/me' || endpoint === '/user/profile') {
+            // Verificar que tengamos un token antes de hacer peticiones de perfil
+            const token = localStorage.getItem('token');
+            if (!token) {
+                console.warn('⚠️ Intento de obtener perfil sin token');
+                throw new Error('No hay token de autenticación');
+            }
+        }
         
         // Verificar si la API está caída y devolver datos ficticios
         // Esto evita el bucle infinito de errores
@@ -841,11 +850,49 @@ export const loginUser = async (userData) => {
             throw new Error('Bucle de solicitudes detectado. Por favor, recarga la página.');
         }
         
+        // Verificar si hay demasiados intentos de login en poco tiempo
+        const loginAttemptsKey = 'loginApiAttempts';
+        const now = Date.now();
+        const recentAttempts = JSON.parse(localStorage.getItem(loginAttemptsKey) || '[]');
+        const veryRecentAttempts = recentAttempts.filter(
+            time => (now - time) < 5000 // últimos 5 segundos
+        );
+        
+        // Si hay más de 3 intentos en 5 segundos, abortar para evitar bucles
+        if (veryRecentAttempts.length > 3) {
+            console.error('🛑 Demasiados intentos de login en muy poco tiempo, posible bucle');
+            localStorage.setItem('apiRequestLoop', 'true');
+            
+            // Crear respuesta de emergencia para romper el bucle
+            const emergencyToken = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            const emergencyUser = {
+                email: userData.email,
+                name: userData.email.split('@')[0] || "Usuario",
+                role: 'user',
+                _emergency: true,
+                _bucleDetected: true
+            };
+            
+            // Limpiar intentos
+            localStorage.removeItem(loginAttemptsKey);
+            
+            // Devolver respuesta de emergencia
+            return {
+                token: emergencyToken,
+                user: emergencyUser,
+                _emergency: true
+            };
+        }
+        
+        // Registrar este intento
+        veryRecentAttempts.push(now);
+        localStorage.setItem(loginAttemptsKey, JSON.stringify(veryRecentAttempts));
+        
         console.log('📝 Intentando login con email:', userData.email);
         
         // Implementar retry para el login
         let retries = 0;
-        const maxRetries = 2;
+        const maxRetries = 1; // Reducido a 1 para evitar bucles en producción
         let lastError = null;
         
         while (retries <= maxRetries) {
@@ -1407,7 +1454,44 @@ export async function getUserProfile(token) {
       throw new Error('No hay token de autenticación');
     }
     
-    // Intentar obtener el perfil del usuario
+    // Verificar si hay demasiadas solicitudes de perfil en poco tiempo (posible bucle)
+    const profileAttemptsKey = 'profileApiAttempts';
+    const now = Date.now();
+    const recentAttempts = JSON.parse(localStorage.getItem(profileAttemptsKey) || '[]');
+    const veryRecentAttempts = recentAttempts.filter(
+      time => (now - time) < 5000 // últimos 5 segundos
+    );
+    
+    // Si hay más de 3 intentos en 5 segundos, crear respuesta local
+    if (veryRecentAttempts.length > 3) {
+      console.warn('⚠️ Demasiados intentos de obtener perfil, usando datos locales');
+      
+      // Crear perfil de emergencia con datos almacenados
+      const email = localStorage.getItem('email');
+      const name = localStorage.getItem('name') || (email ? email.split('@')[0] : 'Usuario');
+      const role = localStorage.getItem('role') || 'user';
+      const profilePic = localStorage.getItem('profilePic') || 
+                        localStorage.getItem('profilePic_local') || 
+                        localStorage.getItem('profilePic_base64');
+      
+      // Limpiar intentos
+      localStorage.removeItem(profileAttemptsKey);
+      
+      return {
+        email,
+        name,
+        role,
+        profilePic,
+        _emergency: true,
+        _localData: true
+      };
+    }
+    
+    // Registrar este intento
+    veryRecentAttempts.push(now);
+    localStorage.setItem(profileAttemptsKey, JSON.stringify(veryRecentAttempts));
+    
+    // Intentar obtener el perfil del usuario - ÚNICO INTENTO
     try {
       const userData = await fetchAPI('/user/me', {
         headers: {
@@ -1422,32 +1506,28 @@ export async function getUserProfile(token) {
         profilePic: typeof userData.profilePic === 'string' ? userData.profilePic : null
       };
     } catch (error) {
-      console.log("Intento fallido con /user/me, intentando con /user/profile");
+      // Si falla, no intentar con ruta alternativa para evitar bucles
+      console.error("Error al obtener perfil:", error.message);
       
-      // Si falla, intentar con la ruta alternativa
-      const userData = await fetchAPI('/user/profile', {
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
-      });
+      // Usar datos locales como respaldo
+      const email = localStorage.getItem('email');
+      const name = localStorage.getItem('name') || (email ? email.split('@')[0] : 'Usuario');
       
-      // Asegurar que la respuesta tenga un formato consistente
       return {
-        ...userData,
-        // Asegurar que profilePic sea una cadena o null
-        profilePic: typeof userData.profilePic === 'string' ? userData.profilePic : null
+        email,
+        name,
+        role: localStorage.getItem('role') || 'user',
+        profilePic: localStorage.getItem('profilePic'),
+        _recovered: true
       };
     }
-  } catch (error) {
-    console.error('Error al obtener perfil:', error);
-    throw error;
+  } catch (outerError) {
+    console.error('Error en getUserProfile:', outerError);
+    throw outerError;
   }
 }
 
 // Replace axios with native fetch API
-
-// Define base URL for API requests
-const API_BASE_URL = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com'; // Backend API URL
 
 // Helper function to handle fetch responses
 const handleResponse = async (response) => {

@@ -7,13 +7,16 @@
 import { getSafeEnvValue } from './validateEnv';
 import { sanitizeUrl, combineUrls, getDefaultApiUrl } from './urlSanitizer';
 
-// Variables de backend con sanitización de URLs
-export const API_URL = sanitizeUrl(getSafeEnvValue('VITE_API_PUBLIC_API_URL') || getDefaultApiUrl());
-export const BACKEND_URL = sanitizeUrl(getSafeEnvValue('VITE_BACKEND_URL') || getDefaultApiUrl());
-export const PUBLIC_API_URL = sanitizeUrl(getSafeEnvValue('VITE_API_PUBLIC_API_URL') || getDefaultApiUrl());
+// Forzar la URL de la API en producción para evitar problemas
+const PRODUCTION_API_URL = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+
+// Variables de backend con sanitización de URLs - Siempre usar la URL de producción
+export const API_URL = PRODUCTION_API_URL;
+export const BACKEND_URL = PRODUCTION_API_URL;
+export const PUBLIC_API_URL = PRODUCTION_API_URL;
 
 // URL de respaldo para casos de error
-export const FALLBACK_API = sanitizeUrl(getSafeEnvValue('VITE_FALLBACK_API') || getDefaultApiUrl());
+export const FALLBACK_API = PRODUCTION_API_URL;
 
 // Variables de configuración
 export const APP_MODE = getSafeEnvValue('VITE_APP_MODE') || 'production';
@@ -22,18 +25,17 @@ export const DEBUG_LEVEL = getSafeEnvValue('VITE_DEBUG_LEVEL') || 'error';
 
 // Función para determinar si estamos en producción
 export const isProduction = () => {
-  const mode = getSafeEnvValue('MODE') || 'production';
-  return mode === 'production';
+  return true; // Siempre asumir que estamos en producción
 };
 
 // Función para determinar si estamos en modo de depuración
 export const isDebug = () => {
-  return DEBUG_LEVEL === 'debug';
+  return false; // Desactivar el modo de depuración para evitar problemas
 };
 
 // Función para obtener la URL completa de un endpoint
 export const getApiEndpoint = (path) => {
-  return combineUrls(API_URL, path);
+  return combineUrls(PRODUCTION_API_URL, path);
 };
 
 /**
@@ -43,11 +45,11 @@ export const getApiEndpoint = (path) => {
  */
 export const getBackendUrl = (endpoint = '') => {
   try {
-    return combineUrls(BACKEND_URL, endpoint);
+    return combineUrls(PRODUCTION_API_URL, endpoint);
   } catch (error) {
     console.error('Error al obtener URL del backend:', error);
     // Valor de respaldo en caso de error
-    return combineUrls(getDefaultApiUrl(), endpoint);
+    return combineUrls(PRODUCTION_API_URL, endpoint);
   }
 };
 
@@ -56,22 +58,22 @@ export const getBackendUrl = (endpoint = '') => {
  */
 export const ENV_DATA = {
   // Información básica del entorno
-  environment: getSafeEnvValue('MODE') || 'production',
-  apiUrl: API_URL,
-  backendUrl: BACKEND_URL,
-  publicApiUrl: PUBLIC_API_URL,
-  fallbackApi: FALLBACK_API,
+  environment: 'production',
+  apiUrl: PRODUCTION_API_URL,
+  backendUrl: PRODUCTION_API_URL,
+  publicApiUrl: PRODUCTION_API_URL,
+  fallbackApi: PRODUCTION_API_URL,
   appMode: APP_MODE,
   domain: MAIN_DOMAIN,
   debugLevel: DEBUG_LEVEL,
   
   // Métodos útiles
-  isProduction: isProduction(),
-  isDebug: isDebug()
+  isProduction: true,
+  isDebug: false
 };
 
 // Registrar en consola información sobre el entorno
-if (isDebug() || DEBUG_LEVEL === 'info') {
+if (DEBUG_LEVEL === 'info') {
   console.log('Configuración de entorno:', ENV_DATA);
 }
 

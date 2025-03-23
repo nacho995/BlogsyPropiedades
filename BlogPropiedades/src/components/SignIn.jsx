@@ -131,6 +131,16 @@ const SignIn = ({ isRegistering = false }) => {
             return;
         }
         
+        // URL única para la API
+        const API_URL = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+        
+        // Guardar la URL de producción para usar en toda la aplicación
+        try {
+            localStorage.setItem('definitive_api_url', API_URL);
+        } catch (e) {
+            console.error("Error al guardar URL de API:", e);
+        }
+        
         // Evitar múltiples envíos simultáneos
         if (isSubmitting.current) {
             console.log("Ya hay una solicitud en curso, ignorando clic");

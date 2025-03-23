@@ -142,7 +142,7 @@ export const combineUrls = (baseUrl, endpoint = '') => {
  * @returns {string} - URL predeterminada
  */
 export const getDefaultApiUrl = () => {
-  // Usar siempre HTTP para Elastic Beanstalk
+  // Siempre usar HTTP para la API de Elastic Beanstalk
   return 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
 };
 

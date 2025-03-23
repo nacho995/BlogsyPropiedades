@@ -101,19 +101,21 @@ export default function CambiarPerfil() {
       setError(null);
       setSuccess(null);
 
-      const formData = new FormData();
-      if (name) formData.append("name", name);
-      if (profilePic?.file) {
-        formData.append("profilePic", profilePic.file);
-      }
+      const API_URL = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+      
+      const userData = {
+        name: name || user?.name,
+        profilePic: profilePic?.file ? await validateAndProcessImage(profilePic.file) : null
+      };
 
-      // Actualizar perfil en el servidor
-      const response = await fetch(`${import.meta.env.VITE_API_PUBLIC_API_URL}/user/update-profile`, {
+      // Llamada al backend para actualizar el perfil
+      const response = await fetch(`${API_URL}/user/update-profile`, {
         method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${localStorage.getItem("token")}`
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: formData
+        body: JSON.stringify(userData)
       });
 
       if (!response.ok) {
