@@ -61,6 +61,12 @@ export default function Navbar() {
     { name: 'Añadir Propiedad', href: '/add-property', current: location.pathname === '/add-property' },
   ];
 
+  // Imprimir información del usuario para depuración
+  console.log("Estado de autenticación:", isAuthenticated);
+  console.log("Información del usuario:", user);
+  console.log("Rol del usuario:", user?.role);
+  console.log("Es admin:", user?.isAdmin);
+
   // Construir la navegación combinada basada en permisos
   let updatedNavigation = [...navigation];
   
@@ -68,7 +74,8 @@ export default function Navbar() {
     updatedNavigation = [...updatedNavigation, ...userRoutes];
     
     // Añadir rutas de administrador si el usuario tiene el rol necesario
-    if (user?.role === 'admin' || user?.isAdmin) {
+    if (user?.role === 'admin' || user?.role === 'ADMIN' || user?.isAdmin === true) {
+      console.log("Usuario es admin, añadiendo rutas de administrador");
       updatedNavigation = [...updatedNavigation, ...adminRoutes];
     }
   }
@@ -175,7 +182,7 @@ export default function Navbar() {
                                 )}
                               </Menu.Item>
                               
-                              {(user?.role === 'admin' || user?.isAdmin) && (
+                              {(user?.role === 'admin' || user?.role === 'ADMIN' || user?.isAdmin === true) && (
                                 <Menu.Item>
                                   {({ active }) => (
                                     <Link

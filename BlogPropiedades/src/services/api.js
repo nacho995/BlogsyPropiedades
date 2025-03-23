@@ -142,7 +142,7 @@ export const createBlogPost = async (data) => {
 export const getBlogPosts = async () => {
   try {
     console.log("Obteniendo blogs del servidor...");
-    const blogs = await fetchAPI('/blog');
+    const blogs = await fetchAPI('/blogs');
     console.log("Blogs recibidos del servidor:", blogs);
     
     // Verificar la estructura de cada blog y procesar las imágenes
@@ -586,7 +586,7 @@ export const createPropertyPost = async (data) => {
 export const getPropertyPosts = async () => {
   try {
     console.log("Obteniendo propiedades del servidor...");
-    const properties = await fetchAPI('/property');
+    const properties = await fetchAPI('/properties');
     console.log("Propiedades recibidas del servidor:", properties);
     
     // Verificar la estructura de cada propiedad y corregir las imágenes si es necesario
