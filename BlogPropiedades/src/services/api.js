@@ -882,7 +882,8 @@ const checkImageAccessibility = (url) => {
       'res.cloudinary.com',
       'images.unsplash.com',
       'goza-madrid.onrender.com',
-      'api.realestategozamadrid.com'
+      'api.realestategozamadrid.com',
+      'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com'
     ];
     
     // Verificar si la URL pertenece a un dominio confiable
@@ -890,7 +891,7 @@ const checkImageAccessibility = (url) => {
     
     // Si la URL contiene "uploads/properties" y es del servidor, verificar con fetch
     // ya que estos archivos pueden no existir (error 404)
-    if (url.includes('uploads/properties') && (url.includes('goza-madrid.onrender.com') || url.includes('api.realestategozamadrid.com'))) {
+    if (url.includes('uploads/properties') && (url.includes('goza-madrid.onrender.com') || url.includes('api.realestategozamadrid.com') || url.includes('gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com'))) {
       console.log('Verificando accesibilidad de imagen en servidor con fetch:', url);
       
       // Usar fetch para verificar si la URL es accesible
