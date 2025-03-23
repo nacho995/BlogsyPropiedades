@@ -1,4 +1,4 @@
-import React, { useEffect, useState, lazy, Suspense } from 'react';
+import React, { useEffect, useState, lazy, Suspense, useRef, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { UserProvider, useUser } from './context/UserContext';
 import Navbar from './components/NavBar';
@@ -434,7 +434,7 @@ function AdminRoute({ children }) {
 function HomeRoute() {
   const { user, isAuthenticated } = useUser();
   const [hasError, setHasError] = useState(false);
-  const [renderCount, setRenderCount] = useState(0);
+  const renderCountRef = useRef(0);
   
   // Comprobar y ajustar URLs de API si es necesario
   useEffect(() => {
@@ -463,25 +463,34 @@ function HomeRoute() {
     }
   }, []);
   
+  // Usamos useEffect una única vez para detectar ciclos, con useRef en lugar de useState
   useEffect(() => {
-    // Detectar posibles ciclos de renderizado en el HomeRoute
-    setRenderCount(prev => prev + 1);
+    // Función de limpieza para resetear el contador en caso de que el componente se desmonte y monte de nuevo
+    return () => {
+      renderCountRef.current = 0;
+    };
+  }, []);
+  
+  useEffect(() => {
+    // Incrementamos el contador de renderizados
+    renderCountRef.current += 1;
     
-    if (renderCount > 5) {
-      console.warn(`⚠️ Posible ciclo de renderizado en HomeRoute: ${renderCount} renderizados`);
+    // Detectar posibles ciclos de renderizado en el HomeRoute
+    if (renderCountRef.current > 10) {
+      console.warn(`⚠️ Posible ciclo de renderizado en HomeRoute: ${renderCountRef.current} renderizados`);
       setHasError(true);
       
       // Registrar para diagnóstico
       try {
         localStorage.setItem('homeRouteCycleDetected', JSON.stringify({
           timestamp: new Date().toISOString(),
-          renderCount
+          renderCount: renderCountRef.current
         }));
       } catch (e) {
         console.error("Error al registrar ciclo:", e);
       }
     }
-  }, [renderCount]);
+  });
   
   // Si detectamos un posible bucle, mostrar SignIn
   if (hasError) {
@@ -489,15 +498,14 @@ function HomeRoute() {
     return <SignIn />;
   }
   
-  // Comportamiento normal - simplificar la lógica para evitar condiciones complejas
-  console.log("🧭 Decidiendo ruta:", { autenticado: isAuthenticated, usuario: !!user });
+  // Memoizar la decisión para evitar re-renders innecesarios
+  const Component = useMemo(() => {
+    console.log("🧭 Decidiendo ruta:", { autenticado: isAuthenticated, usuario: !!user });
+    // Priorizar el estado de autenticación del contexto
+    return (isAuthenticated && user) ? Principal : SignIn;
+  }, [isAuthenticated, user]);
   
-  // Priorizar el estado de autenticación del contexto
-  if (isAuthenticated && user) {
-    return <Principal />;
-  } else {
-    return <SignIn />;
-  }
+  return <Component />;
 }
 
 function App() {
