@@ -158,4 +158,114 @@ export const handleUrlErrors = (urlErrors) => {
   }
   
   return false; // No hay errores de URL
-}; 
+};
+
+/**
+ * Utilidades para el manejo centralizado de errores en la aplicación
+ */
+
+// Contador de errores de API para detectar fallos recurrentes
+let apiErrorCounter = 0;
+let apiErrorTimestamp = Date.now();
+const API_ERROR_THRESHOLD = 5; // Número máximo de errores antes de considerar un fallo general
+const API_ERROR_WINDOW = 60000; // Ventana de tiempo para contar errores (60 segundos)
+
+/**
+ * Registra un error de API y determina si debemos mostrar un mensaje de error general
+ * @param {Error} error - Error capturado
+ * @returns {boolean} - true si debemos mostrar un error general
+ */
+export const trackApiError = (error) => {
+  const now = Date.now();
+  
+  // Reiniciar el contador si ha pasado la ventana de tiempo
+  if (now - apiErrorTimestamp > API_ERROR_WINDOW) {
+    apiErrorCounter = 0;
+    apiErrorTimestamp = now;
+  }
+  
+  // Incrementar el contador de errores
+  apiErrorCounter++;
+  
+  // Guardar información del error en localStorage para diagnóstico
+  try {
+    // Obtener errores previos o inicializar array
+    const storedErrors = JSON.parse(localStorage.getItem('api_errors') || '[]');
+    
+    // Añadir nuevo error al array, limitando a los 10 más recientes
+    const newErrors = [
+      {
+        message: error.message,
+        timestamp: new Date().toISOString(),
+        url: error.config?.url || 'desconocida',
+        status: error.response?.status || 'desconocido'
+      },
+      ...storedErrors
+    ].slice(0, 10);
+    
+    localStorage.setItem('api_errors', JSON.stringify(newErrors));
+  } catch (e) {
+    console.warn('No se pudo guardar el error en localStorage');
+  }
+  
+  // Determinar si hemos alcanzado el umbral de errores
+  return apiErrorCounter >= API_ERROR_THRESHOLD;
+};
+
+/**
+ * Reinicia el contador de errores de API
+ */
+export const resetApiErrorCounter = () => {
+  apiErrorCounter = 0;
+  apiErrorTimestamp = Date.now();
+};
+
+/**
+ * Analiza un error y determina un mensaje amigable para mostrar al usuario
+ * @param {Error} error - Error capturado
+ * @returns {string} - Mensaje de error amigable
+ */
+export const getFriendlyErrorMessage = (error) => {
+  // Error de red
+  if (error.message && (
+      error.message.includes('Network Error') || 
+      error.message.includes('Failed to fetch') ||
+      error.message.includes('network request failed')
+    )) {
+    return 'No se pudo conectar con el servidor. Por favor, verifica tu conexión a internet.';
+  }
+  
+  // Error 401 - No autorizado
+  if (error.response?.status === 401) {
+    return 'Tu sesión ha expirado o no tienes autorización. Por favor, inicia sesión nuevamente.';
+  }
+  
+  // Error 403 - Prohibido
+  if (error.response?.status === 403) {
+    return 'No tienes permisos para realizar esta acción.';
+  }
+  
+  // Error 404 - No encontrado
+  if (error.response?.status === 404) {
+    return 'El recurso solicitado no existe o ha sido movido.';
+  }
+  
+  // Error 500 - Error de servidor
+  if (error.response?.status >= 500) {
+    return 'Ocurrió un error en el servidor. Por favor, intenta nuevamente más tarde.';
+  }
+  
+  // Mensaje por defecto
+  return error.message || 'Ha ocurrido un error inesperado.';
+};
+
+/**
+ * Objeto global para manejo de errores
+ */
+const ErrorHandler = {
+  trackApiError,
+  resetApiErrorCounter,
+  getFriendlyErrorMessage
+};
+
+export default ErrorHandler; 
