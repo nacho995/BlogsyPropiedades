@@ -1626,23 +1626,3 @@ export const uploadImageProperty = async (formData) => {
     throw error;
   }
 };
-
-// Combinar URL base con ruta, asegurando URLs HTTP para dominios específicos
-const combineUrls = (baseUrl, path) => {
-    if (!baseUrl) return path;
-    if (!path) return baseUrl;
-    
-    // Limpiar la URL base y la ruta para evitar barras duplicadas
-    const base = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-    
-    let url = `${base}${normalizedPath}`;
-    
-    // Asegurar que las URLs de elasticbeanstalk usen HTTP
-    if (url.includes('elasticbeanstalk.com') && url.startsWith('https:')) {
-        url = url.replace('https:', 'http:');
-        console.log('⚠️ URL de elasticbeanstalk convertida a HTTP:', url);
-    }
-    
-    return url;
-};
