@@ -78,7 +78,7 @@ export default function SeeProperties() {
     }, []);
 
     const openDeleteModal = (property) => {
-        if (!user || (user.role !== 'admin' && user.role !== 'ADMIN')) {
+        if (!user || !(user.role === 'admin' || user.role === 'ADMIN' || user.isAdmin)) {
             toast.error('No tienes permisos para eliminar propiedades');
             return;
         }
@@ -175,18 +175,26 @@ export default function SeeProperties() {
                                     </div>
 
                                     <div className="mt-4 flex justify-between gap-4">
-                                        {user && (user.role === 'admin' || user.role === 'ADMIN') && (
-                                            <button
-                                                onClick={() => openDeleteModal(prop)}
-                                                className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700 transition"
-                                                disabled={deleteLoading}
-                                            >
-                                                {deleteLoading ? 'Eliminando...' : 'Eliminar'}
-                                            </button>
+                                        {user && (user.role === 'admin' || user.role === 'ADMIN' || user.isAdmin) && (
+                                            <div className="flex gap-2">
+                                                <Link
+                                                    to={`/add-property?id=${prop._id}`}
+                                                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+                                                >
+                                                    Editar
+                                                </Link>
+                                                <button
+                                                    onClick={() => openDeleteModal(prop)}
+                                                    className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700 transition"
+                                                    disabled={deleteLoading}
+                                                >
+                                                    {deleteLoading && propertyToDelete?._id === prop._id ? 'Eliminando...' : 'Eliminar'}
+                                                </button>
+                                            </div>
                                         )}
                                         <Link
                                             to={`/property/${prop._id}`}
-                                            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+                                            className="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-700 transition ml-auto"
                                         >
                                             Ver detalles
                                         </Link>

@@ -131,7 +131,7 @@ export default function SeeBlogs() {
   }, []);
 
   const openDeleteModal = (blog) => {
-    if (!user || (user.role !== 'admin' && user.role !== 'ADMIN')) {
+    if (!user || !(user.role === 'admin' || user.role === 'ADMIN' || user.isAdmin)) {
       toast.error('No tienes permisos para eliminar blogs');
       return;
     }
@@ -236,10 +236,10 @@ export default function SeeBlogs() {
                       Leer más
                     </Link>
 
-                    {user && (user.role === 'admin' || user.role === 'ADMIN') && (
+                    {user && (user.role === 'admin' || user.role === 'ADMIN' || user.isAdmin) && (
                       <div className="flex gap-2">
                         <Link
-                          to={`/blog/${blog._id}`}
+                          to={`/crear-blog?id=${blog._id}`}
                           className="p-2 text-blue-600 hover:text-blue-800 transition-colors"
                           title="Editar"
                         >
@@ -249,7 +249,6 @@ export default function SeeBlogs() {
                           onClick={() => openDeleteModal(blog)}
                           className="p-2 text-red-600 hover:text-red-800 transition-colors"
                           title="Eliminar"
-                          disabled={deleteLoading}
                         >
                           <FiTrash2 className="w-5 h-5" />
                         </button>
