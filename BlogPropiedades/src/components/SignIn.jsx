@@ -80,7 +80,13 @@ const SignIn = ({ isRegistering = false }) => {
                         login(response.token, response.user);
                     } else if (response.temporaryToken) {
                         console.warn("Usando token temporal para mantener sesión básica");
-                        login(response.temporaryToken, response.user || { email });
+                        const minimalUser = {
+                            email,
+                            name: email.split('@')[0] || "Usuario",
+                            role: 'user',
+                            _recoveredLogin: true
+                        };
+                        login(response.temporaryToken, minimalUser);
                     }
                     
                     navigate("/");

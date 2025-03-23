@@ -12,7 +12,29 @@ export function UserProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [recoveryAttempted, setRecoveryAttempted] = useState(false);
   const navigate = useNavigate();
+  
+  // Función para registrar eventos de autenticación para depuración
+  const logAuthEvent = (event, details = {}) => {
+    try {
+      const eventLog = JSON.parse(localStorage.getItem('authEventLog') || '[]');
+      eventLog.unshift({
+        event,
+        timestamp: new Date().toISOString(),
+        details
+      });
+      
+      // Limitar a los últimos 10 eventos
+      if (eventLog.length > 10) {
+        eventLog.length = 10;
+      }
+      
+      localStorage.setItem('authEventLog', JSON.stringify(eventLog));
+    } catch (e) {
+      console.error("Error al registrar evento de autenticación:", e);
+    }
+  };
   
   // Función auxiliar para verificar token
   const isValidToken = (token) => {
@@ -28,24 +50,34 @@ export function UserProvider({ children }) {
       // Verificar si el token ha expirado
       if (payload.exp && payload.exp < Date.now() / 1000) {
         console.warn("Token expirado:", new Date(payload.exp * 1000).toLocaleString());
+        logAuthEvent('token_expired', { expiry: new Date(payload.exp * 1000).toLocaleString() });
         return false;
       }
       
       // Verificar si tiene campo de "iat" (issued at)
       if (!payload.iat) {
         console.warn("Token sin fecha de emisión (iat)");
+        logAuthEvent('token_without_iat');
       }
       
       return true;
     } catch (error) {
       console.error("Error al validar token:", error);
+      logAuthEvent('token_validation_error', { error: error.message });
       return false;
     }
   };
 
   // Función para intentar recuperar la sesión cuando hay problemas
   const recuperateSession = async () => {
+    if (recoveryAttempted) {
+      console.log("🛑 Ya se intentó recuperar la sesión anteriormente, evitando bucle");
+      return false;
+    }
+    
     console.log("🔄 Intentando recuperar sesión...");
+    logAuthEvent('session_recovery_attempt');
+    setRecoveryAttempted(true);
     
     try {
       // Verificar si hay datos del usuario en localStorage
@@ -69,18 +101,46 @@ export function UserProvider({ children }) {
       if (storedToken) {
         console.log("🔑 Encontrado token probablemente inválido o expirado en localStorage");
         
-        // Limpiar el token inválido
-        try {
-          localStorage.removeItem('token');
-          console.log("🧹 Token inválido eliminado de localStorage");
-        } catch (e) {
-          console.error("❌ Error al eliminar token:", e);
+        // Verificar si el token es válido antes de limpiarlo
+        if (!isValidToken(storedToken)) {
+          // Limpiar el token inválido
+          try {
+            localStorage.removeItem('token');
+            logAuthEvent('invalid_token_removed');
+            console.log("🧹 Token inválido eliminado de localStorage");
+          } catch (e) {
+            console.error("❌ Error al eliminar token:", e);
+          }
+        } else {
+          // Si el token es válido pero aún así no se cargó el usuario, intentar usarlo directamente
+          console.log("🔑 Token válido encontrado, intentando usarlo directamente");
+          
+          try {
+            // Intentar obtener perfil del usuario con este token
+            const profileResponse = await getUserProfile(storedToken);
+            
+            if (profileResponse && profileResponse.user) {
+              console.log("✅ Perfil recuperado exitosamente con token existente");
+              logAuthEvent('profile_recovered_with_token');
+              
+              // Configurar el usuario y la autenticación
+              setUser(profileResponse.user);
+              setIsAuthenticated(true);
+              setLoading(false);
+              
+              return true;
+            }
+          } catch (profileError) {
+            console.error("Error al obtener perfil con token existente:", profileError);
+            logAuthEvent('profile_recovery_failed', { error: profileError.message });
+          }
         }
       }
       
       // Si tenemos email y nombre, podemos reconstruir un usuario básico
       if (storedEmail && storedName) {
         console.log("✅ Datos mínimos encontrados, recuperando sesión básica");
+        logAuthEvent('session_recovered_with_basic_data');
         
         // Crear un objeto de usuario básico
         const recoveredUser = {
@@ -97,6 +157,7 @@ export function UserProvider({ children }) {
         if (storedEmail) {
           try {
             localStorage.setItem('tempToken', tempToken);
+            logAuthEvent('temp_token_created');
             console.log("🔑 Token temporal creado y almacenado");
           } catch (e) {
             console.error("❌ Error al almacenar token temporal:", e);
@@ -105,6 +166,7 @@ export function UserProvider({ children }) {
         
         setUser(recoveredUser);
         setIsAuthenticated(true);
+        setLoading(false);
         
         console.log("✅ Sesión básica recuperada con datos locales");
         
@@ -119,6 +181,7 @@ export function UserProvider({ children }) {
       // Si no tenemos datos suficientes pero hay al menos un correo
       if (storedEmail) {
         console.log("⚠️ Solo tenemos email, no podemos recuperar una sesión completa");
+        logAuthEvent('partial_recovery_with_email');
         
         // Crear un objeto de usuario muy básico solo para mostrar algo
         const minimalUser = {
@@ -133,6 +196,7 @@ export function UserProvider({ children }) {
         // No marcamos como autenticado
         setUser(minimalUser);
         setIsAuthenticated(false);
+        setLoading(false);
         
         // Notificar de la recuperación parcial
         window.dispatchEvent(new CustomEvent('sessionPartiallyRecovered', { 
@@ -143,9 +207,12 @@ export function UserProvider({ children }) {
       }
       
       console.log("❌ No hay suficientes datos para recuperar la sesión");
+      logAuthEvent('recovery_failed_no_data');
+      setLoading(false);
       return false;
     } catch (error) {
       console.error("❌ Error crítico al recuperar sesión:", error);
+      logAuthEvent('critical_recovery_error', { error: error.message });
       
       // Último intento - crear un usuario anónimo
       try {
@@ -454,135 +521,118 @@ export function UserProvider({ children }) {
     };
   }, []);
   
-  // Función de login
-  const login = async (userData) => {
+  // Función para iniciar sesión
+  const login = async (token, userData) => {
+    console.log("🔐 Iniciando sesión con token y datos de usuario");
+    logAuthEvent('login_attempt');
+    
     try {
-      // Validar datos básicos
-      if (!userData || !userData.token) {
-        console.error("Datos de login incompletos");
-        throw new Error("Datos de login incompletos");
+      if (!token) {
+        console.error("❌ Error de login: No se proporcionó token");
+        logAuthEvent('login_failed_no_token');
+        return false;
       }
       
-      console.log("Iniciando sesión con datos:", userData);
-      console.log("Token recibido:", userData.token);
-      console.log("Datos de usuario:", userData.user || "No hay objeto user específico");
+      // Verificar si el token es válido
+      if (!isValidToken(token) && !token.startsWith('temp_')) {
+        console.error("❌ Error de login: Token inválido");
+        logAuthEvent('login_failed_invalid_token');
+        return false;
+      }
       
-      // Guardar token y nombre en localStorage
-      localStorage.setItem("token", userData.token);
-      if (userData.name) localStorage.setItem("name", userData.name);
-      
-      // Extraer datos del usuario
-      const userObj = userData.user || {};
-      
-      // Actualizar el estado del usuario
-      setUser({
-        token: userData.token,
-        name: userData.name || userObj.name || "",
-        ...userObj
-      });
-      
-      setIsAuthenticated(true);
-      
-      // Guardar la imagen de perfil actual si existe
-      let currentProfileImage = null;
-      
-      // Verificar si hay una imagen en los datos del usuario
-      if (userObj.profilePic) {
-        if (typeof userObj.profilePic === 'string') {
-          currentProfileImage = userObj.profilePic;
-          console.log("Imagen encontrada en userData.user.profilePic (string):", currentProfileImage.substring(0, 30) + "...");
-        } else if (userObj.profilePic && userObj.profilePic.src) {
-          currentProfileImage = userObj.profilePic.src;
-          console.log("Imagen encontrada en userData.user.profilePic.src:", currentProfileImage.substring(0, 30) + "...");
+      // Verificar datos de usuario
+      if (!userData || !userData.email) {
+        console.error("❌ Error de login: Datos de usuario incompletos");
+        logAuthEvent('login_failed_incomplete_user_data');
+        
+        // Si el token es válido pero faltan datos, intentar obtener el perfil
+        if (isValidToken(token)) {
+          try {
+            console.log("🔍 Intentando obtener perfil con token válido pero sin datos de usuario");
+            const profileResponse = await getUserProfile();
+            
+            if (profileResponse && profileResponse.user) {
+              userData = profileResponse.user;
+              console.log("✅ Perfil obtenido exitosamente");
+              logAuthEvent('profile_obtained_during_login');
+            }
+          } catch (profileError) {
+            console.error("❌ Error al obtener perfil durante login:", profileError);
+            logAuthEvent('profile_fetch_failed_during_login', { error: profileError.message });
+          }
         }
-      } else if (userData.profilePic) {
-        if (typeof userData.profilePic === 'string') {
-          currentProfileImage = userData.profilePic;
-          console.log("Imagen encontrada en userData.profilePic (string):", currentProfileImage.substring(0, 30) + "...");
-        } 
-      } else if (userObj.profileImage) {
-        if (typeof userObj.profileImage === 'string') {
-          currentProfileImage = userObj.profileImage;
-          console.log("Imagen encontrada en userData.user.profileImage (string):", currentProfileImage.substring(0, 30) + "...");
-        } else if (userObj.profileImage && userObj.profileImage.url) {
-          currentProfileImage = userObj.profileImage.url;
-          console.log("Imagen encontrada en userData.user.profileImage.url:", currentProfileImage.substring(0, 30) + "...");
+        
+        // Si todavía no tenemos datos suficientes
+        if (!userData || !userData.email) {
+          return false;
         }
       }
       
-      // Si encontramos una imagen, procesarla y guardarla en localStorage
-      if (currentProfileImage) {
+      // Almacenar token en localStorage
+      try {
+        localStorage.setItem('token', token);
+        console.log("🔑 Token almacenado en localStorage");
+      } catch (e) {
+        console.error("❌ Error al guardar token:", e);
+        logAuthEvent('token_storage_failed', { error: e.message });
+        // Continuar de todos modos, aunque podría haber problemas después
+      }
+      
+      // Almacenar datos básicos del usuario
+      try {
+        localStorage.setItem('email', userData.email);
+        
+        if (userData.name) {
+          localStorage.setItem('name', userData.name);
+        }
+        
+        if (userData.role) {
+          localStorage.setItem('role', userData.role);
+        }
+        
+        if (userData._id) {
+          localStorage.setItem('userId', userData._id);
+        }
+        
+        // Intentar almacenar el objeto de usuario completo
         try {
-          // Procesar la imagen (convertir a base64 si es necesario)
-          const processedImage = await validateAndProcessImage(currentProfileImage);
-          
-          // Guardar en localStorage
-          localStorage.setItem('profilePic', processedImage);
-          localStorage.setItem('profilePic_local', processedImage);
-          localStorage.setItem('profilePic_base64', processedImage);
-          
-          console.log("Imagen procesada y guardada en localStorage durante login");
-          
-          // Notificar a otros componentes
-          window.dispatchEvent(new CustomEvent('profileImageUpdated', { 
-            detail: { imageUrl: processedImage } 
-          }));
-          
-          // Actualizar el estado del usuario con la imagen procesada
-          setUser(prevUser => ({
-            ...prevUser,
-            profileImage: processedImage
-          }));
-        } catch (imageError) {
-          console.error("Error al procesar imagen durante login:", imageError);
-          
-          // Si falla el procesamiento, intentar usar la URL directamente
-          const secureUrl = ensureHttps(currentProfileImage);
-          localStorage.setItem('profilePic', secureUrl);
-          localStorage.setItem('profilePic_local', secureUrl);
-          
-          // Notificar a otros componentes
-          window.dispatchEvent(new CustomEvent('profileImageUpdated', { 
-            detail: { imageUrl: secureUrl } 
-          }));
-          
-          // Actualizar el estado del usuario con la URL segura
-          setUser(prevUser => ({
-            ...prevUser,
-            profileImage: secureUrl
-          }));
+          localStorage.setItem('user', JSON.stringify(userData));
+        } catch (userStorageError) {
+          console.warn("⚠️ No se pudo almacenar objeto de usuario completo:", userStorageError);
+          logAuthEvent('user_object_storage_failed', { error: userStorageError.message });
+        }
+        
+        console.log("👤 Datos de usuario almacenados en localStorage");
+      } catch (e) {
+        console.error("❌ Error al guardar datos de usuario:", e);
+        logAuthEvent('user_data_storage_failed', { error: e.message });
+        // Continuar de todos modos
+      }
+      
+      // Actualizar el estado
+      setUser(userData);
+      setIsAuthenticated(true);
+      console.log("✅ Sesión iniciada correctamente");
+      logAuthEvent('login_successful');
+      
+      // Sincronizar imagen de perfil si es necesario
+      if (userData.profileImage) {
+        try {
+          localStorage.setItem('profilePic', userData.profileImage);
+        } catch (e) {
+          console.error("❌ Error al guardar imagen de perfil:", e);
         }
       } else {
-        // Si no hay imagen, intentar sincronizar con el servidor
-        try {
-          console.log("No se encontró imagen en los datos de usuario, sincronizando con el servidor...");
-          await syncProfileImage();
-          
-          // Obtener la imagen sincronizada
-          const syncedImage = localStorage.getItem('profilePic') || 
-                             localStorage.getItem('profilePic_local') || 
-                             localStorage.getItem('profilePic_base64') || 
-                             fallbackImageBase64;
-          
-          // Actualizar el estado del usuario con la imagen sincronizada
-          setUser(prevUser => ({
-            ...prevUser,
-            profileImage: syncedImage
-          }));
-        } catch (syncError) {
-          console.error("Error al sincronizar imagen durante login:", syncError);
-          // Usar imagen por defecto
-          setUser(prevUser => ({
-            ...prevUser,
-            profileImage: fallbackImageBase64
-          }));
-        }
+        syncProfileImage().catch(e => {
+          console.error("Error al sincronizar imagen de perfil:", e);
+        });
       }
       
       return true;
     } catch (error) {
-      console.error("Error en login:", error);
-      throw error;
+      console.error("❌ Error crítico durante login:", error);
+      logAuthEvent('critical_login_error', { error: error.message });
+      return false;
     }
   };
   

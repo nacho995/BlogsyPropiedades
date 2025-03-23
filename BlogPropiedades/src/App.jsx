@@ -446,7 +446,12 @@ function ErrorFallback({ error, resetError }) {
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { 
+      hasError: false, 
+      error: null,
+      lastErrorTime: 0, // Nuevo: para evitar capturar errores demasiado rápido
+      errorCount: 0     // Nuevo: contar errores repetidos
+    };
   }
 
   static getDerivedStateFromError(error) {
@@ -456,13 +461,48 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     console.error("Error capturado por ErrorBoundary:", error, errorInfo);
     
+    // Evitar capturar errores demasiado rápido (posible bucle)
+    const now = Date.now();
+    const timeSinceLastError = now - this.state.lastErrorTime;
+    
+    this.setState(prevState => ({
+      lastErrorTime: now,
+      errorCount: prevState.errorCount + 1
+    }));
+    
+    // Si hay muchos errores en poco tiempo, podría ser un bucle
+    if (timeSinceLastError < 1000 && this.state.errorCount > 3) {
+      console.warn("⚠️ Posible bucle de errores detectado. Intentando recuperación profunda...");
+      try {
+        // Intentar limpiar datos locales que podrían estar corruptos
+        localStorage.removeItem('token');
+        localStorage.removeItem('tempToken');
+        localStorage.removeItem('profilePic');
+        localStorage.removeItem('lastRenderCycle');
+        localStorage.removeItem('user');
+        
+        // Registrar esta acción para diagnóstico
+        localStorage.setItem('errorRecoveryAttempt', JSON.stringify({
+          timestamp: new Date().toISOString(),
+          errorCount: this.state.errorCount,
+          errorMessage: error.message
+        }));
+        
+        console.log("🧹 Datos potencialmente problemáticos eliminados");
+      } catch (cleanupError) {
+        console.error("Error durante la limpieza de emergencia:", cleanupError);
+      }
+    }
+    
     // Registrar errores para diagnóstico
     try {
       const errorData = {
         message: error.message,
         stack: error.stack,
         componentStack: errorInfo.componentStack,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        url: window.location.href, // Añadir URL para mayor contexto
+        userAgent: navigator.userAgent // Añadir información del navegador
       };
       
       // Guardar en localStorage para referencia
@@ -475,17 +515,55 @@ class ErrorBoundary extends React.Component {
       }
       
       localStorage.setItem('errorsHistory', JSON.stringify(errorsHistory));
+      console.log("Error registrado en localStorage para diagnóstico");
     } catch (e) {
       console.error("No se pudo registrar el error:", e);
     }
   }
 
   resetError = () => {
-    this.setState({ hasError: false, error: null });
+    this.setState({ 
+      hasError: false, 
+      error: null 
+    });
   }
 
   render() {
     if (this.state.hasError) {
+      // Si hay demasiados errores en poco tiempo, mostrar una alternativa más simple
+      if (this.state.errorCount > 5 && (Date.now() - this.state.lastErrorTime < 5000)) {
+        return (
+          <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
+            <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
+              <h2 className="text-2xl font-bold mb-4 text-red-600">Error persistente detectado</h2>
+              <p className="mb-4 text-gray-700">
+                Estamos experimentando problemas técnicos. Por favor, intenta una de estas opciones:
+              </p>
+              <div className="space-y-3">
+                <a 
+                  href="/login" 
+                  className="block w-full py-2 px-4 bg-blue-600 text-white text-center rounded hover:bg-blue-700"
+                >
+                  Ir a inicio de sesión
+                </a>
+                <button 
+                  onClick={() => {
+                    // Limpieza profunda y recarga
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    window.location.reload();
+                  }}
+                  className="block w-full py-2 px-4 bg-red-600 text-white text-center rounded hover:bg-red-700"
+                >
+                  Reinicio de emergencia
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+      
+      // Error normal, mostrar el ErrorFallback
       return <ErrorFallback error={this.state.error} resetError={this.resetError} />;
     }
 
@@ -506,7 +584,7 @@ function AdminRoute({ children }) {
 }
 
 function HomeRoute() {
-  const { user } = useUser();
+  const { user, isAuthenticated } = useUser();
   const [hasError, setHasError] = useState(false);
   const [renderCount, setRenderCount] = useState(0);
   
@@ -516,38 +594,36 @@ function HomeRoute() {
     
     // Si el componente se renderiza demasiadas veces en poco tiempo
     if (renderCount > 5) {
-      console.warn("⚠️ Detectado posible ciclo de renderizado en HomeRoute, forzando vista segura");
+      console.warn("⚠️ Detectado posible ciclo de renderizado en HomeRoute, mostrando SignIn como fallback");
       setHasError(true);
+      
+      // Registrar el ciclo para diagnóstico
+      try {
+        localStorage.setItem('homeRouteCycleDetected', JSON.stringify({
+          timestamp: new Date().toISOString(),
+          renderCount
+        }));
+      } catch (e) {
+        console.error("Error al registrar ciclo:", e);
+      }
     }
-  }, []);
+  }, [renderCount]);
   
-  // Si detectamos un posible bucle, mostrar un componente seguro
+  // Si detectamos un posible bucle, mostrar SignIn
   if (hasError) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
-        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
-          <h2 className="text-2xl font-bold mb-4 text-gray-800">Bienvenido a Blogs y Propiedades</h2>
-          <p className="mb-4 text-gray-600">
-            Hay un problema al cargar tu perfil. Puedes intentar:
-          </p>
-          <div className="space-y-2">
-            <a href="/login" className="block w-full py-2 px-4 bg-blue-600 text-white text-center rounded hover:bg-blue-700">
-              Iniciar sesión
-            </a>
-            <button 
-              onClick={() => window.location.reload()} 
-              className="block w-full py-2 px-4 bg-gray-200 text-gray-800 text-center rounded hover:bg-gray-300"
-            >
-              Recargar página
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    console.log("🚨 Mostrando SignIn debido a ciclo de renderizado detectado");
+    return <SignIn />;
   }
   
-  // Comportamiento normal si no hay error
-  return user ? <Principal /> : <SignIn />;
+  // Comportamiento normal - simplificar la lógica para evitar condiciones complejas
+  console.log("🧭 Decidiendo ruta:", { autenticado: isAuthenticated, usuario: !!user });
+  
+  // Priorizar el estado de autenticación del contexto
+  if (isAuthenticated && user) {
+    return <Principal />;
+  } else {
+    return <SignIn />;
+  }
 }
 
 function App() {

@@ -16,6 +16,18 @@ function ImageLoader() {
       if (profilePic && (profilePic.startsWith('http') || profilePic.startsWith('data:'))) {
         return profilePic;
       }
+      
+      // Intentar con otras fuentes
+      const localProfilePic = localStorage.getItem('profilePic_local');
+      if (localProfilePic && (localProfilePic.startsWith('http') || localProfilePic.startsWith('data:'))) {
+        return localProfilePic;
+      }
+      
+      const base64ProfilePic = localStorage.getItem('profilePic_base64');
+      if (base64ProfilePic && base64ProfilePic.startsWith('data:')) {
+        return base64ProfilePic;
+      }
+      
       return null;
     } catch (e) {
       console.error("Error al obtener imagen de perfil del localStorage:", e);
@@ -25,18 +37,36 @@ function ImageLoader() {
   
   const profilePic = getSafeProfileImage();
   
-  // Limpiar localStorage de imágenes corruptas
+  // Manejar errores de imágenes sin eliminar datos
   useEffect(() => {
     if (imageError) {
       try {
-        // Si hay error, intentar limpiar la imagen corrupta
-        localStorage.removeItem('profilePic');
-        console.log("🧹 Imagen de perfil problemática eliminada del localStorage");
+        // En lugar de eliminar, registrar el error
+        console.warn("⚠️ Error al cargar imagen de perfil", { 
+          tieneImagen: !!profilePic, 
+          tipo: profilePic ? (profilePic.startsWith('data:') ? 'base64' : 'url') : 'ninguno' 
+        });
+        
+        // Registrar para diagnóstico
+        if (profilePic) {
+          try {
+            // Guardar registro del error pero sin la imagen completa para evitar datos sensibles
+            const errorLog = {
+              timestamp: new Date().toISOString(),
+              tipoImagen: profilePic.startsWith('data:') ? 'base64' : 'url',
+              inicioUrl: profilePic.substring(0, 30) + '...'
+            };
+            
+            localStorage.setItem('lastImageError', JSON.stringify(errorLog));
+          } catch (e) {
+            console.error("Error al registrar error de imagen:", e);
+          }
+        }
       } catch (e) {
-        console.error("Error al limpiar localStorage:", e);
+        console.error("Error al manejar error de imagen:", e);
       }
     }
-  }, [imageError]);
+  }, [imageError, profilePic]);
   
   return (
     <div style={{ display: 'none' }}>
