@@ -1,17 +1,22 @@
 // src/services/api.js
+/**
+ * Servicios de API para la aplicación
+ * 
+ * IMPORTANTE: Este archivo siempre usa la URL de la API de producción 
+ * http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com
+ * para evitar problemas de bucles infinitos o conflictos entre entornos.
+ * 
+ * Esta configuración es la que debe usarse en producción.
+ */
 
-// Importar la configuración segura de variables de entorno y sanitizador de URLs
-import { API_URL as API_URL_SAFE, FALLBACK_API, getApiEndpoint, getBackendUrl } from '../utils/envConfig';
+// Importar utilidades
 import { sanitizeUrl, combineUrls } from '../utils/urlSanitizer';
 
-// Definición común de la URL de la API para todo el archivo
+// Definición única de la URL de la API para todo el archivo
 const API_URL = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
 const BASE_URL = API_URL;
 const FALLBACK_API = API_URL;
 const API_BASE_URL = API_URL;
-
-// Asegurarse de que la URL no termine en /
-const BASE_URL_SAFE = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
 
 // Función para manejar errores de conexión con reintentos
 const API_RETRY_COUNT = 3;
