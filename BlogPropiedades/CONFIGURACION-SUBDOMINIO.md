@@ -111,6 +111,24 @@ Si encuentras problemas al configurar o acceder a tu subdominio:
      - El componente SignIn ahora puede recuperarse automáticamente de errores de comunicación
      - Se muestran advertencias claras al usuario cuando se está usando una sesión recuperada o temporal
    
+   - **Mejoras en la validación de tokens y recuperación de sesión (2024)**:
+     - Se ha implementado una validación completa de tokens JWT que incluye:
+       - Verificación de la estructura correcta del token (3 partes separadas por puntos)
+       - Decodificación y validación del payload del token
+       - Comprobación de la fecha de expiración del token
+     - Se añadió una función `recuperateSession` en UserContext que permite:
+       - Recuperar automáticamente la sesión cuando hay problemas con el token
+       - Utilizar datos almacenados en localStorage para reconstruir el estado del usuario
+       - Indicar claramente cuando se está usando una sesión recuperada
+     - Mejoras en el sistema de logs:
+       - Identificadores únicos para cada petición HTTP para facilitar el seguimiento
+       - Registro detallado de headers y contenido de respuestas
+       - Información completa sobre errores y respuestas vacías
+     - Sistema de reintentos mejorado:
+       - Reintentos automáticos con tiempo de espera incremental para operaciones críticas
+       - Manejo especial para diferentes tipos de errores de red y servidor
+       - Múltiples estrategias de recuperación ante fallos
+   
    - **Si persiste el error de login**, intenta depurar con los mensajes de consola ampliados o contáctanos para recibir asistencia.
 
 ## Mantener la configuración

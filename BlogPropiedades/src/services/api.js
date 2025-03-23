@@ -29,61 +29,75 @@ const ensureProtocol = (url) => sanitizeUrl(url);
  */
 export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     try {
-        // Validar que la URL sea correcta
-        const url = combineUrls(BASE_URL, endpoint);
-        console.log(`🚀 Enviando solicitud a: ${url}`);
+        // Unificar URL base según la configuración
+        const BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || 
+                         'https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+        const FALLBACK_API = import.meta.env.VITE_API_PUBLIC_API_URL;
+        
+        // Normalizar endpoint
+        const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+        
+        // Combinar URL base con endpoint
+        const url = combineUrls(BASE_URL, normalizedEndpoint);
+        
+        // Generar un ID único para esta solicitud para seguimiento en logs
+        const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        
+        console.log(`🚀 [${requestId}] Enviando solicitud a: ${url}`);
+        console.log(`📋 [${requestId}] Método: ${options.method || 'GET'}, Intentos: ${retryCount + 1}/${API_RETRY_COUNT + 1}`);
         
         if (options.body) {
-            console.log('Opciones:', typeof options.body === 'string' ? 
-                `Contenido JSON (${options.body.length} bytes)` : 
-                JSON.stringify(options, null, 2));
-        }
-
-        // Verificar si el endpoint es para obtener un listado (debería devolver un array)
-        const expectsArray = endpoint.includes('/property') || 
-                          endpoint.includes('/blog') || 
-                          endpoint.includes('/posts') || 
-                          endpoint.endsWith('/user');
-        
-        console.log(`🔍 Endpoint ${endpoint} - ¿Espera un array? ${expectsArray}`);
-
-        const defaultHeaders = {
-            'Content-Type': 'application/json',
-        };
-
-        // Si hay token en localStorage, añadirlo a los headers
-        const token = localStorage.getItem('token');
-        if (token) {
-            defaultHeaders['Authorization'] = `Bearer ${token}`;
-        }
-
-        const fetchOptions = {
-            ...options,
-            headers: {
-                ...defaultHeaders,
-                ...options.headers
+            try {
+                const bodyPreview = JSON.stringify(
+                    typeof options.body === 'string' ? JSON.parse(options.body) : options.body
+                ).substring(0, 150);
+                console.log(`📦 [${requestId}] Cuerpo: ${bodyPreview}${bodyPreview.length >= 150 ? '...' : ''}`);
+            } catch (e) {
+                // Si no podemos parsear el cuerpo, mostrar tipo
+                console.log(`📦 [${requestId}] Cuerpo: [${typeof options.body}]`);
             }
+        }
+        
+        // Configuración por defecto para la solicitud
+        const fetchOptions = {
+            method: options.method || 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                ...options.headers
+            },
+            ...options
         };
-
-        // Intento de fetch con timeout
-        const abortController = new AbortController();
-        const timeoutId = setTimeout(() => abortController.abort(), 30000); // 30 segundos
+        
+        // Si hay un cuerpo y es un objeto, convertirlo a JSON
+        if (options.body && typeof options.body === 'object') {
+            fetchOptions.body = JSON.stringify(options.body);
+        }
         
         try {
-            fetchOptions.signal = abortController.signal;
+            // Crear un controlador de tiempo de espera
+            const controller = new AbortController();
+            fetchOptions.signal = controller.signal;
+            
+            // Establecer un tiempo de espera
+            const timeoutId = setTimeout(() => {
+                controller.abort();
+                console.warn(`⏱️ [${requestId}] Tiempo de espera agotado después de ${API_TIMEOUT}ms`);
+            }, API_TIMEOUT);
+            
             const response = await fetch(url, fetchOptions);
             clearTimeout(timeoutId);
             
-            console.log(`📥 Respuesta recibida de: ${url}, Status: ${response.status}`);
+            console.log(`📥 [${requestId}] Respuesta recibida de: ${url}, Status: ${response.status}`);
 
             // Manejo especial para errores HTTP
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error(`🔥 Error HTTP ${response.status}: ${errorText}`);
+                console.error(`🔥 [${requestId}] Error HTTP ${response.status}: ${errorText}`);
                 
                 // Si es un error 5xx, podemos reintentar
                 if (response.status >= 500 && response.status < 600 && retryCount < API_RETRY_COUNT) {
-                    console.log(`🔄 Reintentando (${retryCount + 1}/${API_RETRY_COUNT}) en ${API_RETRY_DELAY}ms...`);
+                    console.log(`🔄 [${requestId}] Reintentando (${retryCount + 1}/${API_RETRY_COUNT}) en ${API_RETRY_DELAY}ms...`);
                     await sleep(API_RETRY_DELAY);
                     return fetchAPI(endpoint, options, retryCount + 1);
                 }
@@ -100,17 +114,30 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
 
             // Para respuestas vacías o con contenido cero
             const contentLength = response.headers.get('content-length');
+            const contentType = response.headers.get('content-type');
+
+            console.log(`📏 [${requestId}] Content-Length: ${contentLength || 'no especificado'}, Content-Type: ${contentType || 'no especificado'}`);
+
             if (contentLength === '0' || contentLength === null) {
-                console.warn('⚠️ Respuesta con contenido vacío');
+                console.warn(`⚠️ [${requestId}] Respuesta con contenido vacío`);
                 
-                // Si es endpoint de login y tenemos respuesta vacía, manejar especialmente
+                // Para endpoints específicos, manejar de forma personalizada
                 if (endpoint.includes('/user/login')) {
-                    console.warn('⚠️ Respuesta vacía en login, generando respuesta de contingencia');
+                    console.warn(`⚠️ [${requestId}] Respuesta vacía en login, generando respuesta de contingencia`);
+                    
+                    // Guardar la respuesta completa para diagnóstico
+                    try {
+                        const responseClone = response.clone();
+                        const rawText = await responseClone.text();
+                        console.log(`📄 [${requestId}] Respuesta raw en login:`, rawText);
+                    } catch (textError) {
+                        console.error(`🔥 [${requestId}] Error al obtener texto de respuesta:`, textError);
+                    }
                     
                     // Verificar si hay un token previo
                     const existingToken = localStorage.getItem('token');
                     if (existingToken) {
-                        console.log('🔑 Usando token existente para mantener sesión');
+                        console.log(`🔑 [${requestId}] Usando token existente para mantener sesión`);
                         return {
                             token: existingToken,
                             user: { email: localStorage.getItem('email') || 'usuario@example.com' },
@@ -118,20 +145,37 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
                         };
                     }
                     
-                    // Generar token temporal
-                    const tempToken = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-                    return {
-                        temporaryToken: tempToken,
-                        user: null,
-                        isTemporary: true,
-                        _notice: 'Sesión temporal creada'
-                    };
+                    // Generar respuesta de error específica para login
+                    throw new Error('El servidor devolvió una respuesta vacía durante el login');
                 }
+                
+                // Determinar el valor de retorno según el tipo esperado
+                const expectsArray = endpoint.includes('/list') || 
+                                    endpoint.includes('/all') || 
+                                    endpoint.includes('/posts') ||
+                                    endpoint.endsWith('s') ||  // Plural suele indicar lista
+                                    options.expectsArray;
                 
                 // Si esperamos un array y tenemos respuesta vacía, devolver array vacío
                 if (expectsArray) {
-                    console.warn('⚠️ Se esperaba un array pero la respuesta está vacía, devolviendo []');
+                    console.warn(`⚠️ [${requestId}] Se esperaba un array pero la respuesta está vacía, devolviendo []`);
                     return [];
+                }
+                
+                // Para otros endpoints, intentar leer la respuesta de todos modos
+                try {
+                    const text = await response.text();
+                    if (text && text.trim()) {
+                        console.log(`📄 [${requestId}] Respuesta no vacía después de todo:`, text.substring(0, 150));
+                        try {
+                            return JSON.parse(text);
+                        } catch (e) {
+                            console.warn(`⚠️ [${requestId}] No se pudo parsear la respuesta como JSON:`, e);
+                            return { text, _warning: 'Respuesta no es JSON válido' };
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`⚠️ [${requestId}] Error al leer respuesta vacía:`, e);
                 }
                 
                 // Para otros endpoints, devolver objeto vacío
@@ -481,72 +525,174 @@ export const loginUser = async (userData) => {
     try {
         console.log('📝 Intentando login con email:', userData.email);
         
-        const response = await fetchAPI('/user/login', {
-            method: 'POST',
-            body: JSON.stringify(userData)
-        });
+        // Implementar retry para el login
+        let retries = 0;
+        const maxRetries = 2;
+        let lastError = null;
         
-        console.log('🔑 Respuesta de login recibida:', 
-            typeof response === 'object' ? 
-            (Object.keys(response).length > 0 ? 'Objeto con datos' : 'Objeto vacío') : 
-            `Tipo: ${typeof response}, Valor: ${String(response).substring(0, 50)}`
-        );
-        
-        // Si la respuesta es una cadena vacía, manejar específicamente
-        if (response === '' || response === null || response === undefined) {
-            console.warn('⚠️ Respuesta de login vacía');
-            
-            // Verificar si hay un token previo
-            const existingToken = localStorage.getItem('token');
-            if (existingToken) {
-                console.log('🔑 Usando token existente para mantener sesión');
-                return {
-                    token: existingToken,
-                    user: { email: userData.email },
-                    _recovered: true
-                };
+        while (retries <= maxRetries) {
+            try {
+                const response = await fetchAPI('/user/login', {
+                    method: 'POST',
+                    body: JSON.stringify(userData)
+                });
+                
+                console.log('🔑 Respuesta de login recibida:', 
+                    typeof response === 'object' ? 
+                    (Object.keys(response).length > 0 ? 'Objeto con datos' : 'Objeto vacío') : 
+                    `Tipo: ${typeof response}, Valor: ${String(response).substring(0, 50)}`
+                );
+                
+                // Si la respuesta es una cadena vacía, manejar específicamente
+                if (response === '' || response === null || response === undefined) {
+                    console.warn('⚠️ Respuesta de login vacía');
+                    
+                    // Verificar si hay un token previo
+                    const existingToken = localStorage.getItem('token');
+                    if (existingToken) {
+                        console.log('🔑 Usando token existente para mantener sesión');
+                        // Almacenar el email para posible recuperación de sesión
+                        localStorage.setItem('email', userData.email);
+                        return {
+                            token: existingToken,
+                            user: { email: userData.email },
+                            _recovered: true
+                        };
+                    }
+                    
+                    // Si estamos en el último intento y todas las estrategias fallan
+                    if (retries === maxRetries) {
+                        console.warn('⚠️ Todos los intentos de login fallaron con respuesta vacía');
+                        throw new Error('El servidor devolvió una respuesta vacía');
+                    }
+                    
+                    // Incrementar contador de intentos y esperar antes del siguiente
+                    retries++;
+                    console.log(`🔄 Reintentando login (${retries}/${maxRetries})...`);
+                    await new Promise(resolve => setTimeout(resolve, 1500 * retries));
+                    continue;
+                }
+                
+                // Si la respuesta no tiene token, buscar en diferentes estructuras
+                if (response && !response.token) {
+                    console.warn('⚠️ Respuesta sin token estándar, buscando en otras estructuras');
+                    
+                    let processedResponse = { ...response };
+                    
+                    // Buscar token en diferentes estructuras de respuesta
+                    if (response.data && response.data.token) {
+                        processedResponse = {
+                            token: response.data.token,
+                            user: response.data.user || { email: userData.email }
+                        };
+                    } else if (response.user && response.user.token) {
+                        processedResponse = {
+                            token: response.user.token,
+                            user: response.user
+                        };
+                    } else if (response.accessToken) {
+                        processedResponse = {
+                            token: response.accessToken,
+                            user: response.user || { email: userData.email }
+                        };
+                    } else if (response.auth && response.auth.token) {
+                        processedResponse = {
+                            token: response.auth.token,
+                            user: response.auth.user || response.user || { email: userData.email }
+                        };
+                    }
+                    
+                    // Si no se encontró token en ninguna estructura conocida
+                    if (!processedResponse.token) {
+                        console.warn('⚠️ No se encontró token en ninguna estructura conocida');
+                        console.log('Estructura de respuesta:', JSON.stringify(response, null, 2).substring(0, 500));
+                        
+                        // Últimos intentos desesperados de encontrar el token
+                        const responseStr = JSON.stringify(response);
+                        const tokenMatch = responseStr.match(/"token"\s*:\s*"([^"]+)"/);
+                        
+                        if (tokenMatch && tokenMatch[1]) {
+                            console.log('🔍 Token encontrado con regex:', tokenMatch[1].substring(0, 15) + '...');
+                            processedResponse.token = tokenMatch[1];
+                            processedResponse.user = processedResponse.user || { email: userData.email };
+                        } else if (retries < maxRetries) {
+                            // Si estamos en un intento antes del último, reintentar
+                            retries++;
+                            console.log(`🔄 Reintentando login (${retries}/${maxRetries})...`);
+                            await new Promise(resolve => setTimeout(resolve, 1500 * retries));
+                            continue;
+                        } else {
+                            // En el último intento, lanzar error claro
+                            throw new Error('Formato de respuesta de login inesperado: no se encontró token');
+                        }
+                    }
+                    
+                    // Guardar datos del usuario en localStorage para recuperación
+                    if (processedResponse.user) {
+                        if (processedResponse.user.email) {
+                            localStorage.setItem('email', processedResponse.user.email);
+                        } else {
+                            localStorage.setItem('email', userData.email);
+                        }
+                        
+                        if (processedResponse.user.name) {
+                            localStorage.setItem('name', processedResponse.user.name);
+                        }
+                        
+                        if (processedResponse.user.role) {
+                            localStorage.setItem('role', processedResponse.user.role);
+                        }
+                    }
+                    
+                    return processedResponse;
+                }
+                
+                // Procesamiento de respuesta exitosa con token
+                if (response && response.token) {
+                    // Guardar datos del usuario en localStorage para recuperación
+                    if (response.user) {
+                        if (response.user.email) {
+                            localStorage.setItem('email', response.user.email);
+                        } else {
+                            localStorage.setItem('email', userData.email);
+                        }
+                        
+                        if (response.user.name) {
+                            localStorage.setItem('name', response.user.name);
+                        }
+                        
+                        if (response.user.role) {
+                            localStorage.setItem('role', response.user.role);
+                        }
+                    } else {
+                        localStorage.setItem('email', userData.email);
+                    }
+                }
+                
+                return response;
+            } catch (attemptError) {
+                lastError = attemptError;
+                
+                // Si no es el último intento, reintentar
+                if (retries < maxRetries) {
+                    retries++;
+                    console.log(`🔄 Error en intento ${retries}/${maxRetries + 1}, reintentando: ${attemptError.message}`);
+                    await new Promise(resolve => setTimeout(resolve, 1500 * retries));
+                    continue;
+                }
+                
+                // Si es el último intento, lanzar el error
+                throw attemptError;
             }
-            
-            // Generar token temporal
-            const tempToken = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-            console.log('🔑 Generando token temporal:', tempToken.substring(0, 15) + '...');
-            
-            return {
-                temporaryToken: tempToken,
-                user: { email: userData.email },
-                isTemporary: true
-            };
         }
         
-        // Si la respuesta no tiene token, buscar en diferentes estructuras
-        if (response && !response.token) {
-            console.warn('⚠️ Respuesta sin token estándar, buscando en otras estructuras');
-            
-            // Buscar token en diferentes estructuras de respuesta
-            if (response.data && response.data.token) {
-                return {
-                    token: response.data.token,
-                    user: response.data.user || { email: userData.email }
-                };
-            } else if (response.user && response.user.token) {
-                return {
-                    token: response.user.token,
-                    user: response.user
-                };
-            } else if (response.accessToken) {
-                return {
-                    token: response.accessToken,
-                    user: response.user || { email: userData.email }
-                };
-            } else if (response.auth && response.auth.token) {
-                return {
-                    token: response.auth.token,
-                    user: response.auth.user || response.user || { email: userData.email }
-                };
-            }
+        // Si llegamos aquí y hay un error del último intento, lanzarlo
+        if (lastError) {
+            throw lastError;
         }
         
-        return response;
+        // Fallback por si alguna razón llegamos aquí
+        throw new Error('Error inesperado en el proceso de login');
     } catch (error) {
         console.error('🔥 Error en loginUser:', error);
         throw error;

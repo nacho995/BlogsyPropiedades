@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { UserProvider, useUser } from './context/UserContext';
 import Navbar from './components/NavBar';
@@ -21,6 +21,54 @@ import ProtectedRoute from './components/ProtectedRoute';
 // Componente simple que redirecciona según la autenticación
 function HomeRoute() {
   const { isAuthenticated, loading } = useUser();
+  const [hasError, setHasError] = useState(false);
+  
+  useEffect(() => {
+    // Timeout para detectar problemas de carga
+    const timer = setTimeout(() => {
+      if (loading) {
+        console.warn("La carga de usuario está tomando demasiado tiempo");
+        setHasError(true);
+      }
+    }, 5000); // 5 segundos
+    
+    return () => clearTimeout(timer);
+  }, [loading]);
+  
+  // Si hay error, mostrar una opción para ir a login directamente
+  if (hasError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen p-4">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Parece que hay un problema</h2>
+        <p className="text-gray-600 mb-6 text-center">
+          No pudimos determinar tu estado de inicio de sesión. Puedes intentar las siguientes opciones:
+        </p>
+        <div className="space-y-4 w-full max-w-md">
+          <button 
+            onClick={() => window.location.href = '/login'} 
+            className="w-full bg-black text-white py-2 px-4 rounded hover:bg-gray-800 transition"
+          >
+            Ir a iniciar sesión
+          </button>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="w-full bg-gray-200 text-gray-800 py-2 px-4 rounded hover:bg-gray-300 transition"
+          >
+            Recargar la página
+          </button>
+          <button 
+            onClick={() => {
+              localStorage.clear();
+              window.location.reload();
+            }} 
+            className="w-full bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 transition"
+          >
+            Limpiar datos y recargar
+          </button>
+        </div>
+      </div>
+    );
+  }
   
   // Si está cargando, mostrar un loader simple
   if (loading) {
@@ -32,8 +80,17 @@ function HomeRoute() {
     );
   }
   
-  // Redireccionar según el estado de autenticación
-  return isAuthenticated ? <Principal /> : <SignIn />;
+  try {
+    // Verificar explícitamente el estado de autenticación
+    if (isAuthenticated === true) {
+      return <Principal />;
+    } else {
+      return <SignIn />;
+    }
+  } catch (error) {
+    console.error("Error al renderizar componente:", error);
+    return <SignIn />; // En caso de error, mostrar SignIn por defecto
+  }
 }
 
 function App() {
@@ -57,7 +114,7 @@ function App() {
                     <Navbar />
                     <Routes>
                         <Route path="/" element={<HomeRoute />} />
-                        <Route path="/login" element={<HomeRoute />} />
+                        <Route path="/login" element={<SignIn />} />
                         <Route path="/crear-blog" element={<ProtectedRoute><BlogCreation /></ProtectedRoute>} />
                         <Route path="/ver-blogs" element={<SeeBlogs />} />
                         <Route path="/blog/:id" element={<BlogDetail />} />

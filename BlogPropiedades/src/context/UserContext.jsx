@@ -17,7 +17,68 @@ export function UserProvider({ children }) {
   // Función auxiliar para verificar token
   const isValidToken = (token) => {
     if (!token) return false;
-    return token.split('.').length === 3;
+    
+    // Verificar que tenga formato JWT (3 segmentos separados por puntos)
+    if (token.split('.').length !== 3) return false;
+    
+    try {
+      // Intentar decodificar la parte del payload
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      
+      // Verificar si el token ha expirado
+      if (payload.exp && payload.exp < Date.now() / 1000) {
+        console.warn("Token expirado:", new Date(payload.exp * 1000).toLocaleString());
+        return false;
+      }
+      
+      // Verificar si tiene campo de "iat" (issued at)
+      if (!payload.iat) {
+        console.warn("Token sin fecha de emisión (iat)");
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Error al validar token:", error);
+      return false;
+    }
+  };
+
+  // Función para intentar recuperar la sesión cuando hay problemas
+  const recuperateSession = async () => {
+    console.log("Intentando recuperar sesión...");
+    
+    try {
+      // Verificar si hay datos del usuario en localStorage
+      const storedEmail = localStorage.getItem('email');
+      const storedName = localStorage.getItem('name');
+      const storedRole = localStorage.getItem('role');
+      const storedImage = localStorage.getItem("profilePic") || 
+                          localStorage.getItem("profilePic_local") || 
+                          localStorage.getItem("profilePic_base64") || 
+                          fallbackImageBase64;
+      
+      if (storedEmail && storedName) {
+        console.log("Recuperando sesión con datos almacenados localmente");
+        
+        // Crear un objeto de usuario básico
+        const recoveredUser = {
+          email: storedEmail,
+          name: storedName,
+          role: storedRole || 'user',
+          profileImage: storedImage,
+          _recovered: true
+        };
+        
+        setUser(recoveredUser);
+        setIsAuthenticated(true);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error("Error al recuperar sesión:", error);
+      return false;
+    }
   };
 
   // Función para actualizar la información del usuario
@@ -32,11 +93,29 @@ export function UserProvider({ children }) {
         return;
       }
       
+      // Validación extra del token antes de usarlo
+      if (!isValidToken(storedToken)) {
+        console.warn("Token inválido o expirado. Intentando recuperar sesión.");
+        
+        // Intentar recuperar sesión con datos almacenados
+        const recovered = await recuperateSession();
+        
+        if (!recovered) {
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+        
+        setLoading(false);
+        return;
+      }
+      
       try {
         const userData = await getUserProfile(storedToken);
         
         // Actualizar localStorage con datos básicos
         if (userData.name) localStorage.setItem("name", userData.name);
+        if (userData.email) localStorage.setItem("email", userData.email);
+        if (userData.role) localStorage.setItem("role", userData.role);
         
         // Sincronizar la imagen de perfil con el servidor
         try {
@@ -59,6 +138,7 @@ export function UserProvider({ children }) {
           profileImage: updatedImage
         });
         setIsAuthenticated(true);
+        setLoading(false);
       } catch (error) {
         console.error("Error al obtener datos del usuario:", error);
         // Solo marcar como no autenticado si el error es 401 (no autorizado)
@@ -78,6 +158,7 @@ export function UserProvider({ children }) {
             });
           }
         }
+        setLoading(false);
       }
     } catch (error) {
       console.error("Error al actualizar datos de usuario:", error);
@@ -93,7 +174,6 @@ export function UserProvider({ children }) {
           profileImage: storedImage
         });
       }
-    } finally {
       setLoading(false);
     }
   };
