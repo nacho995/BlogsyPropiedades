@@ -17,7 +17,6 @@ import CambiarPerfil from './components/CambiarPerfil';
 import PropertyCreation from './components/addProperties';
 import PropertyDetail from './components/PropertyDetail';
 import SubirPage from './components/SubirPage';
-import ProtectedRoute from './components/ProtectedRoute';
 import DiagnosticPage from './components/DiagnosticPage';
 
 // Detección de ciclos de renderizado
