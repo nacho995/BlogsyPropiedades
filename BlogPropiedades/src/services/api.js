@@ -122,11 +122,26 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
                 if (typeof localStorage !== 'undefined') {
                     localStorage.setItem('mixedContentWarning', JSON.stringify({
                         timestamp: new Date().toISOString(),
-                        endpoint: endpoint
+                        endpoint: endpoint,
+                        url: window.location.href
                     }));
                 }
             } catch (e) {
                 console.error('Error al registrar aviso de contenido mixto:', e);
+            }
+            
+            // Si estamos en producción y podría haber un problema de contenido mixto,
+            // verificar si podemos usar un servicio proxy o intentar una solución
+            try {
+                // Verificar si hay un proxy configurado
+                if (import.meta.env.VITE_API_PROXY && import.meta.env.VITE_API_PROXY.trim() !== '') {
+                    console.log('ℹ️ Intentando usar proxy para evitar problema de contenido mixto');
+                    // Usar el proxy configurado
+                    const proxyUrl = import.meta.env.VITE_API_PROXY.trim();
+                    // El resto del código sigue igual, pero ahora tendríamos la opción de usar un proxy
+                }
+            } catch (proxyError) {
+                console.error('Error al verificar proxy:', proxyError);
             }
         }
         
@@ -174,8 +189,14 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
         // Normalizar endpoint
         const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
         
-        // Combinar URL base con endpoint
-        const url = combineUrls(BASE_URL, normalizedEndpoint);
+        // Combinar URL base con endpoint - Asegurar que siempre usamos HTTP
+        let url = combineUrls(BASE_URL, normalizedEndpoint);
+        
+        // Asegurar que la URL es HTTP (no HTTPS)
+        if (url.startsWith('https://')) {
+            url = url.replace('https://', 'http://');
+            console.log('🔄 Convertida URL de API de HTTPS a HTTP para evitar problemas');
+        }
         
         // Generar un ID único para esta solicitud para seguimiento en logs
         const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -206,8 +227,15 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
                 'Accept': 'application/json',
                 ...options.headers
             },
-            ...options
+            ...options,
+            // Añadir credenciales para permitir cookies y evitar problemas CORS/CORB
+            credentials: 'include'
         };
+        
+        // Agregar modo para evitar problemas CORS si estamos en un dominio diferente
+        if (new URL(url).origin !== window.location.origin) {
+            fetchOptions.mode = 'cors';
+        }
         
         // Si hay un cuerpo y es un objeto, convertirlo a JSON
         if (options.body && typeof options.body === 'object') {

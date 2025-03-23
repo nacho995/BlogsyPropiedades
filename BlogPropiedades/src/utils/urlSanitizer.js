@@ -8,9 +8,10 @@
 /**
  * Sanitiza una URL asegurando que tenga el protocolo correcto
  * @param {string} url - URL a sanitizar
+ * @param {boolean} forceHttp - Forzar el uso de HTTP en lugar de HTTPS
  * @returns {string} - URL sanitizada
  */
-export const sanitizeUrl = (url) => {
+export const sanitizeUrl = (url, forceHttp = true) => {
   if (!url) return '';
   
   // Eliminar espacios en blanco
@@ -19,18 +20,31 @@ export const sanitizeUrl = (url) => {
   // Eliminar comillas si las hay
   sanitized = sanitized.replace(/^["']|["']$/g, '');
   
+  // Si es una API de GozaMadrid, asegurar que use HTTP
+  const isApiUrl = sanitized.includes('gozamadrid-api') || 
+                  sanitized.includes('api.realestategozamadrid.com') ||
+                  sanitized.includes('goza-madrid.onrender.com');
+  
   // Si ya tiene protocolo, verificar que sea válido
   if (sanitized.includes('://')) {
-    // Asegurarse de que sea http o https, preferiblemente https
-    if (sanitized.startsWith('http://')) {
-      sanitized = sanitized.replace('http://', 'https://');
-    } else if (!sanitized.startsWith('https://')) {
-      // Si tiene otro protocolo, corregirlo
-      sanitized = sanitized.replace(/^.*:\/\//, 'https://');
+    if (isApiUrl || forceHttp) {
+      // Para APIs de GozaMadrid, usar siempre HTTP ya que el servidor no soporta HTTPS
+      sanitized = sanitized.replace(/^https:\/\//, 'http://');
+      if (!sanitized.startsWith('http://')) {
+        sanitized = sanitized.replace(/^.*:\/\//, 'http://');
+      }
+    } else {
+      // Para otros URLs, preferir HTTPS
+      if (sanitized.startsWith('http://') && !forceHttp) {
+        sanitized = sanitized.replace('http://', 'https://');
+      } else if (!sanitized.startsWith('https://') && !sanitized.startsWith('http://')) {
+        // Si tiene otro protocolo, corregirlo
+        sanitized = sanitized.replace(/^.*:\/\//, forceHttp ? 'http://' : 'https://');
+      }
     }
   } else {
-    // Si no tiene protocolo, añadir https://
-    sanitized = `https://${sanitized}`;
+    // Si no tiene protocolo, añadir el protocolo según corresponda
+    sanitized = `${isApiUrl || forceHttp ? 'http' : 'https'}://${sanitized}`;
   }
   
   return sanitized;

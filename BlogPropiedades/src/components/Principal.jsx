@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom"; // Replace useHistory with useNavigate
 import { useUser } from "../context/UserContext";
 import { getBlogPosts, getPropertyPosts } from "../services/api"; // Removed syncProfileImage import
@@ -19,6 +19,7 @@ function Principal() {
   const [properties, setProperties] = useState([]);
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [dataError, setDataError] = useState(null);
   
   // Usar el hook personalizado para manejar la imagen de perfil
   const { 
@@ -32,129 +33,186 @@ function Principal() {
   });
   
   // Obtener datos del usuario
-  const { user, isAuthenticated: userAuthenticated } = useUser();
+  const { user, isAuthenticated: userAuthenticated, logout } = useUser();
   const navigate = useNavigate(); // Replace useHistory with useNavigate
 
-  // Cargar datos reales de la API
+  // Verificar si hay un problema de contenido mixto debido a la configuración de la API
   useEffect(() => {
+    try {
+      const currentProtocol = window.location.protocol;
+      
+      if (currentProtocol === 'https:') {
+        console.log('La aplicación está cargada con HTTPS, verificando compatibilidad con API...');
+        
+        // Verificar si hay una advertencia de contenido mixto
+        const mixedContentWarning = localStorage.getItem('mixedContentWarning');
+        
+        if (mixedContentWarning) {
+          try {
+            const warningData = JSON.parse(mixedContentWarning);
+            const now = new Date();
+            const warningTime = new Date(warningData.timestamp);
+            
+            // Si la advertencia es reciente (menos de 1 hora)
+            if ((now - warningTime) < 3600000) {
+              console.warn('⚠️ Detectados recientes problemas de contenido mixto (HTTP vs HTTPS)');
+              console.log('Para mejor compatibilidad, considere usar la aplicación con HTTP en lugar de HTTPS');
+            }
+          } catch (e) {
+            console.error('Error al procesar advertencia de contenido mixto:', e);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error al verificar protocolo:', e);
+    }
+  }, []);
+
+  // Cargar datos reales de la API con protección contra errores
+  useEffect(() => {
+    let isMounted = true;
+    
     const fetchData = async () => {
       try {
+        if (!isMounted) return;
         setLoading(true);
+        setDataError(null);
         
-        // Obtener blogs
-        const blogsData = await getBlogPosts();
-        setBlogs(blogsData);
+        // Obtener blogs con manejo de errores
+        try {
+          console.log('Obteniendo blogs...');
+          const blogsData = await getBlogPosts();
+          
+          if (isMounted) {
+            console.log(`Blogs obtenidos: ${blogsData.length}`);
+            setBlogs(Array.isArray(blogsData) ? blogsData : []);
+          }
+        } catch (blogError) {
+          console.error("Error al cargar blogs:", blogError);
+          if (isMounted) {
+            // No fallar completamente, solo registrar el error
+            setDataError(prev => ({...prev, blogs: blogError.message}));
+          }
+        }
         
-        // Obtener propiedades
-        const propertiesData = await getPropertyPosts();
-        setProperties(propertiesData);
+        // Obtener propiedades con manejo de errores
+        try {
+          console.log('Obteniendo propiedades...');
+          const propertiesData = await getPropertyPosts();
+          
+          if (isMounted) {
+            console.log(`Propiedades obtenidas: ${propertiesData.length}`);
+            setProperties(Array.isArray(propertiesData) ? propertiesData : []);
+          }
+        } catch (propertyError) {
+          console.error("Error al cargar propiedades:", propertyError);
+          if (isMounted) {
+            // No fallar completamente, solo registrar el error
+            setDataError(prev => ({...prev, properties: propertyError.message}));
+          }
+        }
       } catch (error) {
-        console.error("Error al cargar datos:", error);
+        console.error("Error general al cargar datos:", error);
+        if (isMounted) {
+          setDataError(prev => ({...prev, general: error.message}));
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
     
     fetchData();
+    
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Función para obtener la URL de la imagen de un blog
+  // Función para obtener la URL de la imagen de un blog, con manejo de errores mejorado
   const getImageUrl = (blog) => {
-    console.log(`Obteniendo URL de imagen para blog:`, blog.title || 'sin título');
+    if (!blog) return defaultProfilePic;
     
-    // Caso 1: La imagen es un objeto con src
-    if (blog.image && typeof blog.image === 'object' && blog.image.src) {
-      const imageUrl = blog.image.src;
-      console.log(`Imagen es un objeto con src:`, imageUrl);
+    try {
+      console.log(`Obteniendo URL de imagen para blog:`, blog.title || 'sin título');
       
-      // Verificar si la URL es válida
-      if (typeof imageUrl === 'string' && 
-          imageUrl.trim() !== '' && 
-          imageUrl !== '""' && 
-          imageUrl !== '"' && 
-          imageUrl !== "''") {
-        
-        // Verificar si es una URL de placeholder
-        if (imageUrl.includes('placeholder.com') || imageUrl.includes('via.placeholder')) {
-          console.log(`URL de placeholder detectada, usando imagen por defecto`);
-          return null;
-        }
-        
-        return imageUrl;
-      }
-    }
-    
-    // Caso 2: La imagen es una cadena directamente
-    if (blog.image && typeof blog.image === 'string') {
-      const imageUrl = blog.image;
-      console.log(`Imagen es una cadena:`, imageUrl);
-      
-      // Verificar si la URL es válida
-      if (imageUrl.trim() !== '' && 
-          imageUrl !== '""' && 
-          imageUrl !== '"' && 
-          imageUrl !== "''") {
-        
-        // Verificar si es una URL de placeholder
-        if (imageUrl.includes('placeholder.com') || imageUrl.includes('via.placeholder')) {
-          console.log(`URL de placeholder detectada, usando imagen por defecto`);
-          return null;
-        }
-        
-        return imageUrl;
-      }
-    }
-    
-    // Caso 3: Intentar con el array de imágenes
-    if (blog.images && Array.isArray(blog.images) && blog.images.length > 0) {
-      const firstImage = blog.images[0];
-      console.log(`Intentando con la primera imagen del array:`, firstImage);
-      
-      // Si la primera imagen es un objeto con src
-      if (typeof firstImage === 'object' && firstImage.src) {
-        const imageUrl = firstImage.src;
+      // Caso 1: La imagen es un objeto con src
+      if (blog.image && typeof blog.image === 'object' && blog.image.src) {
+        const imageUrl = blog.image.src;
+        console.log(`Imagen es un objeto con src:`, imageUrl);
         
         // Verificar si la URL es válida
-        if (typeof imageUrl === 'string' && 
-            imageUrl.trim() !== '' && 
-            imageUrl !== '""' && 
-            imageUrl !== '"' && 
-            imageUrl !== "''") {
-          
-          // Verificar si es una URL de placeholder
-          if (imageUrl.includes('placeholder.com') || imageUrl.includes('via.placeholder')) {
-            console.log(`URL de placeholder detectada, usando imagen por defecto`);
-            return null;
-          }
-          
-          return imageUrl;
+        if (typeof imageUrl === 'string' && imageUrl.trim() !== '') {
+          return ensureHttpProtocol(imageUrl);
         }
       }
       
-      // Si la primera imagen es una cadena
-      if (typeof firstImage === 'string') {
-        const imageUrl = firstImage;
+      // Caso 2: La imagen es un string directo
+      if (blog.image && typeof blog.image === 'string') {
+        console.log(`Imagen es un string directo:`, blog.image);
         
-        // Verificar si la URL es válida
-        if (imageUrl.trim() !== '' && 
-            imageUrl !== '""' && 
-            imageUrl !== '"' && 
-            imageUrl !== "''") {
-          
-          // Verificar si es una URL de placeholder
-          if (imageUrl.includes('placeholder.com') || imageUrl.includes('via.placeholder')) {
-            console.log(`URL de placeholder detectada, usando imagen por defecto`);
-            return null;
-          }
-          
-          return imageUrl;
+        if (blog.image.trim() !== '') {
+          return ensureHttpProtocol(blog.image);
         }
       }
+      
+      // Caso 3: Usar la primera imagen del array de imágenes
+      if (blog.images && Array.isArray(blog.images) && blog.images.length > 0) {
+        console.log(`Usando primera imagen del array:`, blog.images[0]);
+        
+        const firstImage = blog.images[0];
+        if (typeof firstImage === 'string') {
+          return ensureHttpProtocol(firstImage);
+        } else if (firstImage && typeof firstImage === 'object' && firstImage.src) {
+          return ensureHttpProtocol(firstImage.src);
+        }
+      }
+    } catch (error) {
+      console.error('Error al procesar imagen del blog:', error);
     }
     
-    // Si no hay imagen válida, devolver null
-    console.log(`No se encontró ninguna imagen válida`);
-    return null;
+    // Si todo falla, usar imagen por defecto
+    return defaultProfilePic;
+  };
+  
+  // Función para asegurar que siempre se use HTTP para las APIS que no soportan HTTPS
+  const ensureHttpProtocol = (url) => {
+    if (!url) return defaultProfilePic;
+    
+    try {
+      // Si es una API de GozaMadrid, asegurar que use HTTP
+      if (url.includes('gozamadrid-api') || 
+          url.includes('api.realestategozamadrid.com') ||
+          url.includes('goza-madrid.onrender.com')) {
+        return url.replace('https://', 'http://');
+      }
+      return url;
+    } catch (e) {
+      console.error('Error al procesar URL:', e);
+      return url;
+    }
+  };
+  
+  // Función segura para manejar el cierre de sesión
+  const handleLogout = () => {
+    console.log("Cerrando sesión...");
+    
+    try {
+      // Usar el método de logout del contexto
+      logout(true);
+    } catch (error) {
+      console.error("Error durante el cierre de sesión:", error);
+      
+      // Fallback: limpiar manualmente localStorage y redireccionar
+      try {
+        localStorage.removeItem('token');
+        navigate('/login');
+      } catch (e) {
+        console.error("Error en el fallback de cierre de sesión:", e);
+        window.location.href = '/login';
+      }
+    }
   };
 
   const getPropertyImageUrl = (property) => {
@@ -262,13 +320,6 @@ function Principal() {
   const ensureHttps = (url) => {
     if (!url) return null;
     return typeof url === 'string' ? url.replace('http://', 'https://') : url;
-  };
-
-  // Simplify the logout handler
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("name");
-    navigate("/login");
   };
 
   return (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { loginUser, createUser } from "../services/api";
 import { useUser } from "../context/UserContext";
@@ -13,25 +13,105 @@ const SignIn = ({ isRegistering = false }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const navigate = useNavigate();
+    const authAttemptCount = useRef(0);
+    const isSubmitting = useRef(false);
     
     const { isAuthenticated, user, login } = useContext(UserContext);
 
+    // Limpiar localStorage al cargar el componente para prevenir problemas
     useEffect(() => {
-        if (isAuthenticated && user) {
-            navigate("/");
+        // Solo limpiar datos específicos que podrían estar causando problemas
+        try {
+            if (localStorage.getItem('homeRouteCycleDetected')) {
+                console.log("🧹 Limpiando detección de ciclos previos");
+                localStorage.removeItem('homeRouteCycleDetected');
+            }
+            
+            // Verificar si hay demasiados intentos de autenticación
+            const authAttempts = JSON.parse(localStorage.getItem('authAttempts') || '[]');
+            if (authAttempts.length > 5) {
+                const lastAttempt = new Date(authAttempts[0].timestamp);
+                const now = new Date();
+                // Si han pasado menos de 2 minutos desde el último intento y hay muchos intentos
+                if ((now - lastAttempt) < 120000 && authAttempts.length > 10) {
+                    console.warn("⚠️ Demasiados intentos de autenticación, limpiando datos de sesión");
+                    localStorage.clear();
+                    // Guardar un indicador de que se realizó esta limpieza
+                    localStorage.setItem('sessionCleanedAt', new Date().toISOString());
+                }
+            }
+        } catch (e) {
+            console.error("Error al limpiar localStorage:", e);
         }
+    }, []);
+
+    // Control para prevenir redireccionamientos que causan ciclos
+    useEffect(() => {
+        let isMounted = true;
+        
+        if (isAuthenticated && user && isMounted) {
+            console.log("Usuario autenticado, redirigiendo a la página principal");
+            // Usar timeout para evitar redirecciones demasiado rápidas
+            const redirectTimer = setTimeout(() => {
+                if (isMounted) {
+                    navigate("/");
+                }
+            }, 300);
+            
+            return () => {
+                clearTimeout(redirectTimer);
+                isMounted = false;
+            };
+        }
+        
+        return () => {
+            isMounted = false;
+        };
     }, [isAuthenticated, user, navigate]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // Evitar múltiples envíos simultáneos
+        if (isSubmitting.current) {
+            console.log("Ya hay una solicitud en curso, ignorando clic");
+            return;
+        }
+        
+        isSubmitting.current = true;
         setLoading(true);
         setError("");
+        
+        // Registrar intento de autenticación para prevenir bucles
+        try {
+            authAttemptCount.current += 1;
+            const attempts = JSON.parse(localStorage.getItem('authAttempts') || '[]');
+            attempts.unshift({
+                timestamp: new Date().toISOString(),
+                email
+            });
+            
+            // Mantener solo los últimos 20 intentos
+            if (attempts.length > 20) {
+                attempts.length = 20;
+            }
+            
+            localStorage.setItem('authAttempts', JSON.stringify(attempts));
+            
+            // Si hay demasiados intentos en poco tiempo, mostrar advertencia
+            if (authAttemptCount.current > 3) {
+                console.warn(`⚠️ ${authAttemptCount.current} intentos de autenticación en esta sesión`);
+            }
+        } catch (e) {
+            console.error("Error al registrar intento:", e);
+        }
 
         try {
             if (isRegistering) {
                 if (password !== confirmPassword) {
                     setError("Las contraseñas no coinciden");
                     setLoading(false);
+                    isSubmitting.current = false;
                     return;
                 }
 
@@ -45,67 +125,107 @@ const SignIn = ({ isRegistering = false }) => {
                     } catch (e) {
                         console.error("Error al mostrar notificación:", e);
                     }
-                    login(response.token, response.user);
-                    navigate("/");
+                    
+                    // Intentar el login y verificar que fue exitoso
+                    const loginSuccess = await login(response.token, response.user);
+                    
+                    if (loginSuccess) {
+                        console.log("✅ Login exitoso después del registro");
+                        navigate("/");
+                    } else {
+                        console.warn("⚠️ El registro fue exitoso pero el login falló");
+                        setError("El registro fue exitoso pero hubo un problema al iniciar sesión automáticamente. Por favor, intenta iniciar sesión manualmente.");
+                    }
                 }
             } else {
-                console.log("Intentando iniciar sesión con:", { email, password });
-                const response = await loginUser({ email, password });
+                console.log("Intentando iniciar sesión con:", { email });
                 
-                console.log("Respuesta de inicio de sesión:", response);
-                
-                if (response) {
-                    if (typeof response === "string" && response.trim() === "") {
-                        console.warn("Respuesta de inicio de sesión vacía, intentando mantener sesión");
-                        try {
-                            toast("Sesión mantenida con token existente", {
-                                icon: "⚠️",
-                                duration: 4000
-                            });
-                        } catch (e) {
-                            console.error("Error al mostrar notificación:", e);
+                try {
+                    const response = await loginUser({ email, password });
+                    console.log("Respuesta de inicio de sesión:", response);
+                    
+                    if (response) {
+                        if (typeof response === "string" && response.trim() === "") {
+                            console.warn("Respuesta de inicio de sesión vacía, intentando mantener sesión");
+                            try {
+                                toast("Sesión mantenida con token existente", {
+                                    icon: "⚠️",
+                                    duration: 4000
+                                });
+                            } catch (e) {
+                                console.error("Error al mostrar notificación:", e);
+                            }
+                        } else {
+                            try {
+                                toast("¡Inicio de sesión exitoso!", {
+                                    icon: "✅",
+                                    duration: 4000
+                                });
+                            } catch (e) {
+                                console.error("Error al mostrar notificación de éxito:", e);
+                            }
                         }
+                        
+                        let loginSuccess = false;
+                        
+                        if (response.token && response.user) {
+                            loginSuccess = await login(response.token, response.user);
+                        } else if (response.temporaryToken) {
+                            console.warn("Usando token temporal para mantener sesión básica");
+                            const minimalUser = {
+                                email,
+                                name: email.split('@')[0] || "Usuario",
+                                role: 'user',
+                                _recoveredLogin: true
+                            };
+                            loginSuccess = await login(response.temporaryToken, minimalUser);
+                        }
+                        
+                        if (loginSuccess) {
+                            console.log("✅ Login exitoso");
+                            navigate("/");
+                        } else {
+                            console.warn("⚠️ La API devolvió una respuesta pero el login falló");
+                            setError("Hubo un problema al iniciar sesión. Por favor, inténtalo de nuevo.");
+                        }
+                    }
+                } catch (loginError) {
+                    console.error("Error durante loginUser:", loginError);
+                    // Gestionar errores específicos de API
+                    if (loginError.message && loginError.message.includes('contenido mixto')) {
+                        setError("Error de conexión con el servidor: el sitio usa HTTPS pero la API requiere HTTP. Este es un problema de configuración del servidor.");
                     } else {
-                        try {
-                            toast("¡Inicio de sesión exitoso!", {
-                                icon: "✅",
-                                duration: 4000
-                            });
-                        } catch (e) {
-                            console.error("Error al mostrar notificación de éxito:", e);
-                        }
+                        setError(loginError.message || "Error durante la autenticación");
                     }
                     
-                    if (response.token && response.user) {
-                        login(response.token, response.user);
-                    } else if (response.temporaryToken) {
-                        console.warn("Usando token temporal para mantener sesión básica");
-                        const minimalUser = {
-                            email,
-                            name: email.split('@')[0] || "Usuario",
-                            role: 'user',
-                            _recoveredLogin: true
-                        };
-                        login(response.temporaryToken, minimalUser);
+                    try {
+                        toast("Error de autenticación: " + (loginError.message || "Credenciales inválidas"), {
+                            icon: "❌",
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        console.error("Error al mostrar notificación de error:", e);
                     }
-                    
-                    navigate("/");
                 }
             }
         } catch (err) {
             console.error("Error durante la autenticación:", err);
             setError(err.message || "Error durante la autenticación");
+            
             try {
                 toast("Error de autenticación: " + (err.message || "Credenciales inválidas"), {
                     icon: "❌",
                     duration: 4000
                 });
             } catch (e) {
-                console.error("Error al mostrar notificación:", e);
-                alert("Error de autenticación: " + (err.message || "Credenciales inválidas"));
+                console.error("Error al mostrar notificación de error:", e);
             }
         } finally {
             setLoading(false);
+            // Permitir nuevos envíos
+            setTimeout(() => {
+                isSubmitting.current = false;
+            }, 1000); // Esperar 1 segundo antes de permitir otro envío
         }
     };
 
