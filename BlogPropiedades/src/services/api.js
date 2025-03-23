@@ -108,7 +108,29 @@ const getEnhancedErrorMessage = (error, response) => {
  */
 export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     try {
-        // Unificar URL base según la configuración - Siempre usar HTTP (no HTTPS)
+        // Verificar si hay demasiadas solicitudes en poco tiempo (posible bucle)
+        const now = Date.now();
+        const recentRequests = JSON.parse(localStorage.getItem('recentApiRequests') || '[]');
+        
+        // Limpiar solicitudes antiguas (más de 5 segundos)
+        const filteredRequests = recentRequests.filter(req => (now - req.timestamp) < 5000);
+        
+        // Si hay más de 15 solicitudes en 5 segundos, puede ser un bucle
+        if (filteredRequests.length > 15) {
+            console.error('⚠️ Posible bucle de solicitudes detectado, abortando para evitar saturación');
+            localStorage.setItem('apiRequestLoop', 'true');
+            throw new Error('Bucle de solicitudes detectado. Por favor, recarga la página.');
+        }
+        
+        // Registrar esta solicitud
+        filteredRequests.push({
+            endpoint,
+            timestamp: now,
+            method: options.method || 'GET'
+        });
+        localStorage.setItem('recentApiRequests', JSON.stringify(filteredRequests));
+        
+        // Unificar URL base según la configuración
         const BASE_URL = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
         const FALLBACK_API = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
         
@@ -813,6 +835,12 @@ export const createUser = async (data) => {
  */
 export const loginUser = async (userData) => {
     try {
+        // Verificar si hay un bucle de API activo
+        if (localStorage.getItem('apiRequestLoop') === 'true') {
+            console.error('⚠️ Bucle de API detectado en loginUser, abortando');
+            throw new Error('Bucle de solicitudes detectado. Por favor, recarga la página.');
+        }
+        
         console.log('📝 Intentando login con email:', userData.email);
         
         // Implementar retry para el login

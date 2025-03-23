@@ -488,6 +488,41 @@ function HomeRoute() {
           console.error('Error al registrar información de protocolo:', e);
         }
       }
+      
+      // Escuchar el evento personalizado de detección de bucles de login
+      const handleLoginLoopDetected = () => {
+        console.error('⚠️ Se ha detectado un bucle de login, forzando reinicio de la aplicación');
+        setForcedComponent('SignIn');
+        setHasError(true);
+        
+        // Limpiar localStorage para romper el bucle
+        try {
+          // Elementos a preservar
+          const profilePic = localStorage.getItem('profilePic');
+          const profilePic_local = localStorage.getItem('profilePic_local');
+          const profilePic_base64 = localStorage.getItem('profilePic_base64');
+          
+          // Limpiar todo
+          localStorage.clear();
+          
+          // Restaurar elementos preservados
+          if (profilePic) localStorage.setItem('profilePic', profilePic);
+          if (profilePic_local) localStorage.setItem('profilePic_local', profilePic_local);
+          if (profilePic_base64) localStorage.setItem('profilePic_base64', profilePic_base64);
+          
+          // Marcar que hubo un reinicio
+          localStorage.setItem('appRestarted', 'true');
+        } catch (e) {
+          console.error('Error al limpiar localStorage:', e);
+        }
+      };
+      
+      window.addEventListener('loginLoopDetected', handleLoginLoopDetected);
+      
+      // Limpiar listener
+      return () => {
+        window.removeEventListener('loginLoopDetected', handleLoginLoopDetected);
+      };
     } catch (error) {
       console.error('Error al verificar configuración de API:', error);
     }

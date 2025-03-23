@@ -545,9 +545,40 @@ export function UserProvider({ children }) {
             timestamp: new Date().toISOString(),
             timeSinceLastLogin: now - lastLoginTime
           }));
+          
+          // Si hay múltiples intentos muy rápidos, interrumpir el flujo de login
+          const loginAttempts = JSON.parse(localStorage.getItem('loginAttempts') || '[]');
+          const recentAttempts = loginAttempts.filter(attempt => (now - attempt) < 5000);
+          
+          if (recentAttempts.length > 3) {
+            console.error("🛑 Demasiados intentos de login en muy poco tiempo, abortando para evitar bucle");
+            
+            // Limpiar tokens y estado para romper el bucle
+            localStorage.removeItem('token');
+            localStorage.removeItem('tempToken');
+            localStorage.removeItem('tokenType');
+            localStorage.removeItem('lastLogin');
+            localStorage.removeItem('loginAttempts');
+            
+            // Actualizar estado
+            setUser(null);
+            setIsAuthenticated(false);
+            
+            // Despachar evento para notificar a otros componentes
+            window.dispatchEvent(new CustomEvent('loginLoopDetected'));
+            
+            return false;
+          }
+          
+          // Registrar este intento
+          recentAttempts.push(now);
+          localStorage.setItem('loginAttempts', JSON.stringify(recentAttempts));
         } catch (e) {
           console.error("Error al registrar bucle de login:", e);
         }
+      } else {
+        // Si no es un intento rápido, limpiar historial de intentos
+        localStorage.removeItem('loginAttempts');
       }
       
       // Actualizar timestamp de último login

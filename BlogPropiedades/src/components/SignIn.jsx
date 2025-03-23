@@ -49,6 +49,13 @@ const SignIn = ({ isRegistering = false }) => {
     useEffect(() => {
         let isMounted = true;
         
+        // Limpiar cualquier posible indicador de bucle al montar el componente
+        localStorage.removeItem('loginRedirects');
+        localStorage.removeItem('apiRequestLoop');
+        
+        // Limpiar el registro de solicitudes recientes al API
+        localStorage.removeItem('recentApiRequests');
+        
         if (isAuthenticated && user && isMounted) {
             console.log("Usuario autenticado, redirigiendo a la página principal");
             
@@ -57,7 +64,7 @@ const SignIn = ({ isRegistering = false }) => {
             localStorage.setItem('loginRedirects', (redirectsCount + 1).toString());
             
             // Si hay demasiados redireccionamientos en poco tiempo, puede ser un bucle
-            if (redirectsCount > 3) {
+            if (redirectsCount > 2) {
                 try {
                     console.warn("⚠️ Posible bucle de redirección detectado, permaneciendo en página de login");
                     localStorage.setItem('redirectLoopDetected', JSON.stringify({
@@ -65,10 +72,14 @@ const SignIn = ({ isRegistering = false }) => {
                         redirects: redirectsCount
                     }));
                     
+                    // Limpiamos todos los datos de sesión para romper el bucle
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('tempToken');
+                    
                     // No redirigimos, dejamos al usuario en la página de login
                     // y mostramos una notificación
                     try {
-                        toast("Se ha detectado un problema con la navegación. Por favor, espera unos segundos.", {
+                        toast("Se ha detectado un problema con la navegación. Sesión reiniciada para evitar bucles.", {
                             icon: "⚠️",
                             duration: 5000
                         });
@@ -80,7 +91,7 @@ const SignIn = ({ isRegistering = false }) => {
                     setTimeout(() => {
                         if (isMounted) {
                             localStorage.removeItem('loginRedirects');
-                            navigate("/");
+                            window.location.reload(); // Recargar la página para reiniciar todo
                         }
                     }, 5000);
                     
@@ -110,6 +121,15 @@ const SignIn = ({ isRegistering = false }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // Verificar si hay un bucle de API activo
+        if (localStorage.getItem('apiRequestLoop') === 'true') {
+            console.warn("⚠️ Bucle de API detectado, limpiando estado y evitando envío");
+            localStorage.removeItem('apiRequestLoop');
+            localStorage.removeItem('recentApiRequests');
+            setError("Se detectó un problema de comunicación. Por favor, espera unos segundos e intenta de nuevo.");
+            return;
+        }
         
         // Evitar múltiples envíos simultáneos
         if (isSubmitting.current) {
