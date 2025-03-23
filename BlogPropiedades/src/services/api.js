@@ -357,6 +357,8 @@ export const createUser = async (data) => {
  */
 export const loginUser = async (credentials) => {
   try {
+    console.log("Inicio de loginUser - Realizando petición a /user/login");
+    
     const response = await fetchAPI('/user/login', {
       method: 'POST',
       body: JSON.stringify(credentials)
@@ -379,13 +381,16 @@ export const loginUser = async (credentials) => {
         const userName = localStorage.getItem('name') || 'Usuario';
         
         // Crear una respuesta simulada con el token existente
-        return {
+        const responseData = {
           token: savedToken,
           user: {
             name: userName
           },
           _notice: "Esta respuesta fue generada localmente debido a una respuesta vacía del servidor"
         };
+        
+        console.log("Respuesta generada localmente:", responseData);
+        return responseData;
       } else {
         console.error("No se encontró un token en localStorage para mantener la sesión");
         // Si el servidor devuelve una respuesta vacía y no hay token, 
@@ -394,7 +399,7 @@ export const loginUser = async (credentials) => {
         const tempToken = `temp_${Math.random().toString(36).substring(2, 15)}`;
         console.log("Generando token temporal para permitir acceso:", tempToken);
         
-        return {
+        const responseData = {
           token: tempToken,
           user: {
             name: credentials?.email?.split('@')[0] || 'Usuario Temporal',
@@ -403,6 +408,9 @@ export const loginUser = async (credentials) => {
           isTemporary: true,
           _notice: "Sesión temporal creada debido a una respuesta vacía del servidor"
         };
+        
+        console.log("Respuesta temporal generada:", responseData);
+        return responseData;
       }
     }
     
@@ -415,13 +423,17 @@ export const loginUser = async (credentials) => {
       const savedToken = localStorage.getItem('token');
       if (savedToken) {
         console.log("Usando token existente para continuar la sesión a pesar del formato de respuesta incorrecto");
-        return {
+        
+        const responseData = {
           token: savedToken,
           user: {
             name: localStorage.getItem('name') || 'Usuario'
           },
           _recovered: true
         };
+        
+        console.log("Respuesta recuperada generada:", responseData);
+        return responseData;
       }
       
       throw new Error(`Formato de respuesta inesperado: ${typeof response}`);
@@ -461,13 +473,17 @@ export const loginUser = async (credentials) => {
       const savedToken = localStorage.getItem('token');
       if (savedToken) {
         console.log("Usando token existente para continuar la sesión a pesar de estructura incorrecta");
-        return {
+        
+        const responseData = {
           token: savedToken,
           user: {
             name: localStorage.getItem('name') || 'Usuario'
           },
           _recovered: true
         };
+        
+        console.log("Respuesta recuperada generada:", responseData);
+        return responseData;
       }
       
       throw new Error("Formato de respuesta incorrecto");
@@ -481,7 +497,8 @@ export const loginUser = async (credentials) => {
       const savedToken = localStorage.getItem('token');
       if (savedToken) {
         console.log("Intentando recuperar sesión con token existente tras error:", error.message);
-        return {
+        
+        const responseData = {
           token: savedToken,
           user: {
             name: localStorage.getItem('name') || 'Usuario'
@@ -489,6 +506,9 @@ export const loginUser = async (credentials) => {
           _errorRecovered: true,
           _errorMessage: error.message
         };
+        
+        console.log("Respuesta de error recuperada:", responseData);
+        return responseData;
       }
     }
     

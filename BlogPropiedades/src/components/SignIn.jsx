@@ -65,10 +65,17 @@ export default function SignIn() {
             
             // Mostrar advertencia si es necesario
             if (sessionWarning) {
-                toast.warning(sessionWarning, {
-                    duration: 6000,
-                    position: 'top-center'
-                });
+                console.log("Mostrando advertencia:", sessionWarning);
+                try {
+                    // Usar toast básico sin opciones complejas para evitar errores
+                    toast(sessionWarning, {
+                        icon: '⚠️',
+                        duration: 6000
+                    });
+                } catch (e) {
+                    console.error("Error al mostrar toast:", e);
+                    alert(sessionWarning); // Fallback a alert si toast falla
+                }
             }
             
             console.log("Claves disponibles:", Object.keys(response));
@@ -140,9 +147,16 @@ export default function SignIn() {
                         _recovered: true
                     });
                     
-                    toast.warning("Sesión mantenida con credenciales locales debido a problemas con el servidor", {
-                        duration: 6000
-                    });
+                    // Usar toast básico en lugar de toast.warning
+                    try {
+                        toast("Sesión mantenida con credenciales locales debido a problemas con el servidor", {
+                            icon: '⚠️',
+                            duration: 6000
+                        });
+                    } catch (e) {
+                        console.error("Error al mostrar toast:", e);
+                        alert("Sesión mantenida con credenciales locales"); 
+                    }
                     
                     // Redirigir a la página principal
                     navigate("/");
@@ -153,7 +167,14 @@ export default function SignIn() {
             }
             
             setError(err.message || "Error al iniciar sesión");
-            toast.error(err.message || "Error al iniciar sesión");
+            try {
+                toast(err.message || "Error al iniciar sesión", {
+                    icon: '❌'
+                });
+            } catch (e) {
+                console.error("Error al mostrar toast de error:", e);
+                alert(err.message || "Error al iniciar sesión");
+            }
         } finally {
             setLoading(false);
         }

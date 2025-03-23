@@ -42,7 +42,19 @@ function App() {
                             </ProtectedRoute>
                         } />
                     </Routes>
-                    <Toaster position="top-right" />
+                    <Toaster 
+                        position="top-right"
+                        toastOptions={{
+                            duration: 5000,
+                            style: {
+                                background: '#fff',
+                                color: '#333',
+                                padding: '16px',
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                            }
+                        }}
+                    />
                 </UserProvider>
             </div>
         </BrowserRouter>
