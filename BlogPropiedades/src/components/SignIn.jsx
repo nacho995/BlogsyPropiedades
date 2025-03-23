@@ -48,9 +48,27 @@ export default function SignIn() {
             }
             
             // Verificar si es una respuesta generada automáticamente por el cliente
-            if (response._generated || response._notice) {
+            let sessionWarning = "";
+            if (response._notice) {
                 console.warn("Usando respuesta generada localmente:", response);
-                toast.warning("Sesión mantenida con datos locales debido a problemas en el servidor");
+                sessionWarning = "Sesión mantenida con datos locales debido a problemas en el servidor";
+            } else if (response._recovered) {
+                console.warn("Usando sesión recuperada:", response);
+                sessionWarning = "Sesión recuperada utilizando datos locales debido a problemas con el servidor";
+            } else if (response._errorRecovered) {
+                console.warn("Sesión recuperada tras error:", response);
+                sessionWarning = "Sesión recuperada tras un error de comunicación con el servidor";
+            } else if (response.isTemporary) {
+                console.warn("Usando sesión temporal:", response);
+                sessionWarning = "Sesión temporal activada. Algunas funciones podrían no estar disponibles.";
+            }
+            
+            // Mostrar advertencia si es necesario
+            if (sessionWarning) {
+                toast.warning(sessionWarning, {
+                    duration: 6000,
+                    position: 'top-center'
+                });
             }
             
             console.log("Claves disponibles:", Object.keys(response));
@@ -100,6 +118,40 @@ export default function SignIn() {
             navigate("/");
         } catch (err) {
             console.error("Error en login:", err);
+            
+            // Verificar si hay token existente para intentar mantener la sesión a pesar del error
+            const savedToken = localStorage.getItem('token');
+            if (savedToken && err.message && (
+                err.message.includes("vacía") || 
+                err.message.includes("no respondió") || 
+                err.message.includes("formato") ||
+                err.message.includes("inesperada")
+            )) {
+                console.log("Intentando login local con token existente tras error:", err.message);
+                
+                try {
+                    const userName = localStorage.getItem('name') || email.split('@')[0] || 'Usuario';
+                    
+                    // Mantener la sesión usando el token local
+                    await login({
+                        token: savedToken,
+                        name: userName,
+                        user: { name: userName, email },
+                        _recovered: true
+                    });
+                    
+                    toast.warning("Sesión mantenida con credenciales locales debido a problemas con el servidor", {
+                        duration: 6000
+                    });
+                    
+                    // Redirigir a la página principal
+                    navigate("/");
+                    return;
+                } catch (loginErr) {
+                    console.error("Error al intentar login local:", loginErr);
+                }
+            }
+            
             setError(err.message || "Error al iniciar sesión");
             toast.error(err.message || "Error al iniciar sesión");
         } finally {

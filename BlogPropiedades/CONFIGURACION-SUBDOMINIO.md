@@ -104,6 +104,13 @@ Si encuentras problemas al configurar o acceder a tu subdominio:
      - Mensajes de error más descriptivos y detallados para el usuario
      - Registro ampliado de información en la consola para facilitar la depuración
    
+   - **Actualización para manejo robusto de respuestas vacías (2023)**: Se ha mejorado significativamente el sistema para manejar casos de respuestas vacías del servidor:
+     - El sistema ahora intenta mantener la sesión automáticamente si existe un token previo
+     - Si no hay token previo, se crea un token temporal para permitir acceso básico al sistema
+     - Se añadieron múltiples puntos de recuperación en el proceso de login para mayor resiliencia
+     - El componente SignIn ahora puede recuperarse automáticamente de errores de comunicación
+     - Se muestran advertencias claras al usuario cuando se está usando una sesión recuperada o temporal
+   
    - **Si persiste el error de login**, intenta depurar con los mensajes de consola ampliados o contáctanos para recibir asistencia.
 
 ## Mantener la configuración

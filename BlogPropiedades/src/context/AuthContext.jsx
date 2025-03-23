@@ -1,15 +1,18 @@
 // src/context/AuthContext.jsx
-// Este archivo es un alias para mantener la compatibilidad con las importaciones existentes
+// Archivo creado para compatibilidad con componentes que utilizan AuthContext
+// en lugar de UserContext
 
 import { UserContext, UserProvider, useUser } from './UserContext';
 
-// Exportamos los mismos componentes pero con nombres diferentes
+// Exportar UserContext como AuthContext para mantener compatibilidad
 export const AuthContext = UserContext;
 export const AuthProvider = UserProvider;
 
-// Hook personalizado con el nombre usado en las importaciones
-export function useAuth() {
-  return useUser();
-}
+// Exportar hook personalizado con nombre alternativo
+export const useAuth = useUser;
 
-export default { AuthContext, AuthProvider, useAuth }; 
+// Re-exportar el contexto original para mantener consistencia
+export { UserContext, UserProvider, useUser };
+
+// Este archivo sirve como puente para evitar errores
+// cuando componentes importan desde '../context/AuthContext' 
