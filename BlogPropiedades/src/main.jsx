@@ -4,6 +4,10 @@ import React, { useEffect } from "react";
 import App from "./App";
 import "./index.css";
 import { initializeErrorHandlers, logError } from "./utils/errorHandler";
+import { initEnvValidation } from "./utils/validateEnv";
+
+// Validar variables de entorno al iniciar la aplicación
+const envValidation = initEnvValidation();
 
 // Componente de error para capturar errores a nivel de aplicación
 class ErrorBoundary extends React.Component {
@@ -84,9 +88,14 @@ const AppContainer = () => {
     // Inicializar manejadores de errores globales
     initializeErrorHandlers();
     
-    // Registrar información del entorno para diagnóstico
-    console.log(`Entorno: ${process.env.NODE_ENV}`);
+    // Mostrar información sobre el entorno
+    console.log(`Entorno: ${import.meta.env.MODE}`);
     console.log(`API URL: ${import.meta.env.VITE_BACKEND_URL || 'No definida'}`);
+    
+    // Validar nuevamente las variables de entorno en componente montado
+    if (!envValidation.isValid) {
+      console.warn("⚠️ Hay problemas con las variables de entorno que podrían causar errores");
+    }
     
     // Verificar si hay errores registrados previamente
     try {
@@ -107,7 +116,7 @@ const AppContainer = () => {
 
 // Agregar la configuración para la recuperación en caso de error fatal
 // Esta configuración ayuda a resolver errores de pantalla en blanco
-if (process.env.NODE_ENV === 'production') {
+if (import.meta.env.MODE === 'production') {
   try {
     // Agregar script de recuperación de emergencia en caso de error de JS
     const script = document.createElement('script');
@@ -130,7 +139,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 createRoot(document.getElementById("root")).render(
-  process.env.NODE_ENV === 'production' ? (
+  import.meta.env.MODE === 'production' ? (
     <ErrorBoundary>
       <AppContainer />
     </ErrorBoundary>
