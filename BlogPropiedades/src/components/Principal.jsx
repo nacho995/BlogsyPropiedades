@@ -74,52 +74,37 @@ function Principal() {
     
     const fetchData = async () => {
       try {
-        if (!isMounted) return;
         setLoading(true);
-        setDataError(null);
+        let blogsData = [];
+        let propertiesData = [];
         
-        // Obtener blogs con manejo de errores
         try {
-          console.log('Obteniendo blogs...');
-          const blogsData = await getBlogPosts();
-          
-          if (isMounted) {
-            console.log(`Blogs obtenidos: ${blogsData.length}`);
-            setBlogs(Array.isArray(blogsData) ? blogsData : []);
-          }
-        } catch (blogError) {
-          console.error("Error al cargar blogs:", blogError);
-          if (isMounted) {
-            // No fallar completamente, solo registrar el error
-            setDataError(prev => ({...prev, blogs: blogError.message}));
-          }
+          console.log("Intentando obtener blogs...");
+          blogsData = await getBlogPosts();
+          console.log("Blogs obtenidos:", blogsData);
+        } catch (error) {
+          console.error("Error al cargar blogs:", error);
+          blogsData = []; // Usar array vacío en caso de error
         }
         
-        // Obtener propiedades con manejo de errores
         try {
-          console.log('Obteniendo propiedades...');
-          const propertiesData = await getPropertyPosts();
-          
-          if (isMounted) {
-            console.log(`Propiedades obtenidas: ${propertiesData.length}`);
-            setProperties(Array.isArray(propertiesData) ? propertiesData : []);
-          }
-        } catch (propertyError) {
-          console.error("Error al cargar propiedades:", propertyError);
-          if (isMounted) {
-            // No fallar completamente, solo registrar el error
-            setDataError(prev => ({...prev, properties: propertyError.message}));
-          }
+          console.log("Intentando obtener propiedades...");
+          propertiesData = await getPropertyPosts();
+          console.log("Propiedades obtenidas:", propertiesData);
+        } catch (error) {
+          console.error("Error al cargar propiedades:", error);
+          propertiesData = []; // Usar array vacío en caso de error
         }
-      } catch (error) {
-        console.error("Error general al cargar datos:", error);
-        if (isMounted) {
-          setDataError(prev => ({...prev, general: error.message}));
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        
+        // Incluso si ambas peticiones fallan, continuamos con arrays vacíos
+        setBlogs(blogsData || []);
+        setProperties(propertiesData || []);
+        setLoading(false);
+      } catch (generalError) {
+        console.error("Error general al cargar datos:", generalError);
+        setBlogs([]);
+        setProperties([]);
+        setLoading(false);
       }
     };
     
