@@ -1,12 +1,42 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { fallbackImageBase64 } from '../utils/profileUtils';
 
-// Componente simple para precargar imágenes
+// Componente mejorado para precargar imágenes con manejo de errores
 function ImageLoader() {
-  // Imagen por defecto (la misma que usamos en otros componentes)
-  const defaultProfilePic = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80";
+  const [imageError, setImageError] = useState(false);
   
-  // Obtener imagen del localStorage
-  const profilePic = localStorage.getItem('profilePic');
+  // Imagen por defecto (la misma que usamos en otros componentes)
+  const defaultProfilePic = fallbackImageBase64;
+  
+  // Obtener imagen del localStorage de forma segura
+  const getSafeProfileImage = () => {
+    try {
+      const profilePic = localStorage.getItem('profilePic');
+      // Verificar que la URL sea válida
+      if (profilePic && (profilePic.startsWith('http') || profilePic.startsWith('data:'))) {
+        return profilePic;
+      }
+      return null;
+    } catch (e) {
+      console.error("Error al obtener imagen de perfil del localStorage:", e);
+      return null;
+    }
+  };
+  
+  const profilePic = getSafeProfileImage();
+  
+  // Limpiar localStorage de imágenes corruptas
+  useEffect(() => {
+    if (imageError) {
+      try {
+        // Si hay error, intentar limpiar la imagen corrupta
+        localStorage.removeItem('profilePic');
+        console.log("🧹 Imagen de perfil problemática eliminada del localStorage");
+      } catch (e) {
+        console.error("Error al limpiar localStorage:", e);
+      }
+    }
+  }, [imageError]);
   
   return (
     <div style={{ display: 'none' }}>
@@ -14,7 +44,13 @@ function ImageLoader() {
       <img src={defaultProfilePic} alt="preload default" />
       
       {/* Precargar imagen de perfil si existe */}
-      {profilePic && <img src={profilePic} alt="preload profile" />}
+      {profilePic && (
+        <img 
+          src={profilePic} 
+          alt="preload profile" 
+          onError={() => setImageError(true)}
+        />
+      )}
     </div>
   );
 }

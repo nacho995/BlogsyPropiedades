@@ -5,6 +5,20 @@ import App from "./App";
 import "./index.css";
 import { initializeErrorHandlers, logError, handleUrlErrors } from "./utils/errorHandler";
 import { initEnvValidation, getSafeEnvValue } from "./utils/validateEnv";
+import { cleanupStorage, fixRenderCycleIssues } from './utils/storageCleanup';
+
+// Limpieza preventiva de localStorage antes de inicializar la aplicación
+try {
+  console.log("🔍 Verificando posibles problemas de almacenamiento...");
+  const cycleFixed = fixRenderCycleIssues();
+  if (cycleFixed) {
+    console.log("🛠️ Detectados y corregidos problemas de ciclos de renderizado");
+  }
+  
+  cleanupStorage();
+} catch (error) {
+  console.error("❌ Error durante la limpieza inicial:", error);
+}
 
 // Limpiar cualquier error inicial que pueda causar problemas
 try {

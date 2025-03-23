@@ -507,7 +507,46 @@ function AdminRoute({ children }) {
 
 function HomeRoute() {
   const { user } = useUser();
+  const [hasError, setHasError] = useState(false);
+  const [renderCount, setRenderCount] = useState(0);
   
+  // Protección contra bucles infinitos
+  useEffect(() => {
+    setRenderCount(prev => prev + 1);
+    
+    // Si el componente se renderiza demasiadas veces en poco tiempo
+    if (renderCount > 5) {
+      console.warn("⚠️ Detectado posible ciclo de renderizado en HomeRoute, forzando vista segura");
+      setHasError(true);
+    }
+  }, []);
+  
+  // Si detectamos un posible bucle, mostrar un componente seguro
+  if (hasError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
+        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
+          <h2 className="text-2xl font-bold mb-4 text-gray-800">Bienvenido a Blogs y Propiedades</h2>
+          <p className="mb-4 text-gray-600">
+            Hay un problema al cargar tu perfil. Puedes intentar:
+          </p>
+          <div className="space-y-2">
+            <a href="/login" className="block w-full py-2 px-4 bg-blue-600 text-white text-center rounded hover:bg-blue-700">
+              Iniciar sesión
+            </a>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="block w-full py-2 px-4 bg-gray-200 text-gray-800 text-center rounded hover:bg-gray-300"
+            >
+              Recargar página
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Comportamiento normal si no hay error
   return user ? <Principal /> : <SignIn />;
 }
 
