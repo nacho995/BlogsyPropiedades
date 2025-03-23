@@ -214,7 +214,7 @@ export default function PropertyDetail() {
 
   // Funciones para el carrusel de imágenes
   const nextImage = () => {
-    if (property.images && property.images.length > 0) {
+    if (property.images && Array.isArray(property.images) && property.images.length > 0) {
       setCurrentImageIndex((prevIndex) => 
         prevIndex === property.images.length - 1 ? 0 : prevIndex + 1
       );
@@ -222,7 +222,7 @@ export default function PropertyDetail() {
   };
 
   const prevImage = () => {
-    if (property.images && property.images.length > 0) {
+    if (property.images && Array.isArray(property.images) && property.images.length > 0) {
       setCurrentImageIndex((prevIndex) => 
         prevIndex === 0 ? property.images.length - 1 : prevIndex - 1
       );
@@ -316,7 +316,7 @@ export default function PropertyDetail() {
       <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
         {/* Carrusel de imágenes */}
         <div className="relative h-[400px] bg-gray-100">
-          {property.images && property.images.length > 0 ? (
+          {property.images && Array.isArray(property.images) && property.images.length > 0 ? (
             <>
               <img
                 src={property.images[currentImageIndex]?.src}
@@ -362,7 +362,7 @@ export default function PropertyDetail() {
         </div>
 
         {/* Miniaturas */}
-        {property.images && property.images.length > 1 && (
+        {property.images && Array.isArray(property.images) && property.images.length > 1 && (
           <div className="flex overflow-x-auto p-4 space-x-2">
             {property.images.map((img, index) => (
               <button

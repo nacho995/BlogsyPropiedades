@@ -26,6 +26,14 @@ export default function SeeProperties() {
                 
                 if (!isMounted) return;
                 
+                // Verificar que PropertyData sea un array antes de usar map
+                if (!Array.isArray(PropertyData)) {
+                    console.error('Error: PropertyData no es un array:', PropertyData);
+                    setProperty([]);
+                    setLoading(false);
+                    return;
+                }
+                
                 // Normalizar el formato de las imágenes para cada propiedad
                 const normalizedProperties = PropertyData.map(prop => {
                     let propertyImages = [];
@@ -75,6 +83,7 @@ export default function SeeProperties() {
                         alert('Error al cargar las propiedades');
                     }
                     setLoading(false);
+                    setProperty([]); // Inicializar con array vacío en caso de error
                 }
             }
         };

@@ -395,7 +395,7 @@ export default function BlogDetail() {
 
   // Función para manejar la navegación de imágenes
   const nextImage = () => {
-    if (blog.images && blog.images.length > 0) {
+    if (blog.images && Array.isArray(blog.images) && blog.images.length > 0) {
       setCurrentImageIndex((prevIndex) => 
         prevIndex === blog.images.length - 1 ? 0 : prevIndex + 1
       );
@@ -403,7 +403,7 @@ export default function BlogDetail() {
   };
 
   const prevImage = () => {
-    if (blog.images && blog.images.length > 0) {
+    if (blog.images && Array.isArray(blog.images) && blog.images.length > 0) {
       setCurrentImageIndex((prevIndex) => 
         prevIndex === 0 ? blog.images.length - 1 : prevIndex - 1
       );
@@ -419,7 +419,7 @@ export default function BlogDetail() {
         <article className="bg-white rounded-2xl shadow-xl overflow-hidden">
           {/* Carrusel de imágenes */}
           <div className="relative h-[400px] bg-gray-100">
-            {blog.images && blog.images.length > 0 ? (
+            {blog.images && Array.isArray(blog.images) && blog.images.length > 0 ? (
               <>
                 <img
                   src={blog.images[currentImageIndex]?.src || ''}
@@ -472,7 +472,7 @@ export default function BlogDetail() {
           </div>
 
           {/* Miniaturas de imágenes */}
-          {blog.images && blog.images.length > 1 && (
+          {blog.images && Array.isArray(blog.images) && blog.images.length > 1 && (
             <div className="flex overflow-x-auto p-4 space-x-2">
               {blog.images.map((img, index) => (
                 <button
@@ -524,7 +524,7 @@ export default function BlogDetail() {
               <div dangerouslySetInnerHTML={{ __html: blog.content }} />
             </div>
             
-            {blog.tags && blog.tags.length > 0 && (
+            {blog.tags && Array.isArray(blog.tags) && blog.tags.length > 0 && (
               <div className="mt-8 pt-4 border-t">
                 <h3 className="text-lg font-semibold mb-2">Etiquetas:</h3>
                 <div className="flex flex-wrap gap-2">

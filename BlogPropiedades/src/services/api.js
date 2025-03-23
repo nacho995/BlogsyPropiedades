@@ -18,6 +18,14 @@ export const fetchAPI = async (endpoint, options = {}) => {
         console.log(`🚀 Enviando solicitud a: ${url}`);
         console.log('Opciones:', JSON.stringify(options, null, 2));
 
+        // Verificar si el endpoint es para obtener un listado (debería devolver un array)
+        const expectsArray = endpoint.includes('/property') || 
+                          endpoint.includes('/blog') || 
+                          endpoint.includes('/posts') || 
+                          endpoint.endsWith('/user');
+        
+        console.log(`🔍 Endpoint ${endpoint} - ¿Espera un array? ${expectsArray}`);
+
         const defaultHeaders = {
             'Content-Type': 'application/json',
         };
@@ -84,6 +92,12 @@ export const fetchAPI = async (endpoint, options = {}) => {
                 };
             }
             
+            // Si esperamos un array y tenemos respuesta vacía, devolver array vacío
+            if (expectsArray) {
+                console.warn('⚠️ Se esperaba un array pero la respuesta está vacía, devolviendo []');
+                return [];
+            }
+            
             // Para otros endpoints, devolver objeto vacío
             return {};
         }
@@ -96,7 +110,7 @@ export const fetchAPI = async (endpoint, options = {}) => {
             // Validar que data sea un objeto o array para evitar errores con métodos como map
             if (data === null) {
                 console.warn('⚠️ Respuesta JSON nula');
-                return {};
+                return expectsArray ? [] : {};
             }
             
             // Verificar tipo de data para métodos como map
@@ -104,29 +118,48 @@ export const fetchAPI = async (endpoint, options = {}) => {
                 // Es un array, está bien
                 return data;
             } else if (typeof data === 'object') {
+                // Es un objeto, pero si esperamos un array y no lo es, crear un wrapper array
+                if (expectsArray && !data.items && !data.data && !data.results) {
+                    console.warn('⚠️ Se esperaba un array pero se recibió un objeto, intentando convertir');
+                    
+                    // Intentar encontrar un array dentro del objeto
+                    for (const key in data) {
+                        if (Array.isArray(data[key])) {
+                            console.log(`🔍 Se encontró un array en la propiedad ${key}`);
+                            return data[key];
+                        }
+                    }
+                    
+                    // Si el objeto tiene propiedades como id, podría ser un elemento único
+                    if (data._id || data.id) {
+                        console.log('🔍 Se encontró un único elemento, devolviendo como array');
+                        return [data];
+                    }
+                    
+                    console.warn('⚠️ No se encontró un array dentro del objeto, devolviendo array vacío');
+                    return [];
+                }
+                
                 // Es un objeto, está bien
                 return data;
             } else {
                 // No es ni objeto ni array, crear un wrapper
                 console.warn(`⚠️ Respuesta con formato inesperado (${typeof data}), creando wrapper`);
-                return { value: data, _warning: 'Respuesta con formato no estándar' };
+                return expectsArray ? [] : { value: data, _warning: 'Respuesta con formato no estándar' };
             }
         } catch (error) {
             console.error('🔥 Error al parsear respuesta JSON:', error);
             
-            // Si falla el parseo, intentar obtener el texto
-            const text = await response.text();
-            console.log('📄 Respuesta como texto:', text.length > 100 ? `${text.substring(0, 100)}...` : text);
-            
-            if (text.trim() === '') {
-                console.warn('⚠️ Respuesta como texto vacía');
-                return {};
+            // Si esperamos un array pero no pudimos parsear la respuesta, devolver array vacío
+            if (expectsArray) {
+                console.warn('⚠️ Se esperaba un array pero hubo error al parsear, devolviendo []');
+                return [];
             }
             
-            throw new Error('Error al procesar la respuesta del servidor');
+            throw new Error(`Error al procesar la respuesta: ${error.message}`);
         }
     } catch (error) {
-        console.error('🔥 Error en fetchAPI:', error);
+        console.error(`🔥 Error en fetchAPI (${endpoint}):`, error);
         throw error;
     }
 };

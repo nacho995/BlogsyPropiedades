@@ -48,6 +48,14 @@ export default function SeeBlogs() {
         const blogsData = await getBlogPosts();
         if (!isMounted) return;
         
+        // Verificar que blogsData sea un array antes de usar map
+        if (!Array.isArray(blogsData)) {
+          console.error('Error: blogsData no es un array:', blogsData);
+          setBlogs([]);
+          setLoading(false);
+          return;
+        }
+        
         // Normalizar el formato de las imágenes para cada blog
         const normalizedBlogs = blogsData.map(blog => {
           console.log('Procesando blog:', blog._id);
@@ -119,6 +127,7 @@ export default function SeeBlogs() {
         if (isMounted) {
           toast.error('Error al cargar los blogs');
           setLoading(false);
+          setBlogs([]); // Inicializar con array vacío en caso de error
         }
       }
     };
