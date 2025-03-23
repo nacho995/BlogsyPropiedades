@@ -29,10 +29,30 @@ export default function SignIn() {
                 throw new Error("Por favor, completa todos los campos");
             }
 
+            console.log("Intentando iniciar sesión con:", email);
             const response = await loginUser({ email, password });
             
             console.log("Respuesta original de login:", response);
             console.log("Tipo de respuesta:", typeof response);
+            
+            // Si la respuesta es una cadena vacía, mostrar mensaje específico
+            if (response === "" || response === null || response === undefined) {
+                console.error("Respuesta de login vacía o nula");
+                throw new Error("El servidor no respondió correctamente. Por favor, intenta de nuevo más tarde.");
+            }
+            
+            // Si la respuesta es una cadena (no vacía), mostrar su contenido
+            if (typeof response === 'string') {
+                console.error("Respuesta de login es una cadena:", response);
+                throw new Error(`Respuesta inesperada del servidor: ${response}`);
+            }
+            
+            // Verificar si es una respuesta generada automáticamente por el cliente
+            if (response._generated || response._notice) {
+                console.warn("Usando respuesta generada localmente:", response);
+                toast.warning("Sesión mantenida con datos locales debido a problemas en el servidor");
+            }
+            
             console.log("Claves disponibles:", Object.keys(response));
             
             // Intentar extraer token y datos de usuario de varias estructuras posibles
@@ -56,7 +76,7 @@ export default function SignIn() {
                 userData = response.user || {};
             } else {
                 console.error("No se pudo extraer token de la respuesta:", response);
-                throw new Error("Formato de respuesta incorrecto");
+                throw new Error("Formato de respuesta incorrecto. Por favor, contacta al soporte técnico.");
             }
             
             if (!token) {
@@ -66,7 +86,8 @@ export default function SignIn() {
             console.log("Token extraído:", token);
             console.log("Datos de usuario extraídos:", userData);
             
-            login({
+            // Ejecutar login con los datos extraídos
+            await login({
                 token,
                 name: userData?.name || "",
                 user: userData,
@@ -75,6 +96,7 @@ export default function SignIn() {
 
             toast.success("¡Inicio de sesión exitoso!");
             
+            // Redirigir a la página principal
             navigate("/");
         } catch (err) {
             console.error("Error en login:", err);

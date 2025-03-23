@@ -10,7 +10,7 @@ const SubirPage = () => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const { isLoggedIn } = useAuth();
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -28,10 +28,10 @@ const SubirPage = () => {
     }
 
     // Verificar autenticación
-    if (!isLoggedIn) {
+    if (!isAuthenticated) {
       setError('Debes iniciar sesión para subir imágenes');
     }
-  }, [isLoggedIn, navigate]);
+  }, [isAuthenticated, navigate]);
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -72,7 +72,7 @@ const SubirPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!isLoggedIn) {
+    if (!isAuthenticated) {
       setError('Debes iniciar sesión para subir imágenes');
       return;
     }

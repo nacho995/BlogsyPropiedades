@@ -98,6 +98,12 @@ Si encuentras problemas al configurar o acceder a tu subdominio:
      - Se ha actualizado el componente `SignIn.jsx` para intentar extraer el token y los datos de usuario de varias estructuras posibles.
      - Se ha añadido más información de depuración para facilitar la solución de problemas futuros.
    
+   - **Error "Estructura de respuesta de login inesperada: ''"**: Este error ocurre cuando el servidor devuelve una respuesta vacía durante el proceso de login. Las mejoras implementadas incluyen:
+     - Manejo especial de respuestas vacías en las funciones `fetchAPI` y `loginUser`
+     - Capacidad para usar el token existente en localStorage cuando el servidor devuelve una respuesta vacía
+     - Mensajes de error más descriptivos y detallados para el usuario
+     - Registro ampliado de información en la consola para facilitar la depuración
+   
    - **Si persiste el error de login**, intenta depurar con los mensajes de consola ampliados o contáctanos para recibir asistencia.
 
 ## Mantener la configuración
