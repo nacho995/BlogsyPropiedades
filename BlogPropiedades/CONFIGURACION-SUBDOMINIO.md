@@ -89,6 +89,10 @@ Si encuentras problemas al configurar o acceder a tu subdominio:
    - Asegúrate de que `gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com` está accesible
    - Verifica que la API responde correctamente a las peticiones
 
+5. **Problemas conocidos y soluciones:**
+   - **Error "Could not resolve '../context/AuthContext'"**: Este error ha sido solucionado añadiendo un archivo de compatibilidad en `src/context/AuthContext.jsx` que actúa como puente hacia `UserContext.jsx`.
+   - Si encuentras este error, asegúrate de tener la versión más reciente del código que incluye esta solución.
+
 ## Mantener la configuración
 
 Cada vez que despliegues una nueva versión de tu aplicación:

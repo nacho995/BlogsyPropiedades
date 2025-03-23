@@ -14,6 +14,7 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "✅ Construcción completada"
+echo "🔍 Nota: Si experimentaste el error 'Could not resolve \"../context/AuthContext\"', este problema ha sido resuelto añadiendo un archivo de compatibilidad."
 
 echo "📋 Instrucciones para Render:"
 echo "1. Si no tienes un servicio en Render, crea uno nuevo de tipo 'Static Site'"
