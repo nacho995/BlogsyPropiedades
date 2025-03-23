@@ -19,6 +19,8 @@ export default function BlogDetail() {
   const [uploadError, setUploadError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [comment, setComment] = useState('');
+  const [commentLoading, setCommentLoading] = useState(false);
   
   // Obtener el usuario actual
   const { user } = useUser();
@@ -259,6 +261,119 @@ export default function BlogDetail() {
     } catch (error) {
       console.error('Error al actualizar el blog:', error);
       toast.error('Error al actualizar el blog');
+    }
+  };
+
+  // Función para manejar los comentarios
+  const handleCommentSubmit = async (e) => {
+    e.preventDefault();
+    if (!comment.trim()) {
+      try {
+        toast('Por favor, escribe un comentario', {
+          icon: '⚠️',
+          duration: 4000
+        });
+      } catch (e) {
+        console.error('Error al mostrar notificación:', e);
+        alert('Por favor, escribe un comentario');
+      }
+      return;
+    }
+
+    if (!user) {
+      try {
+        toast('Debes iniciar sesión para comentar', {
+          icon: '❌',
+          duration: 4000
+        });
+      } catch (e) {
+        console.error('Error al mostrar notificación:', e);
+        alert('Debes iniciar sesión para comentar');
+      }
+      return;
+    }
+
+    setCommentLoading(true);
+    try {
+      const updatedBlog = await updateBlogPost(id, {
+        ...blog,
+        comments: [...(blog.comments || []), {
+          text: comment,
+          author: user.name || 'Usuario anónimo',
+          date: new Date().toISOString()
+        }]
+      });
+
+      setBlog(updatedBlog);
+      setComment('');
+      try {
+        toast('Comentario añadido correctamente', {
+          icon: '✅',
+          duration: 4000
+        });
+      } catch (e) {
+        console.error('Error al mostrar notificación:', e);
+      }
+    } catch (error) {
+      console.error('Error al añadir comentario:', error);
+      try {
+        toast('Error al añadir comentario', {
+          icon: '❌',
+          duration: 4000
+        });
+      } catch (e) {
+        console.error('Error al mostrar notificación:', e);
+        alert('Error al añadir comentario');
+      }
+    } finally {
+      setCommentLoading(false);
+    }
+  };
+
+  // Función para eliminar un comentario
+  const handleCommentDelete = async (commentIndex) => {
+    if (!user) {
+      try {
+        toast('Debes iniciar sesión para eliminar comentarios', {
+          icon: '❌',
+          duration: 4000
+        });
+      } catch (e) {
+        console.error('Error al mostrar notificación:', e);
+        alert('Debes iniciar sesión para eliminar comentarios');
+      }
+      return;
+    }
+
+    try {
+      const comments = [...(blog.comments || [])];
+      comments.splice(commentIndex, 1);
+
+      const updatedBlog = await updateBlogPost(id, {
+        ...blog,
+        comments
+      });
+
+      setBlog(updatedBlog);
+      try {
+        toast('Comentario eliminado correctamente', {
+          icon: '✅',
+          duration: 4000
+        });
+      } catch (e) {
+        console.error('Error al mostrar notificación:', e);
+      }
+    } catch (error) {
+      console.error('Error al eliminar comentario:', error);
+      try {
+        toast('Error al eliminar comentario', {
+          icon: '❌',
+          duration: 4000
+        });
+      } catch (e) {
+        console.error('Error al mostrar notificación:', e);
+        alert('Error al eliminar comentario');
+      }
     }
   };
 

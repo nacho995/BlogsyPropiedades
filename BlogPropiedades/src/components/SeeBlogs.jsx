@@ -34,7 +34,7 @@ export default function SeeBlogs() {
   const [isOpen, setIsOpen] = useState(false);
   const [blogToDelete, setBlogToDelete] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState({});
   
   // Usar useContext directamente con manejo de errores
   const userContext = useContext(UserContext);
@@ -139,23 +139,63 @@ export default function SeeBlogs() {
     setIsOpen(true);
   };
 
-  const confirmDelete = async () => {
-    if (!blogToDelete) return;
-    setDeleteLoading(true);
+  const handleDeleteClick = (blog_id) => {
     try {
-      console.log('Intentando eliminar blog:', blogToDelete._id);
-      const result = await deleteBlogPost(blogToDelete._id);
-      console.log('Resultado de eliminación:', result);
-      
-      setBlogs(prevBlogs => prevBlogs.filter(blog => blog._id !== blogToDelete._id));
-      toast.success('Blog eliminado correctamente');
+      toast(`¿Desea eliminar el blog?`, {
+        icon: '🗑️',
+        duration: 4000,
+        action: {
+          label: 'Sí',
+          onClick: () => confirmDelete(blog_id)
+        },
+      });
+    } catch (e) {
+      console.error('Error al mostrar notificación:', e);
+      if (confirm('¿Desea eliminar el blog?')) {
+        confirmDelete(blog_id);
+      }
+    }
+  };
+
+  const confirmDelete = async (blog_id) => {
+    try {
+      setDeleteLoading(prevState => ({ ...prevState, [blog_id]: true }));
+      const deleted = await deleteBlogPost(blog_id);
+      if (deleted) {
+        try {
+          toast('Blog eliminado correctamente', {
+            icon: '✅',
+            duration: 4000
+          });
+        } catch (e) {
+          console.error('Error al mostrar notificación:', e);
+        }
+        // Actualizar el estado para que no se muestre el blog eliminado
+        setBlogs(prevBlogs => prevBlogs.filter(blog => blog._id !== blog_id));
+      } else {
+        try {
+          toast('Error al eliminar el blog', {
+            icon: '❌',
+            duration: 4000
+          });
+        } catch (e) {
+          console.error('Error al mostrar notificación:', e);
+          alert('Error al eliminar el blog');
+        }
+      }
     } catch (error) {
       console.error('Error al eliminar el blog:', error);
-      toast.error('Error al eliminar el blog');
+      try {
+        toast('Error al eliminar el blog', {
+          icon: '❌',
+          duration: 4000
+        });
+      } catch (e) {
+        console.error('Error al mostrar notificación:', e);
+        alert('Error al eliminar el blog');
+      }
     } finally {
-      setDeleteLoading(false);
-      setIsOpen(false);
-      setBlogToDelete(null);
+      setDeleteLoading(prevState => ({ ...prevState, [blog_id]: false }));
     }
   };
 
@@ -246,7 +286,7 @@ export default function SeeBlogs() {
                           <FiEdit className="w-5 h-5" />
                         </Link>
                         <button
-                          onClick={() => openDeleteModal(blog)}
+                          onClick={() => handleDeleteClick(blog._id)}
                           className="p-2 text-red-600 hover:text-red-800 transition-colors"
                           title="Eliminar"
                         >
@@ -305,17 +345,17 @@ export default function SeeBlogs() {
                       type="button"
                       className="inline-flex justify-center rounded-md border border-transparent bg-gray-100 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
                       onClick={() => setIsOpen(false)}
-                      disabled={deleteLoading}
+                      disabled={deleteLoading[blogToDelete?._id]}
                     >
                       Cancelar
                     </button>
                     <button
                       type="button"
                       className="inline-flex justify-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
-                      onClick={confirmDelete}
-                      disabled={deleteLoading}
+                      onClick={() => confirmDelete(blogToDelete?._id)}
+                      disabled={deleteLoading[blogToDelete?._id]}
                     >
-                      {deleteLoading ? 'Eliminando...' : 'Eliminar'}
+                      {deleteLoading[blogToDelete?._id] ? 'Eliminando...' : 'Eliminar'}
                     </button>
                   </div>
                 </Dialog.Panel>

@@ -64,7 +64,16 @@ export default function SeeProperties() {
             } catch (error) {
                 console.error('Error al obtener las propiedades:', error);
                 if (isMounted) {
-                    toast.error('Error al cargar las propiedades');
+                    // Usar toast básico en lugar de toast.error
+                    try {
+                        toast('Error al cargar las propiedades', {
+                            icon: '❌',
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        console.error('Error al mostrar notificación:', e);
+                        alert('Error al cargar las propiedades');
+                    }
                     setLoading(false);
                 }
             }
@@ -86,25 +95,63 @@ export default function SeeProperties() {
         setIsOpen(true);
     };
 
-    const confirmDelete = async () => {
-        if (!propertyToDelete) return;
-        setDeleteLoading(true);
+    const handleDeleteClick = (property_id) => {
         try {
-            console.log('Intentando eliminar propiedad:', propertyToDelete._id);
-            const result = await deletePropertyPost(propertyToDelete._id);
-            console.log('Resultado de eliminación:', result);
-            
-            setProperty(prevProperties => 
-                prevProperties.filter(prop => prop._id !== propertyToDelete._id)
-            );
-            toast.success('Propiedad eliminada correctamente');
+            toast(`¿Desea eliminar la propiedad?`, {
+                icon: '🗑️',
+                duration: 4000,
+                action: {
+                    label: 'Sí',
+                    onClick: () => confirmDelete(property_id)
+                },
+            });
+        } catch (e) {
+            console.error('Error al mostrar notificación:', e);
+            if (confirm('¿Desea eliminar la propiedad?')) {
+                confirmDelete(property_id);
+            }
+        }
+    };
+
+    const confirmDelete = async (property_id) => {
+        try {
+            setDeleteLoading(prevState => ({ ...prevState, [property_id]: true }));
+            const deleted = await deletePropertyPost(property_id);
+            if (deleted.success) {
+                try {
+                    toast('Propiedad eliminada correctamente', {
+                        icon: '✅',
+                        duration: 4000
+                    });
+                } catch (e) {
+                    console.error('Error al mostrar notificación:', e);
+                }
+                // Actualizar el estado para que no se muestre la propiedad eliminada
+                setProperty(prevProperties => prevProperties.filter(prop => prop._id !== property_id));
+            } else {
+                try {
+                    toast('Error al eliminar la propiedad', {
+                        icon: '❌',
+                        duration: 4000
+                    });
+                } catch (e) {
+                    console.error('Error al mostrar notificación:', e);
+                    alert('Error al eliminar la propiedad');
+                }
+            }
         } catch (error) {
             console.error('Error al eliminar la propiedad:', error);
-            toast.error('Error al eliminar la propiedad');
+            try {
+                toast('Error al eliminar la propiedad', {
+                    icon: '❌',
+                    duration: 4000
+                });
+            } catch (e) {
+                console.error('Error al mostrar notificación:', e);
+                alert('Error al eliminar la propiedad');
+            }
         } finally {
-            setDeleteLoading(false);
-            setIsOpen(false);
-            setPropertyToDelete(null);
+            setDeleteLoading(prevState => ({ ...prevState, [property_id]: false }));
         }
     };
 
@@ -256,7 +303,7 @@ export default function SeeProperties() {
                                         <button
                                             type="button"
                                             className="inline-flex justify-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
-                                            onClick={confirmDelete}
+                                            onClick={() => confirmDelete(propertyToDelete._id)}
                                             disabled={deleteLoading}
                                         >
                                             {deleteLoading ? 'Eliminando...' : 'Eliminar'}

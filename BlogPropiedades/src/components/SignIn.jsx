@@ -1,23 +1,26 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { loginUser, getCurrentUser } from "../services/api";
+import { loginUser, createUser } from "../services/api";
 import { useUser } from "../context/UserContext";
 import toast from "react-hot-toast";
+import { UserContext } from '../context/UserContext';
+import PropTypes from 'prop-types';
 
-export default function SignIn() {
+const SignIn = ({ isRegistering = false }) => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const navigate = useNavigate();
     
-    const { login, isAuthenticated } = useUser();
+    const { isAuthenticated, user, login } = useContext(UserContext);
 
     useEffect(() => {
-        if (isAuthenticated) {
+        if (isAuthenticated && user) {
             navigate("/");
         }
-    }, [isAuthenticated, navigate]);
+    }, [isAuthenticated, user, navigate]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -25,155 +28,75 @@ export default function SignIn() {
         setError("");
 
         try {
-            if (!email || !password) {
-                throw new Error("Por favor, completa todos los campos");
-            }
-
-            console.log("Intentando iniciar sesión con:", email);
-            const response = await loginUser({ email, password });
-            
-            console.log("Respuesta original de login:", response);
-            console.log("Tipo de respuesta:", typeof response);
-            
-            // Si la respuesta es una cadena vacía, mostrar mensaje específico
-            if (response === "" || response === null || response === undefined) {
-                console.error("Respuesta de login vacía o nula");
-                throw new Error("El servidor no respondió correctamente. Por favor, intenta de nuevo más tarde.");
-            }
-            
-            // Si la respuesta es una cadena (no vacía), mostrar su contenido
-            if (typeof response === 'string') {
-                console.error("Respuesta de login es una cadena:", response);
-                throw new Error(`Respuesta inesperada del servidor: ${response}`);
-            }
-            
-            // Verificar si es una respuesta generada automáticamente por el cliente
-            let sessionWarning = "";
-            if (response._notice) {
-                console.warn("Usando respuesta generada localmente:", response);
-                sessionWarning = "Sesión mantenida con datos locales debido a problemas en el servidor";
-            } else if (response._recovered) {
-                console.warn("Usando sesión recuperada:", response);
-                sessionWarning = "Sesión recuperada utilizando datos locales debido a problemas con el servidor";
-            } else if (response._errorRecovered) {
-                console.warn("Sesión recuperada tras error:", response);
-                sessionWarning = "Sesión recuperada tras un error de comunicación con el servidor";
-            } else if (response.isTemporary) {
-                console.warn("Usando sesión temporal:", response);
-                sessionWarning = "Sesión temporal activada. Algunas funciones podrían no estar disponibles.";
-            }
-            
-            // Mostrar advertencia si es necesario
-            if (sessionWarning) {
-                console.log("Mostrando advertencia:", sessionWarning);
-                try {
-                    // Usar toast básico sin opciones complejas para evitar errores
-                    toast(sessionWarning, {
-                        icon: '⚠️',
-                        duration: 6000
-                    });
-                } catch (e) {
-                    console.error("Error al mostrar toast:", e);
-                    alert(sessionWarning); // Fallback a alert si toast falla
+            if (isRegistering) {
+                if (password !== confirmPassword) {
+                    setError("Las contraseñas no coinciden");
+                    setLoading(false);
+                    return;
                 }
-            }
-            
-            console.log("Claves disponibles:", Object.keys(response));
-            
-            // Intentar extraer token y datos de usuario de varias estructuras posibles
-            let token, userData;
-            
-            if (response && response.token) {
-                // Estructura { token, user }
-                token = response.token;
-                userData = response.user || {};
-            } else if (response && response.data && response.data.token) {
-                // Estructura { data: { token, user } }
-                token = response.data.token;
-                userData = response.data.user || {};
-            } else if (response && response.user && response.user.token) {
-                // Estructura { user: { token, ... } }
-                token = response.user.token;
-                userData = response.user;
-            } else if (response && response.accessToken) {
-                // Estructura { accessToken, user }
-                token = response.accessToken;
-                userData = response.user || {};
-            } else {
-                console.error("No se pudo extraer token de la respuesta:", response);
-                throw new Error("Formato de respuesta incorrecto. Por favor, contacta al soporte técnico.");
-            }
-            
-            if (!token) {
-                throw new Error("Error al iniciar sesión. No se recibió token de autenticación.");
-            }
 
-            console.log("Token extraído:", token);
-            console.log("Datos de usuario extraídos:", userData);
-            
-            // Ejecutar login con los datos extraídos
-            await login({
-                token,
-                name: userData?.name || "",
-                user: userData,
-                profilePic: userData?.profilePic || ""
-            });
-
-            toast.success("¡Inicio de sesión exitoso!");
-            
-            // Redirigir a la página principal
-            navigate("/");
-        } catch (err) {
-            console.error("Error en login:", err);
-            
-            // Verificar si hay token existente para intentar mantener la sesión a pesar del error
-            const savedToken = localStorage.getItem('token');
-            if (savedToken && err.message && (
-                err.message.includes("vacía") || 
-                err.message.includes("no respondió") || 
-                err.message.includes("formato") ||
-                err.message.includes("inesperada")
-            )) {
-                console.log("Intentando login local con token existente tras error:", err.message);
-                
-                try {
-                    const userName = localStorage.getItem('name') || email.split('@')[0] || 'Usuario';
-                    
-                    // Mantener la sesión usando el token local
-                    await login({
-                        token: savedToken,
-                        name: userName,
-                        user: { name: userName, email },
-                        _recovered: true
-                    });
-                    
-                    // Usar toast básico en lugar de toast.warning
+                const response = await createUser({ email, password });
+                if (response) {
                     try {
-                        toast("Sesión mantenida con credenciales locales debido a problemas con el servidor", {
-                            icon: '⚠️',
-                            duration: 6000
+                        toast("Registro exitoso", {
+                            icon: "✅",
+                            duration: 4000
                         });
                     } catch (e) {
-                        console.error("Error al mostrar toast:", e);
-                        alert("Sesión mantenida con credenciales locales"); 
+                        console.error("Error al mostrar notificación:", e);
+                    }
+                    login(response.token, response.user);
+                    navigate("/");
+                }
+            } else {
+                console.log("Intentando iniciar sesión con:", { email, password });
+                const response = await loginUser({ email, password });
+                
+                console.log("Respuesta de inicio de sesión:", response);
+                
+                if (response) {
+                    if (typeof response === "string" && response.trim() === "") {
+                        console.warn("Respuesta de inicio de sesión vacía, intentando mantener sesión");
+                        try {
+                            toast("Sesión mantenida con token existente", {
+                                icon: "⚠️",
+                                duration: 4000
+                            });
+                        } catch (e) {
+                            console.error("Error al mostrar notificación:", e);
+                        }
+                    } else {
+                        try {
+                            toast("¡Inicio de sesión exitoso!", {
+                                icon: "✅",
+                                duration: 4000
+                            });
+                        } catch (e) {
+                            console.error("Error al mostrar notificación de éxito:", e);
+                        }
                     }
                     
-                    // Redirigir a la página principal
+                    if (response.token && response.user) {
+                        login(response.token, response.user);
+                    } else if (response.temporaryToken) {
+                        console.warn("Usando token temporal para mantener sesión básica");
+                        login(response.temporaryToken, response.user || { email });
+                    }
+                    
                     navigate("/");
-                    return;
-                } catch (loginErr) {
-                    console.error("Error al intentar login local:", loginErr);
                 }
             }
-            
-            setError(err.message || "Error al iniciar sesión");
+        } catch (err) {
+            console.error("Error durante la autenticación:", err);
+            setError(err.message || "Error durante la autenticación");
             try {
-                toast(err.message || "Error al iniciar sesión", {
-                    icon: '❌'
+                toast("Error de autenticación: " + (err.message || "Credenciales inválidas"), {
+                    icon: "❌",
+                    duration: 4000
                 });
             } catch (e) {
-                console.error("Error al mostrar toast de error:", e);
-                alert(err.message || "Error al iniciar sesión");
+                console.error("Error al mostrar notificación:", e);
+                alert("Error de autenticación: " + (err.message || "Credenciales inválidas"));
             }
         } finally {
             setLoading(false);
@@ -238,6 +161,24 @@ export default function SignIn() {
                                 onChange={(e) => setPassword(e.target.value)}
                             />
                         </div>
+                        {isRegistering && (
+                            <div>
+                                <label htmlFor="confirm-password" className="sr-only">
+                                    Confirmar Contraseña
+                                </label>
+                                <input
+                                    id="confirm-password"
+                                    name="confirm-password"
+                                    type="password"
+                                    autoComplete="new-password"
+                                    required
+                                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                                    placeholder="Confirmar Contraseña"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                />
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex items-center justify-between">
@@ -264,4 +205,10 @@ export default function SignIn() {
             </div>
         </div>
     );
-} 
+};
+
+SignIn.propTypes = {
+    isRegistering: PropTypes.bool,
+};
+
+export default SignIn; 

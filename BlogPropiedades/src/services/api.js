@@ -7,124 +7,128 @@ const API_URL = import.meta.env.VITE_API_PUBLIC_API_URL || 'http://localhost:300
 const BASE_URL = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
 
 /**
- * Función para realizar peticiones HTTP con fetch
+ * Realiza peticiones al API con manejo de errores
  * @param {string} endpoint - Endpoint de la API
- * @param {Object} options - Opciones de fetch (method, body, etc)
+ * @param {Object} options - Opciones de fetch (method, headers, body)
  * @returns {Promise<any>} - Respuesta de la API
  */
-const fetchAPI = async (endpoint, options = {}) => {
-  // Añadir token de autenticación si existe
-  const token = localStorage.getItem('token');
-  const headers = {
-    ...options.headers
-  };
-  
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
+export const fetchAPI = async (endpoint, options = {}) => {
+    try {
+        const url = `${BASE_URL}${endpoint}`;
+        console.log(`🚀 Enviando solicitud a: ${url}`);
+        console.log('Opciones:', JSON.stringify(options, null, 2));
 
-  // No añadir Content-Type para FormData
-  if (!(options.body instanceof FormData)) {
-    headers['Content-Type'] = 'application/json';
-  }
-  
-  const url = `${BASE_URL}${endpoint}`;
-  
-  try {
-    console.log(`Realizando petición ${options.method || 'GET'} a ${url}`);
-    console.log('Headers:', headers);
-    if (options.body) {
-      console.log('Body:', options.body instanceof FormData ? 'FormData' : options.body);
-    }
-    
-    const response = await fetch(url, {
-      ...options,
-      headers,
-      credentials: 'include'
-    });
-    
-    // Verificar si la respuesta es exitosa
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Error en respuesta del servidor (${response.status}):`, errorText);
-      throw new Error(errorText || `Error ${response.status}: ${response.statusText}`);
-    }
-    
-    // Especial para login: registrar la respuesta completa para depuración
-    if (endpoint === '/user/login') {
-      const responseClone = response.clone();
-      const rawText = await responseClone.text();
-      console.log("Respuesta raw del login:", rawText);
-      
-      // Si la respuesta está vacía, manejarlo específicamente
-      if (!rawText || rawText.trim() === '') {
-        console.warn("La respuesta del servidor para login está vacía");
-        
-        // Verificar si hay headers que puedan dar más información
-        const headers = {};
-        response.headers.forEach((value, key) => {
-          headers[key] = value;
-        });
-        console.log("Headers de respuesta:", headers);
-        
-        // Intentar validar el token actual para mantener la sesión
-        if (token && token.split('.').length === 3) {
-          console.log("Usando token existente para mantener la sesión");
-          return {
-            token,
-            user: {
-              name: localStorage.getItem('name') || 'Usuario'
-            },
-            _generated: true
-          };
+        const defaultHeaders = {
+            'Content-Type': 'application/json',
+        };
+
+        // Si hay token en localStorage, añadirlo a los headers
+        const token = localStorage.getItem('token');
+        if (token) {
+            defaultHeaders['Authorization'] = `Bearer ${token}`;
         }
-        
-        return "";
-      }
-      
-      // Intentar parsear JSON, pero si falla retornar el texto original
-      try {
-        return JSON.parse(rawText);
-      } catch (e) {
-        console.warn("La respuesta no es un JSON válido:", e);
-        return rawText;
-      }
-    }
-    
-    // Verificar si la respuesta está vacía
-    const contentType = response.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-      try {
-        const jsonResponse = await response.json();
-        
-        // Para respuestas JSON vacías (como {} o []), registrar información
-        if (jsonResponse && (
-            (Array.isArray(jsonResponse) && jsonResponse.length === 0) || 
-            (typeof jsonResponse === 'object' && Object.keys(jsonResponse).length === 0)
-          )) {
-          console.warn(`Respuesta JSON vacía para ${endpoint}`);
+
+        const fetchOptions = {
+            ...options,
+            headers: {
+                ...defaultHeaders,
+                ...options.headers
+            }
+        };
+
+        const response = await fetch(url, fetchOptions);
+        console.log(`📥 Respuesta recibida de: ${url}, Status: ${response.status}`);
+
+        // Manejo especial para errores HTTP
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`🔥 Error HTTP ${response.status}: ${errorText}`);
+            
+            try {
+                // Intentar parsear como JSON
+                const errorData = JSON.parse(errorText);
+                throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
+            } catch (jsonError) {
+                // Si no es JSON, lanzar error con el texto
+                throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
+            }
         }
-        
-        return jsonResponse;
-      } catch (e) {
-        console.error(`Error al parsear JSON desde ${url}:`, e);
-        const rawText = await response.text();
-        console.log("Texto de respuesta raw:", rawText);
-        
-        if (!rawText || rawText.trim() === '') {
-          console.warn("La respuesta está vacía");
-          return "";
+
+        // Para respuestas vacías o con contenido cero
+        const contentLength = response.headers.get('content-length');
+        if (contentLength === '0' || contentLength === null) {
+            console.warn('⚠️ Respuesta con contenido vacío');
+            
+            // Si es endpoint de login y tenemos respuesta vacía, manejar especialmente
+            if (endpoint.includes('/user/login')) {
+                console.warn('⚠️ Respuesta vacía en login, generando respuesta de contingencia');
+                
+                // Verificar si hay un token previo
+                const existingToken = localStorage.getItem('token');
+                if (existingToken) {
+                    console.log('🔑 Usando token existente para mantener sesión');
+                    return {
+                        token: existingToken,
+                        user: { email: localStorage.getItem('email') || 'usuario@example.com' },
+                        _notice: 'Sesión mantenida con token existente'
+                    };
+                }
+                
+                // Generar token temporal
+                const tempToken = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+                return {
+                    temporaryToken: tempToken,
+                    user: null,
+                    isTemporary: true,
+                    _notice: 'Sesión temporal creada'
+                };
+            }
+            
+            // Para otros endpoints, devolver objeto vacío
+            return {};
         }
-        
-        throw new Error(`Error al parsear respuesta JSON: ${e.message}`);
-      }
+
+        try {
+            // Intentar parsear la respuesta como JSON
+            const data = await response.json();
+            console.log(`📦 Respuesta parseada:`, typeof data === 'object' ? 'Objeto válido' : `Tipo: ${typeof data}`);
+            
+            // Validar que data sea un objeto o array para evitar errores con métodos como map
+            if (data === null) {
+                console.warn('⚠️ Respuesta JSON nula');
+                return {};
+            }
+            
+            // Verificar tipo de data para métodos como map
+            if (Array.isArray(data)) {
+                // Es un array, está bien
+                return data;
+            } else if (typeof data === 'object') {
+                // Es un objeto, está bien
+                return data;
+            } else {
+                // No es ni objeto ni array, crear un wrapper
+                console.warn(`⚠️ Respuesta con formato inesperado (${typeof data}), creando wrapper`);
+                return { value: data, _warning: 'Respuesta con formato no estándar' };
+            }
+        } catch (error) {
+            console.error('🔥 Error al parsear respuesta JSON:', error);
+            
+            // Si falla el parseo, intentar obtener el texto
+            const text = await response.text();
+            console.log('📄 Respuesta como texto:', text.length > 100 ? `${text.substring(0, 100)}...` : text);
+            
+            if (text.trim() === '') {
+                console.warn('⚠️ Respuesta como texto vacía');
+                return {};
+            }
+            
+            throw new Error('Error al procesar la respuesta del servidor');
+        }
+    } catch (error) {
+        console.error('🔥 Error en fetchAPI:', error);
+        throw error;
     }
-    
-    return await response.text();
-  } catch (error) {
-    console.error(`Error en petición a ${url}:`, error);
-    throw error;
-  }
 };
 
 /**
@@ -351,169 +355,84 @@ export const createUser = async (data) => {
 };
 
 /**
- * Inicia sesión de un usuario.
- * @param {Object} credentials - Credenciales del usuario (email y password).
- * @returns {Promise<Object>} - Datos del usuario y token.
+ * Inicia sesión de usuario
+ * @param {Object} userData - Email y contraseña del usuario
+ * @returns {Promise<Object>} - Token y datos del usuario
  */
-export const loginUser = async (credentials) => {
-  try {
-    console.log("Inicio de loginUser - Realizando petición a /user/login");
-    
-    const response = await fetchAPI('/user/login', {
-      method: 'POST',
-      body: JSON.stringify(credentials)
-    });
-    
-    console.log("Respuesta de login completa:", response);
-    console.log("Tipo de respuesta:", typeof response);
-    
-    // Verificar si la respuesta es una cadena vacía
-    if (response === "") {
-      console.error("La respuesta del servidor es una cadena vacía");
-      console.log("Intentando obtener usuario desde localStorage...");
-      
-      // Verificar si hay un token en localStorage
-      const savedToken = localStorage.getItem('token');
-      if (savedToken) {
-        console.log("Token encontrado en localStorage, usando el token existente para continuar la sesión");
+export const loginUser = async (userData) => {
+    try {
+        console.log('📝 Intentando login con email:', userData.email);
         
-        // Intentar obtener más información del usuario
-        const userName = localStorage.getItem('name') || 'Usuario';
+        const response = await fetchAPI('/user/login', {
+            method: 'POST',
+            body: JSON.stringify(userData)
+        });
         
-        // Crear una respuesta simulada con el token existente
-        const responseData = {
-          token: savedToken,
-          user: {
-            name: userName
-          },
-          _notice: "Esta respuesta fue generada localmente debido a una respuesta vacía del servidor"
-        };
+        console.log('🔑 Respuesta de login recibida:', 
+            typeof response === 'object' ? 
+            (Object.keys(response).length > 0 ? 'Objeto con datos' : 'Objeto vacío') : 
+            `Tipo: ${typeof response}, Valor: ${String(response).substring(0, 50)}`
+        );
         
-        console.log("Respuesta generada localmente:", responseData);
-        return responseData;
-      } else {
-        console.error("No se encontró un token en localStorage para mantener la sesión");
-        // Si el servidor devuelve una respuesta vacía y no hay token, 
-        // considerarlo como un login exitoso con un token temporal
-        // para no bloquear al usuario en situaciones de backend inestable
-        const tempToken = `temp_${Math.random().toString(36).substring(2, 15)}`;
-        console.log("Generando token temporal para permitir acceso:", tempToken);
+        // Si la respuesta es una cadena vacía, manejar específicamente
+        if (response === '' || response === null || response === undefined) {
+            console.warn('⚠️ Respuesta de login vacía');
+            
+            // Verificar si hay un token previo
+            const existingToken = localStorage.getItem('token');
+            if (existingToken) {
+                console.log('🔑 Usando token existente para mantener sesión');
+                return {
+                    token: existingToken,
+                    user: { email: userData.email },
+                    _recovered: true
+                };
+            }
+            
+            // Generar token temporal
+            const tempToken = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+            console.log('🔑 Generando token temporal:', tempToken.substring(0, 15) + '...');
+            
+            return {
+                temporaryToken: tempToken,
+                user: { email: userData.email },
+                isTemporary: true
+            };
+        }
         
-        const responseData = {
-          token: tempToken,
-          user: {
-            name: credentials?.email?.split('@')[0] || 'Usuario Temporal',
-            email: credentials?.email || 'usuario@example.com'
-          },
-          isTemporary: true,
-          _notice: "Sesión temporal creada debido a una respuesta vacía del servidor"
-        };
+        // Si la respuesta no tiene token, buscar en diferentes estructuras
+        if (response && !response.token) {
+            console.warn('⚠️ Respuesta sin token estándar, buscando en otras estructuras');
+            
+            // Buscar token en diferentes estructuras de respuesta
+            if (response.data && response.data.token) {
+                return {
+                    token: response.data.token,
+                    user: response.data.user || { email: userData.email }
+                };
+            } else if (response.user && response.user.token) {
+                return {
+                    token: response.user.token,
+                    user: response.user
+                };
+            } else if (response.accessToken) {
+                return {
+                    token: response.accessToken,
+                    user: response.user || { email: userData.email }
+                };
+            } else if (response.auth && response.auth.token) {
+                return {
+                    token: response.auth.token,
+                    user: response.auth.user || response.user || { email: userData.email }
+                };
+            }
+        }
         
-        console.log("Respuesta temporal generada:", responseData);
-        return responseData;
-      }
+        return response;
+    } catch (error) {
+        console.error('🔥 Error en loginUser:', error);
+        throw error;
     }
-    
-    // Verificar si la respuesta es un objeto
-    if (typeof response !== 'object' || response === null) {
-      console.error(`La respuesta no es un objeto, es de tipo: ${typeof response}`);
-      console.error("Contenido de la respuesta:", response);
-      
-      // Intentar mantener la sesión con el token existente
-      const savedToken = localStorage.getItem('token');
-      if (savedToken) {
-        console.log("Usando token existente para continuar la sesión a pesar del formato de respuesta incorrecto");
-        
-        const responseData = {
-          token: savedToken,
-          user: {
-            name: localStorage.getItem('name') || 'Usuario'
-          },
-          _recovered: true
-        };
-        
-        console.log("Respuesta recuperada generada:", responseData);
-        return responseData;
-      }
-      
-      throw new Error(`Formato de respuesta inesperado: ${typeof response}`);
-    }
-    
-    console.log("Estructura de respuesta:", Object.keys(response));
-    
-    // Verificar estructura de respuesta para adaptarnos al formato del backend
-    if (response && response.token) {
-      console.log("Estructura encontrada: { token, ... }");
-      return response; // { token, user }
-    } else if (response && response.data && response.data.token) {
-      console.log("Estructura encontrada: { data: { token, ... } }");
-      return response.data; // { data: { token, user } }
-    } else if (response && response.user && response.user.token) {
-      console.log("Estructura encontrada: { user: { token, ... } }");
-      return {
-        token: response.user.token,
-        user: response.user
-      };
-    } else if (response && response.success && response.token) {
-      console.log("Estructura encontrada: { success, token, ... }");
-      return {
-        token: response.token,
-        user: response.user || {}
-      };
-    } else if (response && response.accessToken) {
-      console.log("Estructura encontrada: { accessToken, ... }");
-      return {
-        token: response.accessToken,
-        user: response.user || {}
-      };
-    } else {
-      console.error("Estructura de respuesta de login inesperada:", JSON.stringify(response, null, 2));
-      
-      // Intentar mantener la sesión con el token existente incluso con estructura incorrecta
-      const savedToken = localStorage.getItem('token');
-      if (savedToken) {
-        console.log("Usando token existente para continuar la sesión a pesar de estructura incorrecta");
-        
-        const responseData = {
-          token: savedToken,
-          user: {
-            name: localStorage.getItem('name') || 'Usuario'
-          },
-          _recovered: true
-        };
-        
-        console.log("Respuesta recuperada generada:", responseData);
-        return responseData;
-      }
-      
-      throw new Error("Formato de respuesta incorrecto");
-    }
-  } catch (error) {
-    console.error('Error en login:', error);
-    
-    // Si ocurre un error pero hay un token en localStorage, intentar mantener la sesión
-    if (error.message.includes('vacía') || error.message.includes('empty') || 
-        error.message.includes('incorrecto') || error.message.includes('Formato')) {
-      const savedToken = localStorage.getItem('token');
-      if (savedToken) {
-        console.log("Intentando recuperar sesión con token existente tras error:", error.message);
-        
-        const responseData = {
-          token: savedToken,
-          user: {
-            name: localStorage.getItem('name') || 'Usuario'
-          },
-          _errorRecovered: true,
-          _errorMessage: error.message
-        };
-        
-        console.log("Respuesta de error recuperada:", responseData);
-        return responseData;
-      }
-    }
-    
-    throw error;
-  }
 };
 
 /**

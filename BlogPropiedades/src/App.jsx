@@ -21,9 +21,21 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
     return (
-        <BrowserRouter>
-            <div className="App">
-                <UserProvider>
+        <UserProvider>
+            <div className="min-h-screen bg-gray-100">
+                <Toaster 
+                    position="top-center"
+                    reverseOrder={false}
+                    gutter={8}
+                    toastOptions={{
+                        duration: 4000,
+                        style: {
+                            background: '#363636',
+                            color: '#fff',
+                        },
+                    }}
+                />
+                <BrowserRouter>
                     <ImageLoader />
                     <Navbar />
                     <Routes>
@@ -42,22 +54,9 @@ function App() {
                             </ProtectedRoute>
                         } />
                     </Routes>
-                    <Toaster 
-                        position="top-right"
-                        toastOptions={{
-                            duration: 5000,
-                            style: {
-                                background: '#fff',
-                                color: '#333',
-                                padding: '16px',
-                                borderRadius: '8px',
-                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-                            }
-                        }}
-                    />
-                </UserProvider>
+                </BrowserRouter>
             </div>
-        </BrowserRouter>
+        </UserProvider>
     );
 }
 

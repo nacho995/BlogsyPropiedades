@@ -17,6 +17,8 @@ export default function PropertyDetail() {
   const [uploadError, setUploadError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [message, setMessage] = useState('');
+  const [messageLoading, setMessageLoading] = useState(false);
   
   const { user } = useUser();
 
@@ -224,6 +226,72 @@ export default function PropertyDetail() {
       setCurrentImageIndex((prevIndex) => 
         prevIndex === 0 ? property.images.length - 1 : prevIndex - 1
       );
+    }
+  };
+
+  // Función para manejar los mensajes
+  const handleMessageSubmit = async (e) => {
+    e.preventDefault();
+    if (!message.trim()) {
+      try {
+        toast('Por favor, escribe un mensaje', {
+          icon: '⚠️',
+          duration: 4000
+        });
+      } catch (e) {
+        console.error('Error al mostrar notificación:', e);
+        alert('Por favor, escribe un mensaje');
+      }
+      return;
+    }
+
+    if (!user) {
+      try {
+        toast('Debes iniciar sesión para enviar mensajes', {
+          icon: '❌',
+          duration: 4000
+        });
+      } catch (e) {
+        console.error('Error al mostrar notificación:', e);
+        alert('Debes iniciar sesión para enviar mensajes');
+      }
+      return;
+    }
+
+    setMessageLoading(true);
+    try {
+      const updatedProperty = await updatePropertyPost(id, {
+        ...property,
+        messages: [...(property.messages || []), {
+          text: message,
+          author: user.name || 'Usuario anónimo',
+          date: new Date().toISOString()
+        }]
+      });
+
+      setProperty(updatedProperty);
+      setMessage('');
+      try {
+        toast('Mensaje enviado correctamente', {
+          icon: '✅',
+          duration: 4000
+        });
+      } catch (e) {
+        console.error('Error al mostrar notificación:', e);
+      }
+    } catch (error) {
+      console.error('Error al enviar mensaje:', error);
+      try {
+        toast('Error al enviar mensaje', {
+          icon: '❌',
+          duration: 4000
+        });
+      } catch (e) {
+        console.error('Error al mostrar notificación:', e);
+        alert('Error al enviar mensaje');
+      }
+    } finally {
+      setMessageLoading(false);
     }
   };
 
