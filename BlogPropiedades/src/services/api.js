@@ -22,7 +22,8 @@ const ERROR_MESSAGES = {
   SERVER: "Error del servidor: Estamos experimentando problemas técnicos. Por favor, inténtalo de nuevo en unos minutos.",
   AUTHENTICATION: "Error de autenticación: Tu sesión ha expirado o no tienes permiso para realizar esta acción.",
   VALIDATION: "Error de validación: Por favor, verifica los datos ingresados e intenta nuevamente.",
-  UNKNOWN: "Ocurrió un error inesperado. Por favor, inténtalo de nuevo."
+  UNKNOWN: "Ocurrió un error inesperado. Por favor, inténtalo de nuevo.",
+  MIXED_CONTENT: "Error de contenido mixto: La página usa HTTPS pero la API usa HTTP"
 };
 
 // Estado global de la red para detectar problemas persistentes
@@ -110,6 +111,24 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
         // Unificar URL base según la configuración - Siempre usar HTTP (no HTTPS)
         const BASE_URL = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
         const FALLBACK_API = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+        
+        // Verificar si hay un potencial problema de contenido mixto (HTTPS->HTTP)
+        if (window.location.protocol === 'https:') {
+            console.warn('⚠️ Posible problema de contenido mixto: La página usa HTTPS pero la API usa HTTP');
+            console.log('ℹ️ Algunas peticiones podrían ser bloqueadas por el navegador');
+            
+            // Registrar este problema para diagnóstico
+            try {
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.setItem('mixedContentWarning', JSON.stringify({
+                        timestamp: new Date().toISOString(),
+                        endpoint: endpoint
+                    }));
+                }
+            } catch (e) {
+                console.error('Error al registrar aviso de contenido mixto:', e);
+            }
+        }
         
         // Verificar estado de conexión
         if (!navigator.onLine) {
@@ -209,9 +228,9 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
             const response = await fetch(url, fetchOptions);
             clearTimeout(timeoutId);
             
-            // Calcular latencia
-            const latencyMs = Date.now() - startTime;
-            console.log(`📥 [${requestId}] Respuesta recibida de: ${url}, Status: ${response.status}, Latencia: ${latencyMs}ms`);
+            // Registrar la latencia
+            const latency = Date.now() - startTime;
+            console.log(`⏱️ [${requestId}] Latencia: ${latency}ms`);
             
             // Actualizar estado de la red
             networkHealthStatus.lastSuccessfulRequest = Date.now();
@@ -237,39 +256,55 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
                 }
             }
 
-            // Manejo especial para errores HTTP
+            // Evaluar la respuesta HTTP
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error(`🔥 [${requestId}] Error HTTP ${response.status}: ${errorText}`);
+                console.error(`❌ [${requestId}] Error HTTP ${response.status}: ${response.statusText}`);
                 
-                // Actualizar información de diagnóstico
-                networkHealthStatus.diagnosticInfo.lastFailureReason = `HTTP ${response.status}`;
-                networkHealthStatus.diagnosticInfo.lastFailureTimestamp = Date.now();
-                
-                // Si es un error 5xx, podemos reintentar
-                if (response.status >= 500 && response.status < 600 && retryCount < API_RETRY_COUNT) {
-                    console.log(`🔄 [${requestId}] Reintentando (${retryCount + 1}/${API_RETRY_COUNT}) en ${API_RETRY_DELAY}ms...`);
-                    await sleep(API_RETRY_DELAY * (retryCount + 1)); // Retraso exponencial
-                    return fetchAPI(endpoint, options, retryCount + 1);
-                }
-                
-                // Si es un error de autenticación, limpiar token
+                // Para códigos de error específicos, dar mensajes más claros
                 if (response.status === 401) {
-                    console.warn('🔐 Error de autenticación, limpiando credenciales');
-                    // No limpiar todo, solo el token para mantener otros datos
-                    localStorage.removeItem('token');
+                    console.warn('🔐 Autenticación fallida - posible token expirado o inválido');
+                    
+                    // Limpiar token si es un error de autenticación
+                    if (!options.keepTokenOnError) {
+                        try {
+                            localStorage.removeItem('token');
+                            console.log('🧹 Token eliminado debido a error de autenticación');
+                        } catch (e) {
+                            console.error('Error al eliminar token:', e);
+                        }
+                    }
+                    
+                    throw new Error(ERROR_MESSAGES.AUTHENTICATION);
+                } else if (response.status === 403) {
+                    console.warn('🚫 Permiso denegado - no tienes autorización para este recurso');
+                    throw new Error(ERROR_MESSAGES.AUTHENTICATION);
+                } else if (response.status === 404) {
+                    console.warn(`🔍 Recurso no encontrado: ${endpoint}`);
+                    throw new Error(ERROR_MESSAGES.VALIDATION);
+                } else if (response.status === 0 || !response.status) {
+                    // Error de red o CORS (común en problemas de contenido mixto)
+                    console.error('🔥 Error de red o CORS detectado - posible problema de contenido mixto (HTTP vs HTTPS)');
+                    
+                    // Registrar este error específico
+                    try {
+                        if (typeof localStorage !== 'undefined') {
+                            localStorage.setItem('corsOrMixedContentError', JSON.stringify({
+                                timestamp: new Date().toISOString(),
+                                url: url,
+                                pageProtocol: window.location.protocol,
+                                requestProtocol: url.startsWith('https:') ? 'https:' : 'http:'
+                            }));
+                        }
+                    } catch (e) {
+                        console.error('Error al registrar error CORS:', e);
+                    }
+                    
+                    // Lanzar error específico
+                    throw new Error(ERROR_MESSAGES.MIXED_CONTENT);
                 }
                 
-                try {
-                    // Intentar parsear como JSON
-                    const errorData = JSON.parse(errorText);
-                    const errorMessage = errorData.message || errorData.error || `Error ${response.status}: ${response.statusText}`;
-                    throw new Error(errorMessage);
-                } catch (jsonError) {
-                    // Si no es JSON, lanzar error con el texto
-                    const enhancedErrorMessage = getEnhancedErrorMessage({ message: errorText }, response);
-                    throw new Error(enhancedErrorMessage);
-                }
+                // Para otros errores HTTP genéricos
+                throw new Error(`${ERROR_MESSAGES.SERVER} (${response.status})`);
             }
 
             // Para respuestas vacías o con contenido cero
@@ -1590,4 +1625,24 @@ export const uploadImageProperty = async (formData) => {
     console.error('Error al subir imagen de propiedad:', error);
     throw error;
   }
+};
+
+// Combinar URL base con ruta, asegurando URLs HTTP para dominios específicos
+const combineUrls = (baseUrl, path) => {
+    if (!baseUrl) return path;
+    if (!path) return baseUrl;
+    
+    // Limpiar la URL base y la ruta para evitar barras duplicadas
+    const base = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    
+    let url = `${base}${normalizedPath}`;
+    
+    // Asegurar que las URLs de elasticbeanstalk usen HTTP
+    if (url.includes('elasticbeanstalk.com') && url.startsWith('https:')) {
+        url = url.replace('https:', 'http:');
+        console.log('⚠️ URL de elasticbeanstalk convertida a HTTP:', url);
+    }
+    
+    return url;
 };

@@ -4,12 +4,20 @@
 export const fallbackImageBase64 = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iIzM0OThkYiIvPjxjaXJjbGUgY3g9IjEwMCIgY3k9IjgwIiByPSI0MCIgZmlsbD0iI2VjZjBmMSIvPjxwYXRoIGQ9Ik0xNjAgMTgwYzAtMzMuMTM3LTI2Ljg2My02MC02MC02MHMtNjAgMjYuODYzLTYwIDYweiIgZmlsbD0iI2VjZjBmMSIvPjwvc3ZnPg==";
 
 /**
- * Convierte las URLs HTTP a HTTPS
+ * Convierte las URLs HTTP a HTTPS, excepto para dominios específicos que requieren HTTP
  */
 export const ensureHttps = (url) => {
   if (!url) return null;
   if (typeof url === 'string' && url.trim() === '') return null;
   if (typeof url === 'string' && url.startsWith('data:')) return url;
+  
+  // Excepción para elasticbeanstalk y otros servicios que solo soportan HTTP
+  if (typeof url === 'string' && url.includes('elasticbeanstalk.com')) {
+    // Asegurarnos que elasticbeanstalk siempre use HTTP
+    return url.replace('https:', 'http:');
+  }
+  
+  // Para cualquier otra URL, preferir HTTPS
   if (typeof url === 'string' && url.startsWith('http:')) {
     return url.replace('http:', 'https:');
   }

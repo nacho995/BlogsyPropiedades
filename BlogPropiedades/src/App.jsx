@@ -436,16 +436,42 @@ function HomeRoute() {
   const [hasError, setHasError] = useState(false);
   const [renderCount, setRenderCount] = useState(0);
   
-  // Protección contra bucles infinitos
+  // Comprobar y ajustar URLs de API si es necesario
   useEffect(() => {
+    try {
+      // Verificar si estamos usando HTTPS pero la API requiere HTTP
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const currentProtocol = window.location.protocol;
+      
+      if (currentProtocol === 'https:' && apiUrl.startsWith('http:')) {
+        console.warn('⚠️ Detectado posible conflicto de protocolos: La página usa HTTPS pero la API usa HTTP.');
+        console.log('🔄 Se está utilizando la API con HTTP desde una página HTTPS. Esto puede causar problemas de contenido mixto.');
+        
+        // Registrar este problema para diagnóstico
+        try {
+          localStorage.setItem('protocolMismatch', JSON.stringify({
+            timestamp: new Date().toISOString(),
+            pageProtocol: currentProtocol,
+            apiProtocol: apiUrl.startsWith('https:') ? 'https:' : 'http:'
+          }));
+        } catch (e) {
+          console.error('Error al registrar información de protocolo:', e);
+        }
+      }
+    } catch (error) {
+      console.error('Error al verificar configuración de API:', error);
+    }
+  }, []);
+  
+  useEffect(() => {
+    // Detectar posibles ciclos de renderizado en el HomeRoute
     setRenderCount(prev => prev + 1);
     
-    // Si el componente se renderiza demasiadas veces en poco tiempo
     if (renderCount > 5) {
-      console.warn("⚠️ Detectado posible ciclo de renderizado en HomeRoute, mostrando SignIn como fallback");
+      console.warn(`⚠️ Posible ciclo de renderizado en HomeRoute: ${renderCount} renderizados`);
       setHasError(true);
       
-      // Registrar el ciclo para diagnóstico
+      // Registrar para diagnóstico
       try {
         localStorage.setItem('homeRouteCycleDetected', JSON.stringify({
           timestamp: new Date().toISOString(),

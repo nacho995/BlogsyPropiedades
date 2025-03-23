@@ -97,7 +97,13 @@ export const extractDomain = (url) => {
 export const combineUrls = (baseUrl, endpoint = '') => {
   try {
     // Sanitizar la URL base
-    const sanitizedBase = sanitizeUrl(baseUrl);
+    let sanitizedBase = sanitizeUrl(baseUrl);
+    
+    // Convertir HTTPS a HTTP para Elastic Beanstalk
+    if (sanitizedBase.startsWith('https:') && sanitizedBase.includes('elasticbeanstalk.com')) {
+      console.warn('⚠️ Convirtiendo URL de Elastic Beanstalk de HTTPS a HTTP:', sanitizedBase);
+      sanitizedBase = sanitizedBase.replace('https:', 'http:');
+    }
     
     // Eliminar slash final de la base si existe
     const base = sanitizedBase.endsWith('/') 
@@ -122,7 +128,8 @@ export const combineUrls = (baseUrl, endpoint = '') => {
  * @returns {string} - URL predeterminada
  */
 export const getDefaultApiUrl = () => {
-  return 'https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+  // Usar siempre HTTP para Elastic Beanstalk
+  return 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
 };
 
 // Exportar todas las funciones
