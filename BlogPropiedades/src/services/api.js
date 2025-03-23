@@ -299,14 +299,36 @@ export const loginUser = async (credentials) => {
     });
     
     console.log("Respuesta de login completa:", response);
+    console.log("Tipo de respuesta:", typeof response);
+    console.log("Estructura de respuesta:", Object.keys(response));
     
     // Verificar estructura de respuesta para adaptarnos al formato del backend
     if (response && response.token) {
+      console.log("Estructura encontrada: { token, ... }");
       return response; // { token, user }
     } else if (response && response.data && response.data.token) {
+      console.log("Estructura encontrada: { data: { token, ... } }");
       return response.data; // { data: { token, user } }
+    } else if (response && response.user && response.user.token) {
+      console.log("Estructura encontrada: { user: { token, ... } }");
+      return {
+        token: response.user.token,
+        user: response.user
+      };
+    } else if (response && response.success && response.token) {
+      console.log("Estructura encontrada: { success, token, ... }");
+      return {
+        token: response.token,
+        user: response.user || {}
+      };
+    } else if (response && response.accessToken) {
+      console.log("Estructura encontrada: { accessToken, ... }");
+      return {
+        token: response.accessToken,
+        user: response.user || {}
+      };
     } else {
-      console.error("Estructura de respuesta de login inesperada:", response);
+      console.error("Estructura de respuesta de login inesperada:", JSON.stringify(response, null, 2));
       throw new Error("Formato de respuesta incorrecto");
     }
   } catch (error) {

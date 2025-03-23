@@ -195,6 +195,8 @@ export function UserProvider({ children }) {
       }
       
       console.log("Iniciando sesión con datos:", userData);
+      console.log("Token recibido:", userData.token);
+      console.log("Datos de usuario:", userData.user || "No hay objeto user específico");
       
       // Guardar token y nombre en localStorage
       localStorage.setItem("token", userData.token);
@@ -224,6 +226,11 @@ export function UserProvider({ children }) {
           currentProfileImage = userObj.profilePic.src;
           console.log("Imagen encontrada en userData.user.profilePic.src:", currentProfileImage.substring(0, 30) + "...");
         }
+      } else if (userData.profilePic) {
+        if (typeof userData.profilePic === 'string') {
+          currentProfileImage = userData.profilePic;
+          console.log("Imagen encontrada en userData.profilePic (string):", currentProfileImage.substring(0, 30) + "...");
+        } 
       } else if (userObj.profileImage) {
         if (typeof userObj.profileImage === 'string') {
           currentProfileImage = userObj.profileImage;

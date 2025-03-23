@@ -92,6 +92,13 @@ Si encuentras problemas al configurar o acceder a tu subdominio:
 5. **Problemas conocidos y soluciones:**
    - **Error "Could not resolve '../context/AuthContext'"**: Este error ha sido solucionado añadiendo un archivo de compatibilidad en `src/context/AuthContext.jsx` que actúa como puente hacia `UserContext.jsx`.
    - Si encuentras este error, asegúrate de tener la versión más reciente del código que incluye esta solución.
+   
+   - **Error "Estructura de respuesta de login inesperada"**: Este error ocurre cuando el formato de respuesta del backend durante el login no tiene la estructura esperada. La solución implementada:
+     - Se ha mejorado la función `loginUser` en `src/services/api.js` para manejar múltiples formatos de respuesta.
+     - Se ha actualizado el componente `SignIn.jsx` para intentar extraer el token y los datos de usuario de varias estructuras posibles.
+     - Se ha añadido más información de depuración para facilitar la solución de problemas futuros.
+   
+   - **Si persiste el error de login**, intenta depurar con los mensajes de consola ampliados o contáctanos para recibir asistencia.
 
 ## Mantener la configuración
 

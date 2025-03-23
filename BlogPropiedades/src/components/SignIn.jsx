@@ -31,16 +31,46 @@ export default function SignIn() {
 
             const response = await loginUser({ email, password });
             
-            if (!response || !response.token) {
-                throw new Error("Error al iniciar sesión. Respuesta inválida del servidor.");
+            console.log("Respuesta original de login:", response);
+            console.log("Tipo de respuesta:", typeof response);
+            console.log("Claves disponibles:", Object.keys(response));
+            
+            // Intentar extraer token y datos de usuario de varias estructuras posibles
+            let token, userData;
+            
+            if (response && response.token) {
+                // Estructura { token, user }
+                token = response.token;
+                userData = response.user || {};
+            } else if (response && response.data && response.data.token) {
+                // Estructura { data: { token, user } }
+                token = response.data.token;
+                userData = response.data.user || {};
+            } else if (response && response.user && response.user.token) {
+                // Estructura { user: { token, ... } }
+                token = response.user.token;
+                userData = response.user;
+            } else if (response && response.accessToken) {
+                // Estructura { accessToken, user }
+                token = response.accessToken;
+                userData = response.user || {};
+            } else {
+                console.error("No se pudo extraer token de la respuesta:", response);
+                throw new Error("Formato de respuesta incorrecto");
+            }
+            
+            if (!token) {
+                throw new Error("Error al iniciar sesión. No se recibió token de autenticación.");
             }
 
-            console.log("Login exitoso:", response);
+            console.log("Token extraído:", token);
+            console.log("Datos de usuario extraídos:", userData);
             
             login({
-                token: response.token,
-                name: response.user?.name || "",
-                profilePic: response.user?.profilePic || ""
+                token,
+                name: userData?.name || "",
+                user: userData,
+                profilePic: userData?.profilePic || ""
             });
 
             toast.success("¡Inicio de sesión exitoso!");
