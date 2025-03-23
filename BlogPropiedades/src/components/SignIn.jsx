@@ -131,8 +131,14 @@ const SignIn = ({ isRegistering = false }) => {
             return;
         }
         
-        // URL única para la API
-        const API_URL = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+        // Determinar si estamos usando HTTPS
+        const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+
+        // Definición de la URL de la API adaptada al protocolo
+        const API_DOMAIN = 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+        const API_URL = `${isHttps ? 'https' : 'http'}://${API_DOMAIN}`;
+
+        console.log(`🔄 SignIn usando API en: ${API_URL} (${isHttps ? 'HTTPS' : 'HTTP'})`);
         
         // Guardar la URL de producción para usar en toda la aplicación
         try {

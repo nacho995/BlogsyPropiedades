@@ -2,21 +2,27 @@
 /**
  * Servicios de API para la aplicación
  * 
- * IMPORTANTE: Este archivo siempre usa la URL de la API de producción 
- * http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com
- * para evitar problemas de bucles infinitos o conflictos entre entornos.
- * 
- * Esta configuración es la que debe usarse en producción.
+ * Este archivo adapta automáticamente el protocolo (HTTP/HTTPS) de la API 
+ * para que coincida con el protocolo de la página web, evitando problemas
+ * de contenido mixto en navegadores modernos.
  */
 
 // Importar utilidades
 import { sanitizeUrl, combineUrls } from '../utils/urlSanitizer';
 
+// Determinar si estamos usando HTTPS
+const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+
 // Definición única de la URL de la API para todo el archivo
-const API_URL = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+// Adaptar al protocolo de la página (HTTP o HTTPS)
+const API_DOMAIN = 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+const API_URL = `${isHttps ? 'https' : 'http'}://${API_DOMAIN}`;
 const BASE_URL = API_URL;
 const FALLBACK_API = API_URL;
 const API_BASE_URL = API_URL;
+
+// Registrar la URL de la API usada
+console.log(`🌐 Usando API en: ${API_URL} (${isHttps ? 'HTTPS' : 'HTTP'})`);
 
 // Función para manejar errores de conexión con reintentos
 const API_RETRY_COUNT = 3;
@@ -160,108 +166,23 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
             return [];
         }
         
-        if (endpoint === '/user/me') {
-            console.log('🔄 API /user/me no disponible, devolviendo datos ficticios');
-            // Si no hay token, no estamos autenticados
-            const token = localStorage.getItem('token');
-            if (!token) {
-                throw new Error(ERROR_MESSAGES.AUTHENTICATION);
+        // Verificar si hay problemas conocidos con el protocolo
+        const protocolMismatch = JSON.parse(localStorage.getItem('protocolMismatch') || 'null');
+        const now24h = now - (24 * 60 * 60 * 1000); // 24 horas atrás
+        if (protocolMismatch && protocolMismatch.timestamp && new Date(protocolMismatch.timestamp).getTime() > now24h) {
+            console.warn('⚠️ Detectado problema de protocolo previo, manejando situación');
+            
+            // Si estamos en HTTPS y la API sólo soporta HTTP, usar proxy o dar una respuesta alternativa
+            if (isHttps && endpoint === '/user/login') {
+                console.log('🔀 Login con protocolo ajustado para prevenir contenido mixto');
             }
-            
-            // Devolver un usuario falso para evitar errores
-            return {
-                _id: 'temp-user-id',
-                name: localStorage.getItem('username') || 'Usuario',
-                email: localStorage.getItem('email') || 'usuario@example.com',
-                role: localStorage.getItem('userRole') || 'user'
-            };
-        }
-        
-        // Verificar si hay un potencial problema de contenido mixto (HTTPS->HTTP)
-        if (window.location.protocol === 'https:') {
-            console.warn('⚠️ Posible problema de contenido mixto: La página usa HTTPS pero la API usa HTTP');
-            console.log('ℹ️ Algunas peticiones podrían ser bloqueadas por el navegador');
-            
-            // Registrar este problema para diagnóstico
-            try {
-                if (typeof localStorage !== 'undefined') {
-                    localStorage.setItem('mixedContentWarning', JSON.stringify({
-                        timestamp: new Date().toISOString(),
-                        endpoint: endpoint,
-                        url: window.location.href
-                    }));
-                }
-            } catch (e) {
-                console.error('Error al registrar aviso de contenido mixto:', e);
-            }
-            
-            // Si estamos en producción y podría haber un problema de contenido mixto,
-            // verificar si podemos usar un servicio proxy o intentar una solución
-            try {
-                // Verificar si hay un proxy configurado
-                if (import.meta.env.VITE_API_PROXY && import.meta.env.VITE_API_PROXY.trim() !== '') {
-                    console.log('ℹ️ Intentando usar proxy para evitar problema de contenido mixto');
-                    // Usar el proxy configurado
-                    const proxyUrl = import.meta.env.VITE_API_PROXY.trim();
-                    // El resto del código sigue igual, pero ahora tendríamos la opción de usar un proxy
-                }
-            } catch (proxyError) {
-                console.error('Error al verificar proxy:', proxyError);
-            }
-        }
-        
-        // Verificar estado de conexión
-        if (!navigator.onLine) {
-            console.warn('📡 Dispositivo sin conexión a internet');
-            
-            // Para operaciones de lectura, intentar recuperar de caché si existe
-            const isReadOperation = options.method === 'GET' || !options.method;
-            if (isReadOperation) {
-                const cacheKey = `api_cache_${endpoint}`;
-                const cachedData = localStorage.getItem(cacheKey);
-                
-                if (cachedData) {
-                    try {
-                        const { data, timestamp } = JSON.parse(cachedData);
-                        const cacheAge = Date.now() - timestamp;
-                        const MAX_CACHE_AGE = 3600000; // 1 hora
-                        
-                        if (cacheAge < MAX_CACHE_AGE) {
-                            console.log(`📦 Usando datos en caché para ${endpoint} (${Math.round(cacheAge/1000/60)} min de antigüedad)`);
-                            return data;
-                        }
-                    } catch (e) {
-                        console.error('Error al recuperar datos de caché:', e);
-                    }
-                }
-            }
-            
-            // Si es una operación de escritura o no hay caché, guardar para reintento posterior
-            if (!isReadOperation) {
-                const pendingRequest = {
-                    endpoint,
-                    options,
-                    timestamp: Date.now()
-                };
-                
-                networkHealthStatus.pendingRequests.push(pendingRequest);
-                console.log(`✉️ Solicitud guardada para procesar cuando se recupere la conexión: ${endpoint}`);
-            }
-            
-            throw new Error(ERROR_MESSAGES.NETWORK);
         }
         
         // Normalizar endpoint
         const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
         
-        // Combinar URL base con endpoint - Asegurar que siempre usamos HTTP
+        // Combinar URL base con endpoint - Usar la URL con el protocolo correcto
         let url = combineUrls(BASE_URL, normalizedEndpoint);
-        
-        // Asegurar que la URL es HTTP (no HTTPS)
-        if (url.startsWith('https://')) {
-            url = url.replace('https://', 'http://');
-            console.log('🔄 Convertida URL de API de HTTPS a HTTP para evitar problemas');
-        }
         
         // Generar un ID único para esta solicitud para seguimiento en logs
         const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -271,351 +192,175 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
         
         if (options.body) {
             try {
-                const bodyPreview = JSON.stringify(
-                    typeof options.body === 'string' ? JSON.parse(options.body) : options.body
-                ).substring(0, 150);
-                console.log(`📦 [${requestId}] Cuerpo: ${bodyPreview}${bodyPreview.length >= 150 ? '...' : ''}`);
+                // Si el cuerpo es FormData, mostrar solo las claves
+                if (options.body instanceof FormData) {
+                    const keys = Array.from(options.body.keys());
+                    console.log(`📦 [${requestId}] FormData con claves: ${keys.join(', ')}`);
+                } else {
+                    const bodyPreview = JSON.stringify(
+                        typeof options.body === 'string' ? JSON.parse(options.body) : options.body
+                    ).substring(0, 150);
+                    console.log(`📦 [${requestId}] Cuerpo: ${bodyPreview}${bodyPreview.length >= 150 ? '...' : ''}`);
+                }
             } catch (e) {
                 // Si no podemos parsear el cuerpo, mostrar tipo
                 console.log(`📦 [${requestId}] Cuerpo: [${typeof options.body}]`);
             }
         }
         
-        // Registrar la hora de inicio de la petición para medir latencia
-        const startTime = Date.now();
-        
         // Configuración por defecto para la solicitud
         const fetchOptions = {
             method: options.method || 'GET',
-            headers: {
+            headers: options.omitContentType ? { ...options.headers } : {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
                 ...options.headers
             },
             ...options,
             // Añadir credenciales para permitir cookies y evitar problemas CORS/CORB
-            credentials: 'include'
+            credentials: 'include',
+            // Añadir opción para manejar errores de red
+            mode: 'cors'
         };
         
-        // Agregar modo para evitar problemas CORS si estamos en un dominio diferente
-        if (new URL(url).origin !== window.location.origin) {
-            fetchOptions.mode = 'cors';
-        }
-        
-        // Si hay un cuerpo y es un objeto, convertirlo a JSON
-        if (options.body && typeof options.body === 'object') {
+        // Si hay un cuerpo y es un objeto, convertirlo a JSON solo si no es FormData
+        if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
             fetchOptions.body = JSON.stringify(options.body);
+        } else if (options.body instanceof FormData) {
+            // Si es FormData, pasarlo directamente y asegurarse de no tener Content-Type
+            fetchOptions.body = options.body;
+            // Eliminar Content-Type para que el navegador lo establezca con el boundary correcto
+            if (fetchOptions.headers && fetchOptions.headers['Content-Type']) {
+                delete fetchOptions.headers['Content-Type'];
+            }
         }
         
         try {
-            // Crear un controlador de tiempo de espera
-            const controller = new AbortController();
-            fetchOptions.signal = controller.signal;
+            // Registrar cronómetro para medir tiempo de respuesta
+            const startTime = performance.now();
             
-            // Establecer un tiempo de espera
-            const timeoutId = setTimeout(() => {
-                controller.abort();
-                console.warn(`⏱️ [${requestId}] Tiempo de espera agotado después de ${API_TIMEOUT}ms`);
-            }, API_TIMEOUT);
-            
+            // Realizar la solicitud a la API
             const response = await fetch(url, fetchOptions);
-            clearTimeout(timeoutId);
             
-            // Registrar la latencia
-            const latency = Date.now() - startTime;
-            console.log(`⏱️ [${requestId}] Latencia: ${latency}ms`);
+            // Calcular tiempo de respuesta
+            const responseTime = Math.round(performance.now() - startTime);
+            console.log(`⏱️ [${requestId}] Tiempo de respuesta: ${responseTime}ms`);
             
-            // Actualizar estado de la red
-            networkHealthStatus.lastSuccessfulRequest = Date.now();
-            networkHealthStatus.failedRequestCount = 0;
-            
-            // Almacenar en caché si es una operación de lectura exitosa
-            const isReadOperation = options.method === 'GET' || !options.method;
-            if (isReadOperation && response.ok) {
+            // Guardar en caché si es una operación GET exitosa
+            if (response.ok && (options.method === 'GET' || !options.method)) {
                 try {
-                    const responseClone = response.clone();
-                    const responseData = await responseClone.json();
+                    const clonedResponse = response.clone();
+                    const data = await clonedResponse.json();
                     
-                    const cacheKey = `api_cache_${endpoint}`;
-                    const cacheData = {
-                        data: responseData,
-                        timestamp: Date.now()
-                    };
-                    
-                    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-                } catch (e) {
-                    // Error al almacenar en caché, continuar sin caché
-                    console.warn(`⚠️ No se pudo almacenar en caché: ${e.message}`);
+                    // Solo guardar en caché si no estamos en modo incógnito o si localStorage está disponible
+                    if (typeof localStorage !== 'undefined') {
+                        const cacheKey = `api_cache_${endpoint}`;
+                        localStorage.setItem(cacheKey, JSON.stringify({
+                            data,
+                            timestamp: Date.now()
+                        }));
+                    }
+                } catch (cacheError) {
+                    console.warn(`⚠️ Error al guardar respuesta en caché: ${cacheError.message}`);
                 }
             }
-
-            // Evaluar la respuesta HTTP
+            
+            // Si la respuesta no es exitosa, manejar el error
             if (!response.ok) {
-                console.error(`❌ [${requestId}] Error HTTP ${response.status}: ${response.statusText}`);
+                console.error(`🛑 [${requestId}] Error HTTP: ${response.status} ${response.statusText}`);
                 
-                // Para códigos de error específicos, dar mensajes más claros
+                // Si es un error de autenticación, limpiar credenciales
                 if (response.status === 401) {
-                    console.warn('🔐 Autenticación fallida - posible token expirado o inválido');
-                    
-                    // Limpiar token si es un error de autenticación
-                    if (!options.keepTokenOnError) {
-                        try {
-                            localStorage.removeItem('token');
-                            console.log('🧹 Token eliminado debido a error de autenticación');
-                        } catch (e) {
-                            console.error('Error al eliminar token:', e);
-                        }
+                    console.warn('🔑 Error de autenticación, limpiando credenciales');
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    // Redirigir a login solo si no estamos ya en login
+                    if (!window.location.pathname.includes('/login')) {
+                        window.location.href = '/login';
                     }
-                    
-                    throw new Error(ERROR_MESSAGES.AUTHENTICATION);
-                } else if (response.status === 403) {
-                    console.warn('🚫 Permiso denegado - no tienes autorización para este recurso');
-                    throw new Error(ERROR_MESSAGES.AUTHENTICATION);
-                } else if (response.status === 404) {
-                    console.warn(`🔍 Recurso no encontrado: ${endpoint}`);
-                    throw new Error(ERROR_MESSAGES.VALIDATION);
-                } else if (response.status === 0 || !response.status) {
-                    // Error de red o CORS (común en problemas de contenido mixto)
-                    console.error('🔥 Error de red o CORS detectado - posible problema de contenido mixto (HTTP vs HTTPS)');
-                    
-                    // Registrar este error específico
-                    try {
-                        if (typeof localStorage !== 'undefined') {
-                            localStorage.setItem('corsOrMixedContentError', JSON.stringify({
-                                timestamp: new Date().toISOString(),
-                                url: url,
-                                pageProtocol: window.location.protocol,
-                                requestProtocol: url.startsWith('https:') ? 'https:' : 'http:'
-                            }));
-                        }
-                    } catch (e) {
-                        console.error('Error al registrar error CORS:', e);
-                    }
-                    
-                    // Lanzar error específico
-                    throw new Error(ERROR_MESSAGES.MIXED_CONTENT);
+                    throw new Error('Sesión expirada o inválida');
                 }
                 
-                // Para otros errores HTTP genéricos
-                throw new Error(`${ERROR_MESSAGES.SERVER} (${response.status})`);
-            }
-
-            // Para respuestas vacías o con contenido cero
-            const contentLength = response.headers.get('content-length');
-            const contentType = response.headers.get('content-type');
-
-            console.log(`📏 [${requestId}] Content-Length: ${contentLength || 'no especificado'}, Content-Type: ${contentType || 'no especificado'}`);
-
-            if (contentLength === '0' || contentLength === null) {
-                console.warn(`⚠️ [${requestId}] Respuesta con contenido vacío`);
-                
-                // Para endpoints específicos, manejar de forma personalizada
-                if (endpoint.includes('/user/login')) {
-                    console.warn(`⚠️ [${requestId}] Respuesta vacía en login, generando respuesta de contingencia`);
-                    
-                    // Guardar la respuesta completa para diagnóstico
-                    try {
-                        const responseClone = response.clone();
-                        const rawText = await responseClone.text();
-                        console.log(`📄 [${requestId}] Respuesta raw en login:`, rawText);
-                        
-                        // Si hay algún header con información útil, registrarlo
-                        console.log(`🔍 [${requestId}] Headers de respuesta:`, Object.fromEntries([...response.headers.entries()]));
-                    } catch (textError) {
-                        console.error(`🔥 [${requestId}] Error al obtener texto de respuesta:`, textError);
-                    }
-                    
-                    // Verificar si hay un token previo
-                    const existingToken = localStorage.getItem('token');
-                    const existingEmail = localStorage.getItem('email');
-                    
-                    if (existingToken && existingEmail) {
-                        console.log(`🔑 [${requestId}] Usando token existente para mantener sesión`);
-                        return {
-                            token: existingToken,
-                            user: { 
-                                email: existingEmail,
-                                name: localStorage.getItem('username') || 'Usuario',
-                                role: localStorage.getItem('userRole') || 'user'
-                            },
-                            _notice: 'Sesión mantenida con token existente debido a respuesta vacía del servidor'
-                        };
-                    }
-                    
-                    // Generar respuesta de error específica para login
-                    throw new Error('El servidor devolvió una respuesta vacía durante el login. Por favor, inténtalo de nuevo.');
+                // Si es un error de protocolo o mix-content, registrarlo
+                if (response.status === 0 || (response.type && response.type === 'opaque')) {
+                    localStorage.setItem('protocolMismatch', JSON.stringify({
+                        timestamp: new Date().toISOString(),
+                        url: url
+                    }));
+                    console.error('⛔ Posible problema de protocolo (mixed-content) detectado');
                 }
                 
-                // Determinar el valor de retorno según el tipo esperado
-                const expectsArray = endpoint.includes('/list') || 
-                                    endpoint.includes('/all') || 
-                                    endpoint.includes('/posts') ||
-                                    endpoint.endsWith('s') ||  // Plural suele indicar lista
-                                    options.expectsArray;
-                
-                // Si esperamos un array y tenemos respuesta vacía, devolver array vacío
-                if (expectsArray) {
-                    console.warn(`⚠️ [${requestId}] Se esperaba un array pero la respuesta está vacía, devolviendo []`);
-                    return [];
+                // Si es un error 404 en producción, intentar la URL alternativa
+                if (response.status === 404 && retryCount === 0) {
+                    console.log(`⚠️ [${requestId}] Recurso no encontrado, intentando URL alternativa`);
+                    // En este caso, intentamos con la misma URL pero asegurándonos que use HTTP
+                    return fetchAPI(endpoint, options, retryCount + 1);
                 }
                 
-                // Para otros endpoints, intentar leer la respuesta de todos modos
+                // Para otros errores, intentar analizar la respuesta
                 try {
-                    const text = await response.text();
-                    if (text && text.trim()) {
-                        console.log(`📄 [${requestId}] Respuesta no vacía después de todo:`, text.substring(0, 150));
-                        try {
-                            return JSON.parse(text);
-                        } catch (e) {
-                            console.warn(`⚠️ [${requestId}] No se pudo parsear la respuesta como JSON:`, e);
-                            return { text, _warning: 'Respuesta no es JSON válido' };
-                        }
-                    }
-                } catch (e) {
-                    console.warn(`⚠️ [${requestId}] Error al leer respuesta vacía:`, e);
+                    const errorData = await response.json();
+                    console.error(`🔍 [${requestId}] Detalle del error:`, errorData);
+                    
+                    // Lanzar error con mensaje del servidor si está disponible
+                    throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
+                } catch (jsonError) {
+                    // Si no podemos analizar la respuesta, usar mensaje genérico
+                    throw new Error(`Error ${response.status}: ${response.statusText}`);
                 }
-                
-                // Para otros endpoints, devolver objeto vacío
-                return {};
             }
-
+            
+            // Si la respuesta es exitosa, intentar analizarla como JSON
             try {
-                // Intentar parsear la respuesta como JSON
                 const data = await response.json();
-                console.log(`📦 [${requestId}] Respuesta parseada:`, typeof data === 'object' ? 'Objeto válido' : `Tipo: ${typeof data}`);
-                
-                // Validar que data sea un objeto o array para evitar errores con métodos como map
-                if (data === null) {
-                    console.warn(`⚠️ [${requestId}] Respuesta JSON nula`);
-                    return options.expectsArray ? [] : {};
-                }
-                
-                // Verificar tipo de data para métodos como map
-                if (Array.isArray(data)) {
-                    // Es un array, está bien
-                    return data;
-                } else if (typeof data === 'object') {
-                    // Es un objeto, pero si esperamos un array y no lo es, crear un wrapper array
-                    if (options.expectsArray && !data.items && !data.data && !data.results) {
-                        console.warn(`⚠️ [${requestId}] Se esperaba un array pero se recibió un objeto, intentando convertir`);
-                        
-                        // Intentar encontrar un array dentro del objeto
-                        for (const key in data) {
-                            if (Array.isArray(data[key])) {
-                                console.log(`🔍 [${requestId}] Se encontró un array en la propiedad ${key}`);
-                                return data[key];
-                            }
-                        }
-                        
-                        // Si el objeto tiene propiedades como id, podría ser un elemento único
-                        if (data._id || data.id) {
-                            console.log(`🔍 [${requestId}] Se encontró un único elemento, devolviendo como array`);
-                            return [data];
-                        }
-                        
-                        console.warn(`⚠️ [${requestId}] No se encontró un array dentro del objeto, devolviendo array vacío`);
-                        return [];
-                    }
-                    
-                    // Es un objeto, está bien
-                    return data;
-                } else {
-                    // No es ni objeto ni array, crear un wrapper
-                    console.warn(`⚠️ [${requestId}] Respuesta con formato inesperado (${typeof data}), creando wrapper`);
-                    return options.expectsArray ? [] : { value: data, _warning: 'Respuesta con formato no estándar' };
-                }
-            } catch (error) {
-                console.error(`🔥 [${requestId}] Error al parsear respuesta JSON:`, error);
-                
-                // Intentar usar respuesta de texto como alternativa
-                try {
-                    const textResponse = await response.text();
-                    console.log(`📄 [${requestId}] Respuesta como texto:`, textResponse.substring(0, 100) + '...');
-                    
-                    // Si esperamos un array pero no pudimos parsear la respuesta, devolver array vacío
-                    if (options.expectsArray) {
-                        console.warn(`⚠️ [${requestId}] Se esperaba un array pero hubo error al parsear, devolviendo []`);
-                        return [];
-                    }
-                    
-                    return { 
-                        text: textResponse,
-                        _warning: 'Respuesta no es JSON válido'
-                    };
-                } catch (textError) {
-                    // Si ni siquiera podemos obtener texto, lanzar error
-                    throw new Error(`Error al procesar la respuesta: ${error.message}`);
-                }
+                return data;
+            } catch (jsonError) {
+                console.warn(`⚠️ [${requestId}] No se pudo analizar respuesta como JSON:`, jsonError);
+                // Devolver respuesta en texto plano
+                return await response.text();
             }
         } catch (error) {
-            // Actualizar estado de la red
-            networkHealthStatus.failedRequestCount++;
-            networkHealthStatus.diagnosticInfo.lastFailureReason = error.message;
-            networkHealthStatus.diagnosticInfo.lastFailureTimestamp = Date.now();
+            console.error(`❌ [${requestId}] Error en fetchAPI:`, error.message);
             
-            // Verificar si es un error de abort (timeout)
-            if (error.name === 'AbortError') {
-                console.error(`⏱️ [${requestId}] Error: Tiempo de espera agotado`);
+            // Si hay un error de red y tenemos reintentos disponibles
+            if ((error.name === 'TypeError' || error.message.includes('Failed to fetch')) && retryCount < API_RETRY_COUNT) {
+                const backoffTime = Math.pow(2, retryCount) * 1000; // Exponential backoff
+                console.log(`🔄 [${requestId}] Reintentando en ${backoffTime}ms (intento ${retryCount + 1}/${API_RETRY_COUNT})`);
                 
-                // Si hay suficientes intentos, reintentar
-                if (retryCount < API_RETRY_COUNT) {
-                    console.log(`🔄 [${requestId}] Reintentando (${retryCount + 1}/${API_RETRY_COUNT}) después de timeout...`);
-                    await sleep(API_RETRY_DELAY * (retryCount + 1));
-                    return fetchAPI(endpoint, options, retryCount + 1);
-                }
-                
-                throw new Error(ERROR_MESSAGES.TIMEOUT);
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        resolve(fetchAPI(endpoint, options, retryCount + 1));
+                    }, backoffTime);
+                });
             }
             
-            // Error de conexión
-            if (error.message.includes('NetworkError') || error.message.includes('fetch')) {
-                console.error(`🌐 [${requestId}] Error de red:`, error);
-                
-                // Si hay suficientes intentos, reintentar
-                if (retryCount < API_RETRY_COUNT) {
-                    console.log(`🔄 [${requestId}] Reintentando (${retryCount + 1}/${API_RETRY_COUNT}) después de error de red...`);
+            // Registrar detalles del error para diagnóstico
+            try {
+                if (typeof localStorage !== 'undefined') {
+                    const apiErrors = JSON.parse(localStorage.getItem('apiErrors') || '[]');
+                    apiErrors.push({
+                        endpoint,
+                        error: error.message,
+                        timestamp: new Date().toISOString(),
+                        url: url
+                    });
                     
-                    // Espera exponencial para evitar saturar
-                    await sleep(API_RETRY_DELAY * Math.pow(2, retryCount));
+                    // Limitar a los últimos 10 errores
+                    if (apiErrors.length > 10) {
+                        apiErrors.shift();
+                    }
                     
-                    return fetchAPI(endpoint, options, retryCount + 1);
+                    localStorage.setItem('apiErrors', JSON.stringify(apiErrors));
                 }
-                
-                // Alternativa: probar con el API de respaldo si existe y no lo hemos usado
-                if (FALLBACK_API && BASE_URL !== FALLBACK_API && !options._usedFallback) {
-                    console.log(`🔄 [${requestId}] Intentando con API de respaldo: ${FALLBACK_API}`);
-                    
-                    // Crear nuevas opciones con bandera de fallback
-                    const fallbackOptions = {
-                        ...options,
-                        _usedFallback: true
-                    };
-                    
-                    // Ajustar URL base a la alternativa
-                    const fallbackUrl = endpoint.replace(BASE_URL, FALLBACK_API);
-                    return fetchAPI(fallbackUrl, fallbackOptions, 0);
-                }
-                
-                // Si hemos agotado todos los intentos, lanzar un error más amigable
-                throw new Error(ERROR_MESSAGES.NETWORK);
+            } catch (e) {
+                console.error('Error al guardar registro de error:', e);
             }
             
-            // Otros errores
-            console.error(`❌ [${requestId}] Error:`, error);
-            
-            // Mejorar el mensaje de error para el usuario
-            const enhancedErrorMessage = getEnhancedErrorMessage(error);
-            throw new Error(enhancedErrorMessage);
+            throw error;
         }
-    } catch (finalError) {
-        // Actualizar diagnóstico
-        networkHealthStatus.diagnosticInfo.successRate = Math.max(
-            0, 
-            100 - (networkHealthStatus.failedRequestCount * 10)
-        );
-        
-        console.error(`❌ Error final en fetchAPI:`, finalError);
-        throw finalError;
+    } catch (outerError) {
+        console.error(`🔥 Error general en fetchAPI:`, outerError);
+        throw outerError;
     }
 };
 
@@ -1115,18 +860,6 @@ export const resetPassword = async (token, password, passwordConfirm) => {
  * @returns {Promise<Object>} - Datos actualizados del usuario
  */
 export const updateProfile = async (userData, token) => {
-  const formData = new FormData();
-  
-  // Añadir nombre si existe
-  if (userData.name) {
-    formData.append('name', userData.name);
-  }
-  
-  // Añadir imagen de perfil si existe
-  if (userData.profilePic) {
-    formData.append('profilePic', userData.profilePic);
-  }
-  
   try {
     // Usar el token del localStorage si no se proporciona uno
     const authToken = token || localStorage.getItem('token');
@@ -1136,21 +869,54 @@ export const updateProfile = async (userData, token) => {
     
     console.log("Actualizando perfil con token:", authToken);
     
-    const response = await fetch(`${BASE_URL}/user/update-profile`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-      },
-      body: formData
-    });
+    // Crear el objeto con los datos del usuario
+    const updateData = {};
     
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error("Error del servidor:", errorData);
-      throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
+    // Añadir nombre si existe
+    if (userData.name) {
+      updateData.name = userData.name;
     }
     
-    return await response.json();
+    // Convertir formData a JSON si es necesario
+    if (userData.profilePic) {
+      // Si es un archivo, necesitamos usar FormData
+      if (userData.profilePic instanceof File) {
+        const formData = new FormData();
+        
+        // Añadir los campos del formulario
+        if (userData.name) {
+          formData.append('name', userData.name);
+        }
+        
+        formData.append('profilePic', userData.profilePic);
+        
+        // Usar fetchAPI con la ruta correcta
+        return await fetchAPI('/user/update-profile', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: formData,
+          // No establecer Content-Type para que el navegador lo haga automáticamente con el boundary
+          omitContentType: true
+        });
+      } else {
+        // Si es una URL o string, simplemente agregar al objeto JSON
+        updateData.profilePic = userData.profilePic;
+      }
+    }
+    
+    // Si no hay archivo, usar JSON
+    if (!userData.profilePic || !(userData.profilePic instanceof File)) {
+      return await fetchAPI('/user/update-profile', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData)
+      });
+    }
   } catch (error) {
     console.error('Error al actualizar perfil:', error);
     throw error;
@@ -1212,14 +978,14 @@ export const uploadFile = async (file, token) => {
     }
     
     // Intentar primero con la ruta de subida específica
-    console.log("Intentando subir archivo a:", `${BASE_URL}/property/upload`);
+    console.log("Intentando subir archivo a:", `${API_URL}/property/upload`);
     
     let response;
     let usePropertyRoute = false;
     
     try {
       // Intentar con la ruta de subida específica
-      response = await fetch(`${BASE_URL}/property/upload`, {
+      response = await fetch(`${API_URL}/property/upload`, {
         method: 'POST',
         headers,
         body: formData
@@ -1228,6 +994,12 @@ export const uploadFile = async (file, token) => {
       if (response.ok) {
         const data = await response.json();
         console.log("Respuesta exitosa del servidor (property/upload):", data);
+        
+        // Asegurar que cualquier URL en la respuesta use el mismo protocolo que la página
+        if (data.imageUrl && isHttps && data.imageUrl.startsWith('http:')) {
+          data.imageUrl = data.imageUrl.replace('http://', 'https://');
+        }
+        
         return data;
       }
     } catch (err) {
@@ -1237,9 +1009,9 @@ export const uploadFile = async (file, token) => {
     
     // Si falla, intentar con la ruta de blog
     if (usePropertyRoute || !response || !response.ok) {
-      console.log("Intentando con ruta alternativa:", `${BASE_URL}/blog/upload`);
+      console.log("Intentando con ruta alternativa:", `${API_URL}/blog/upload`);
       
-      response = await fetch(`${BASE_URL}/blog/upload`, {
+      response = await fetch(`${API_URL}/blog/upload`, {
         method: 'POST',
         headers,
         body: formData
@@ -1248,15 +1020,21 @@ export const uploadFile = async (file, token) => {
       if (response.ok) {
         const data = await response.json();
         console.log("Respuesta exitosa del servidor (blog/upload):", data);
+        
+        // Asegurar que cualquier URL en la respuesta use el mismo protocolo que la página
+        if (data.imageUrl && isHttps && data.imageUrl.startsWith('http:')) {
+          data.imageUrl = data.imageUrl.replace('http://', 'https://');
+        }
+        
         return data;
       }
     }
     
     // Si ambas rutas fallan, intentar con la ruta principal
     if (!response || !response.ok) {
-      console.log("Intentando con ruta principal:", `${BASE_URL}/property`);
+      console.log("Intentando con ruta principal:", `${API_URL}/property`);
       
-      response = await fetch(`${BASE_URL}/property`, {
+      response = await fetch(`${API_URL}/property`, {
         method: 'POST',
         headers,
         body: formData
@@ -1271,6 +1049,11 @@ export const uploadFile = async (file, token) => {
     
     const data = await response.json();
     console.log("Respuesta exitosa del servidor:", data);
+    
+    // Asegurar que cualquier URL en la respuesta use el mismo protocolo que la página
+    if (data.imageUrl && isHttps && data.imageUrl.startsWith('http:')) {
+      data.imageUrl = data.imageUrl.replace('http://', 'https://');
+    }
     
     return data;
   } catch (error) {
@@ -1546,7 +1329,7 @@ const handleResponse = async (response) => {
 // GET request
 export const fetchData = async (endpoint) => {
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`);
+    const response = await fetch(`${API_URL}${endpoint}`);
     return handleResponse(response);
   } catch (error) {
     console.error('Error fetching data:', error);
@@ -1557,7 +1340,7 @@ export const fetchData = async (endpoint) => {
 // POST request
 export const postData = async (endpoint, data) => {
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(`${API_URL}${endpoint}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1574,7 +1357,7 @@ export const postData = async (endpoint, data) => {
 // PUT request
 export const updateData = async (endpoint, data) => {
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(`${API_URL}${endpoint}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -1591,7 +1374,7 @@ export const updateData = async (endpoint, data) => {
 // DELETE request
 export const deleteData = async (endpoint) => {
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(`${API_URL}${endpoint}`, {
       method: 'DELETE',
     });
     return handleResponse(response);
@@ -1623,26 +1406,51 @@ export const syncProfileImage = async (newImage = null) => {
 
     if (newImage) {
       // Si hay una nueva imagen, usar el endpoint de actualización de perfil
-      const formData = new FormData();
-      formData.append('profilePic', newImage);
+      let formData;
+      
+      // Verificar si newImage es un objeto File o un string base64/URL
+      if (newImage instanceof File) {
+        formData = new FormData();
+        formData.append('profilePic', newImage);
+      } else {
+        // Si es un string (base64 o URL), enviar como JSON
+        return await fetchAPI('/user/update-profile', {
+          method: 'POST',
+          body: JSON.stringify({ profilePic: newImage })
+        });
+      }
 
       const response = await fetchAPI('/user/update-profile', {
         method: 'POST',
-        body: formData
+        body: formData,
+        omitContentType: true,
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       
       console.log('Respuesta al actualizar imagen:', response);
-      return {
-        imageUrl: response.profilePic || response.profileImage || response.imageUrl
-      };
+      
+      // Procesar la URL para asegurar que use el mismo protocolo que la página
+      let imageUrl = response.profilePic || response.profileImage || response.imageUrl;
+      if (imageUrl && isHttps && imageUrl.startsWith('http:')) {
+        imageUrl = imageUrl.replace('http://', 'https://');
+      }
+      
+      return { imageUrl };
     } else {
       // Si no hay nueva imagen, obtener los datos actuales del usuario
       const response = await fetchAPI('/user/me');
       
       console.log('Respuesta al obtener datos de usuario:', response);
-      return {
-        imageUrl: response.profilePic || response.profileImage || response.imageUrl
-      };
+      
+      // Procesar la URL para asegurar que use el mismo protocolo que la página
+      let imageUrl = response.profilePic || response.profileImage || response.imageUrl;
+      if (imageUrl && isHttps && imageUrl.startsWith('http:')) {
+        imageUrl = imageUrl.replace('http://', 'https://');
+      }
+      
+      return { imageUrl };
     }
   } catch (error) {
     console.error('Error en syncProfileImage:', error);
@@ -1759,10 +1567,10 @@ export const uploadImageProperty = async (formData) => {
     };
     
     console.log("Token de autorización:", token);
-    console.log("Subiendo imagen de propiedad a:", `${BASE_URL}/property/upload-image`);
+    console.log("Subiendo imagen de propiedad a:", `${API_URL}/property/upload-image`);
     console.log("FormData contenido:", Array.from(formData.entries()));
     
-    const response = await fetch(`${BASE_URL}/property/upload-image`, {
+    const response = await fetch(`${API_URL}/property/upload-image`, {
       method: 'POST',
       headers: headers,
       body: formData,
@@ -1786,8 +1594,14 @@ export const uploadImageProperty = async (formData) => {
     
     const imageUrl = data.imageUrl || data.url || data.secure_url;
     
+    // Asegurar que la URL devuelta use el mismo protocolo que la página
+    let processedUrl = imageUrl;
+    if (isHttps && processedUrl.startsWith('http:')) {
+      processedUrl = processedUrl.replace('http://', 'https://');
+    }
+    
     return {
-      src: imageUrl.replace('http://', 'https://'),
+      src: processedUrl,
       alt: 'Imagen de propiedad'
     };
     

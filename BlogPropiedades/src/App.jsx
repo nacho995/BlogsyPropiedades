@@ -469,25 +469,18 @@ function HomeRoute() {
   // Comprobar si hay problemas de protocolo (HTTP vs HTTPS)
   useEffect(() => {
     try {
-      // Verificar si estamos usando HTTPS pero la API requiere HTTP
-      const apiUrl = import.meta.env.VITE_API_URL || '';
-      const currentProtocol = window.location.protocol;
+      // URL de API actualizada para usar el protocolo correcto
+      const isHttps = window.location.protocol === 'https:';
+      const API_DOMAIN = 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+      const apiUrl = `${isHttps ? 'https' : 'http'}://${API_DOMAIN}`;
       
-      if (currentProtocol === 'https:' && apiUrl.startsWith('http:')) {
-        console.warn('⚠️ Conflicto de protocolos: La página usa HTTPS pero la API usa HTTP.');
-        console.log('Esto puede causar problemas de contenido mixto en navegadores modernos');
-        
-        // Registrar este problema
-        try {
-          localStorage.setItem('protocolMismatch', JSON.stringify({
-            timestamp: new Date().toISOString(),
-            pageProtocol: currentProtocol,
-            apiProtocol: 'http:'
-          }));
-        } catch (e) {
-          console.error('Error al registrar información de protocolo:', e);
-        }
-      }
+      console.log(`🌐 App usando API en: ${apiUrl}`);
+      
+      // Guardar la URL definitiva en localStorage para otros componentes
+      localStorage.setItem('definitive_api_url', apiUrl);
+      
+      // Limpiar cualquier aviso de conflicto de protocolo
+      localStorage.removeItem('protocolMismatch');
       
       // Escuchar el evento personalizado de detección de bucles de login
       const handleLoginLoopDetected = () => {
@@ -524,7 +517,7 @@ function HomeRoute() {
         window.removeEventListener('loginLoopDetected', handleLoginLoopDetected);
       };
     } catch (error) {
-      console.error('Error al verificar configuración de API:', error);
+      console.error("Error al verificar protocolos:", error);
     }
   }, []);
   

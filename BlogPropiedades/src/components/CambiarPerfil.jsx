@@ -37,6 +37,15 @@ export default function CambiarPerfil() {
     };
   }, [profilePic]);
 
+  // Determinar si estamos usando HTTPS
+  const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+
+  // Definición de la URL de la API adaptada al protocolo
+  const API_DOMAIN = 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+  const API_URL = `${isHttps ? 'https' : 'http'}://${API_DOMAIN}`;
+
+  console.log(`🔄 CambiarPerfil usando API en: ${API_URL} (${isHttps ? 'HTTPS' : 'HTTP'})`);
+
   // Manejar cambios en la imagen
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
@@ -101,8 +110,6 @@ export default function CambiarPerfil() {
       setError(null);
       setSuccess(null);
 
-      const API_URL = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
-      
       const userData = {
         name: name || user?.name,
         profilePic: profilePic?.file ? await validateAndProcessImage(profilePic.file) : null

@@ -79,9 +79,14 @@ const DiagnosticPage = () => {
 
   // Comprobar el estado de la red
   const checkNetworkStatus = async () => {
+    // Determinar si estamos usando HTTPS
+    const isHttps = window.location.protocol === 'https:';
+    const API_DOMAIN = 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+    const apiUrl = `${isHttps ? 'https' : 'http'}://${API_DOMAIN}`;
+    
     // Lista de endpoints a comprobar
     const endpoints = [
-      { name: 'Backend API', url: import.meta.env.VITE_API_URL },
+      { name: 'Backend API', url: apiUrl },
       { name: 'Google (Internet)', url: 'https://www.google.com' },
     ];
 
