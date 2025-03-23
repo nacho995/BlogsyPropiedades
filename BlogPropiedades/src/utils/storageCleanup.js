@@ -72,7 +72,7 @@ export const cleanupStorage = () => {
     return report;
   } catch (error) {
     console.error("❌ Error durante la limpieza:", error);
-    report.errors.push({ global: true, error: error.message });
+    report.errors.push({ type: "global", message: error.message });
     return report;
   }
 };
