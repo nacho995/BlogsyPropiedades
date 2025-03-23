@@ -1,7 +1,10 @@
 // src/services/api.js
 
-// Configuración base
-const API_URL = import.meta.env.VITE_API_PUBLIC_API_URL || 'http://localhost:3000';
+// Importar la configuración segura de variables de entorno
+import { API_URL as API_URL_SAFE, getApiEndpoint, getBackendUrl } from '../utils/envConfig';
+
+// Configuración base - Usar la variable segura o un valor predeterminado
+const API_URL = API_URL_SAFE || 'https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
 
 // Asegurarse de que la URL no termine en /
 const BASE_URL = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
