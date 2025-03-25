@@ -131,255 +131,107 @@ const getEnhancedErrorMessage = (error, response) => {
   return error.message || ERROR_MESSAGES.UNKNOWN;
 };
 
-/**
- * Realiza peticiones al API con manejo de errores y reintentos automáticos
- * @param {string} endpoint - Endpoint de la API
- * @param {Object} options - Opciones de fetch (method, headers, body)
- * @param {number} retryCount - Número de reintentos si falla (interno)
- * @returns {Promise<any>} - Respuesta de la API
- */
+// CORS Proxy para situaciones donde hay bloqueo de solicitudes
+const CORS_PROXY = 'https://cors-anywhere.herokuapp.com/';
+let useCorsProxy = false;
+let errorCount = 0;
+const MAX_ERRORS = 3;
+
+// Función para manejar errores con límite de intentos
 export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
-    try {
-        // Verificar si hay demasiadas solicitudes en poco tiempo (posible bucle)
-        const now = Date.now();
-        const recentRequests = JSON.parse(localStorage.getItem('recentApiRequests') || '[]');
-        
-        // Limpiar solicitudes antiguas (más de 5 segundos)
-        const filteredRequests = recentRequests.filter(req => (now - req.timestamp) < 5000);
-        
-        // Si hay más de 15 solicitudes en 5 segundos, puede ser un bucle
-        if (filteredRequests.length > 15) {
-            console.error('⚠️ Posible bucle de solicitudes detectado, abortando para evitar saturación');
-            localStorage.setItem('apiRequestLoop', 'true');
-            throw new Error('Bucle de solicitudes detectado. Por favor, recarga la página.');
-        }
-        
-        // Registrar esta solicitud
-        filteredRequests.push({
-            endpoint,
-            timestamp: now,
-            method: options.method || 'GET'
-        });
-        localStorage.setItem('recentApiRequests', JSON.stringify(filteredRequests));
-        
-        // En producción, siempre usamos el endpoint estándar
-        if (endpoint === '/user/me' || endpoint === '/user/profile') {
-            // Verificar que tengamos un token antes de hacer peticiones de perfil
-            const token = localStorage.getItem('token');
-            if (!token) {
-                console.warn('⚠️ Intento de obtener perfil sin token');
-                throw new Error('No hay token de autenticación');
-            }
-        }
-        
-        // Verificar si la API está caída y devolver datos ficticios
-        // Esto evita el bucle infinito de errores
-        if (endpoint === '/blog') {
-            console.log('🔄 API /blog no disponible, devolviendo datos ficticios');
-            return [];
-        }
-        
-        if (endpoint === '/property') {
-            console.log('🔄 API /property no disponible, devolviendo datos ficticios');
-            return [];
-        }
-        
-        // Verificar si hay problemas conocidos con el protocolo
-        const protocolMismatch = JSON.parse(localStorage.getItem('protocolMismatch') || 'null');
-        const now24h = now - (24 * 60 * 60 * 1000); // 24 horas atrás
-        if (protocolMismatch && protocolMismatch.timestamp && new Date(protocolMismatch.timestamp).getTime() > now24h) {
-            console.warn('⚠️ Detectado problema de protocolo previo, manejando situación');
-            
-            // Si estamos en HTTPS y la API sólo soporta HTTP, usar proxy o dar una respuesta alternativa
-            if (isHttps && endpoint === '/user/login') {
-                console.log('🔀 Login con protocolo ajustado para prevenir contenido mixto');
-            }
-        }
-        
-        // Normalizar endpoint
-        const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-        
-        // Combinar URL base con endpoint - Usar la URL con el protocolo correcto
-        let url = combineUrls(BASE_URL, normalizedEndpoint);
-        
-        // Generar un ID único para esta solicitud para seguimiento en logs
-        const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        
-        console.log(`🚀 [${requestId}] Enviando solicitud a: ${url}`);
-        console.log(`📋 [${requestId}] Método: ${options.method || 'GET'}, Intentos: ${retryCount + 1}/${API_RETRY_COUNT + 1}`);
-        
-        if (options.body) {
-            try {
-                // Si el cuerpo es FormData, mostrar solo las claves
-                if (options.body instanceof FormData) {
-                    const keys = Array.from(options.body.keys());
-                    console.log(`📦 [${requestId}] FormData con claves: ${keys.join(', ')}`);
-                } else {
-                    const bodyPreview = JSON.stringify(
-                        typeof options.body === 'string' ? JSON.parse(options.body) : options.body
-                    ).substring(0, 150);
-                    console.log(`📦 [${requestId}] Cuerpo: ${bodyPreview}${bodyPreview.length >= 150 ? '...' : ''}`);
-                }
-            } catch (e) {
-                // Si no podemos parsear el cuerpo, mostrar tipo
-                console.log(`📦 [${requestId}] Cuerpo: [${typeof options.body}]`);
-            }
-        }
-        
-        // Configuración por defecto para la solicitud
-        const fetchOptions = {
-            method: options.method || 'GET',
-            headers: options.omitContentType ? { ...options.headers } : {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                ...options.headers
-            },
-            ...options,
-            // Añadir credenciales para permitir cookies y evitar problemas CORS/CORB
-            credentials: 'include',
-            // Añadir opción para manejar errores de red
-            mode: 'cors'
-        };
-        
-        // Si hay un cuerpo y es un objeto, convertirlo a JSON solo si no es FormData
-        if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
-            fetchOptions.body = JSON.stringify(options.body);
-        } else if (options.body instanceof FormData) {
-            // Si es FormData, pasarlo directamente y asegurarse de no tener Content-Type
-            fetchOptions.body = options.body;
-            // Eliminar Content-Type para que el navegador lo establezca con el boundary correcto
-            if (fetchOptions.headers && fetchOptions.headers['Content-Type']) {
-                delete fetchOptions.headers['Content-Type'];
-            }
-        }
-        
-        try {
-            // Registrar cronómetro para medir tiempo de respuesta
-            const startTime = performance.now();
-            
-            // Realizar la solicitud a la API
-            const response = await fetch(url, fetchOptions);
-            
-            // Calcular tiempo de respuesta
-            const responseTime = Math.round(performance.now() - startTime);
-            console.log(`⏱️ [${requestId}] Tiempo de respuesta: ${responseTime}ms`);
-            
-            // Guardar en caché si es una operación GET exitosa
-            if (response.ok && (options.method === 'GET' || !options.method)) {
-                try {
-                    const clonedResponse = response.clone();
-                    const data = await clonedResponse.json();
-                    
-                    // Solo guardar en caché si no estamos en modo incógnito o si localStorage está disponible
-                    if (typeof localStorage !== 'undefined') {
-                        const cacheKey = `api_cache_${endpoint}`;
-                        localStorage.setItem(cacheKey, JSON.stringify({
-                            data,
-                            timestamp: Date.now()
-                        }));
-                    }
-                } catch (cacheError) {
-                    console.warn(`⚠️ Error al guardar respuesta en caché: ${cacheError.message}`);
-                }
-            }
-            
-            // Si la respuesta no es exitosa, manejar el error
-            if (!response.ok) {
-                console.error(`🛑 [${requestId}] Error HTTP: ${response.status} ${response.statusText}`);
-                
-                // Si es un error de autenticación, limpiar credenciales
-                if (response.status === 401) {
-                    console.warn('🔑 Error de autenticación, limpiando credenciales');
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                    // Redirigir a login solo si no estamos ya en login
-                    if (!window.location.pathname.includes('/login')) {
-                        window.location.href = '/login';
-                    }
-                    throw new Error('Sesión expirada o inválida');
-                }
-                
-                // Si es un error de protocolo o mix-content, registrarlo
-                if (response.status === 0 || (response.type && response.type === 'opaque')) {
-                    localStorage.setItem('protocolMismatch', JSON.stringify({
-                        timestamp: new Date().toISOString(),
-                        url: url
-                    }));
-                    console.error('⛔ Posible problema de protocolo (mixed-content) detectado');
-                }
-                
-                // Si es un error 404 en producción, intentar la URL alternativa
-                if (response.status === 404 && retryCount === 0) {
-                    console.log(`⚠️ [${requestId}] Recurso no encontrado, intentando URL alternativa`);
-                    // En este caso, intentamos con la misma URL pero asegurándonos que use HTTP
-                    return fetchAPI(endpoint, options, retryCount + 1);
-                }
-                
-                // Para otros errores, intentar analizar la respuesta
-                try {
-                    const errorData = await response.json();
-                    console.error(`🔍 [${requestId}] Detalle del error:`, errorData);
-                    
-                    // Lanzar error con mensaje del servidor si está disponible
-                    throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
-                } catch (jsonError) {
-                    // Si no podemos analizar la respuesta, usar mensaje genérico
-                    throw new Error(`Error ${response.status}: ${response.statusText}`);
-                }
-            }
-            
-            // Si la respuesta es exitosa, intentar analizarla como JSON
-            try {
-                const data = await response.json();
-                return data;
-            } catch (jsonError) {
-                console.warn(`⚠️ [${requestId}] No se pudo analizar respuesta como JSON:`, jsonError);
-                // Devolver respuesta en texto plano
-                return await response.text();
-            }
-        } catch (error) {
-            console.error(`❌ [${requestId}] Error en fetchAPI:`, error.message);
-            
-            // Si hay un error de red y tenemos reintentos disponibles
-            if ((error.name === 'TypeError' || error.message.includes('Failed to fetch')) && retryCount < API_RETRY_COUNT) {
-                const backoffTime = Math.pow(2, retryCount) * 1000; // Exponential backoff
-                console.log(`🔄 [${requestId}] Reintentando en ${backoffTime}ms (intento ${retryCount + 1}/${API_RETRY_COUNT})`);
-                
-                return new Promise(resolve => {
-                    setTimeout(() => {
-                        resolve(fetchAPI(endpoint, options, retryCount + 1));
-                    }, backoffTime);
-                });
-            }
-            
-            // Registrar detalles del error para diagnóstico
-            try {
-                if (typeof localStorage !== 'undefined') {
-                    const apiErrors = JSON.parse(localStorage.getItem('apiErrors') || '[]');
-                    apiErrors.push({
-                        endpoint,
-                        error: error.message,
-                        timestamp: new Date().toISOString(),
-                        url: url
-                    });
-                    
-                    // Limitar a los últimos 10 errores
-                    if (apiErrors.length > 10) {
-                        apiErrors.shift();
-                    }
-                    
-                    localStorage.setItem('apiErrors', JSON.stringify(apiErrors));
-                }
-            } catch (e) {
-                console.error('Error al guardar registro de error:', e);
-            }
-            
-            throw error;
-        }
-    } catch (outerError) {
-        console.error(`🔥 Error general en fetchAPI:`, outerError);
-        throw outerError;
+  // Verificar si ya estamos en un bucle y romperlo
+  if (errorCount > MAX_ERRORS) {
+    console.error("🛑 DEMASIADOS ERRORES CONSECUTIVOS - OMITIENDO SOLICITUD");
+    // Resetear para futuros intentos pero con un tiempo mínimo
+    setTimeout(() => {
+      errorCount = 0;
+    }, 5000);
+    
+    // Para endpoints críticos, devolver datos vacíos para no romper la UI
+    if (endpoint.includes('/blog') || endpoint.includes('/property')) {
+      return [];
     }
+    
+    throw new Error("Demasiados errores consecutivos. Intente nuevamente más tarde.");
+  }
+  
+  try {
+    // Omitir solicitudes no críticas si hay demasiados errores recientes
+    const isLoginRequest = endpoint.includes('login') || endpoint.includes('register');
+    
+    // Construir la URL completa
+    let url = combineUrls(BASE_URL, endpoint.startsWith('/') ? endpoint : `/${endpoint}`);
+    
+    // Si se detectaron problemas CORS, usar proxy
+    if (useCorsProxy) {
+      url = CORS_PROXY + url;
+      console.log(`🌐 Usando CORS proxy: ${url}`);
+    }
+
+    console.log(`🔄 Enviando solicitud a: ${url}`);
+    
+    // Configuración por defecto de fetch
+    const fetchOptions = {
+      method: options.method || 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...options.headers
+      },
+      mode: 'cors',
+      credentials: 'include'
+    };
+    
+    // Agregar cuerpo si existe
+    if (options.body) {
+      fetchOptions.body = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
+    }
+    
+    // Intentar realizar la solicitud
+    const response = await fetch(url, fetchOptions);
+    
+    // Verificar respuesta
+    if (!response.ok) {
+      throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
+    }
+    
+    // Resetear contador de errores tras éxito
+    errorCount = 0;
+    
+    // Procesar respuesta
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      return await response.json();
+    } else {
+      return await response.text();
+    }
+  } catch (error) {
+    console.error(`❌ [req_${Date.now()}_${Math.random().toString(36).slice(2, 7)}] Error en fetchAPI:`, error);
+    
+    // Incrementar contador de errores
+    errorCount++;
+    
+    // Si hay problemas de CORS y aún no estamos usando proxy, activarlo para siguiente intento
+    if (error.message.includes('CORS') || error.message.includes('blocked') || error.message.includes('NetworkError')) {
+      useCorsProxy = true;
+      console.warn("⚠️ Detectado posible error CORS, activando proxy para próximas solicitudes");
+      
+      // Si estamos en un intento inicial, reintentamos con proxy
+      if (retryCount < 1) {
+        console.log("🔄 Reintentando solicitud con CORS proxy...");
+        return fetchAPI(endpoint, options, retryCount + 1);
+      }
+    }
+    
+    // Para endpoints de propiedades y blogs, devolver array vacío para evitar romper la UI
+    if (endpoint.includes('/blog') || endpoint.includes('/property')) {
+      console.warn(`⚠️ Error al cargar datos de ${endpoint}, devolviendo array vacío`);
+      return [];
+    }
+    
+    // Propagar el error para otros endpoints
+    throw error;
+  }
 };
 
 /**
