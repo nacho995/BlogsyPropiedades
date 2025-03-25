@@ -161,15 +161,16 @@ function Principal() {
     return defaultProfilePic;
   };
   
-  // Función para asegurar que siempre se use HTTP para las APIS que no soportan HTTPS
+  // Función para asegurar que siempre se use HTTP para las APIs de GozaMadrid
   const ensureHttpProtocol = (url) => {
     if (!url) return defaultProfilePic;
     
     try {
-      // Si es una API de GozaMadrid, asegurar que use HTTP
+      // Las APIs de GozaMadrid necesitan usar HTTP
       if (url.includes('gozamadrid-api') || 
           url.includes('api.realestategozamadrid.com') ||
-          url.includes('goza-madrid.onrender.com')) {
+          url.includes('goza-madrid.onrender.com') ||
+          url.includes('elasticbeanstalk.com')) {
         return url.replace('https://', 'http://');
       }
       return url;

@@ -136,9 +136,23 @@ const SignIn = ({ isRegistering = false }) => {
 
         // Definición de la URL de la API adaptada al protocolo
         const API_DOMAIN = 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
-        const API_URL = `${isHttps ? 'https' : 'http'}://${API_DOMAIN}`;
+        // Necesitamos usar HTTP porque el backend requiere HTTP
+        const API_URL = `http://${API_DOMAIN}`;
 
-        console.log(`🔄 SignIn usando API en: ${API_URL} (${isHttps ? 'HTTPS' : 'HTTP'})`);
+        console.log(`🔄 SignIn usando API en: ${API_URL} (HTTP con CORS)`);
+        
+        if (isHttps) {
+            console.log('⚠️ AVISO: La página está en HTTPS pero la API usa HTTP. Puede haber problemas de contenido mixto.');
+            // Registrar este tipo de evento para detectar posibles problemas
+            try {
+                localStorage.setItem('mixedContentWarning', JSON.stringify({
+                    timestamp: new Date().toISOString(),
+                    https: isHttps
+                }));
+            } catch (e) {
+                console.error("Error al guardar advertencia de contenido mixto:", e);
+            }
+        }
         
         // Guardar la URL de producción para usar en toda la aplicación
         try {

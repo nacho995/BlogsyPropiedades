@@ -1,0 +1,37 @@
+CONFIGURACIÓN DE CLOUDFLARE PARA PERMITIR CONTENIDO MIXTO
+
+Para que tu aplicación en HTTPS pueda comunicarse correctamente con el backend en HTTP, debes configurar Cloudflare para permitir este comportamiento. Sigue estos pasos:
+
+1. Accede a tu panel de Cloudflare: https://dash.cloudflare.com/
+2. Selecciona el dominio realestategozamadrid.com
+3. Ve a la sección "SSL/TLS" en el menú lateral
+4. Asegúrate de que está seleccionado "Full" (no "Full (strict)")
+5. Luego, ve a la pestaña "Edge Certificates"
+6. Busca la opción "Disable Universal SSL" y NO la actives (debe estar desactivada)
+7. Ahora ve a la pestaña "Origin Server"
+8. Si hay algún certificado personalizado, asegúrate de que está configurado correctamente
+
+CONFIGURACIÓN DE PÁGINA DE REGLAS PARA CONTENIDO MIXTO:
+
+1. Ve a la sección "Rules" > "Page Rules" en el menú lateral
+2. Crea una nueva regla con las siguientes configuraciones:
+   - URL: blog.realestategozamadrid.com/*
+   - Configuración: 
+     * SSL: Off
+     * Security Level: High
+     * Cache Level: Standard
+   - Activa la regla
+
+CONFIGURACIÓN DE TRANSFORM RULES:
+
+1. Ve a la sección "Rules" > "Transform Rules"
+2. Crea una nueva regla:
+   - Nombre: "Allow Mixed Content"
+   - Cuando coincida: "Host" = "blog.realestategozamadrid.com"
+   - Ejecutar estas acciones: 
+     * Modificar encabezado de respuesta
+     * Configuración: Set "Content-Security-Policy" = "upgrade-insecure-requests; default-src https: http: 'unsafe-inline' 'unsafe-eval'"
+
+Esta configuración permitirá que tu aplicación en HTTPS pueda comunicarse con la API en HTTP a través de Cloudflare.
+
+IMPORTANTE: Esta configuración debería ser temporal. Lo ideal es que el backend en AWS Elastic Beanstalk sea accesible directamente mediante HTTPS en el futuro. 
