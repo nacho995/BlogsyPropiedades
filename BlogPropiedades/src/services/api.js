@@ -2,7 +2,8 @@
 /**
  * Servicios de API para la aplicación
  * 
- * Este archivo se conecta directamente al backend HTTPS sin proxies o simulaciones
+ * Este archivo se conecta directamente al backend HTTP sin proxies CORS
+ * Permite el acceso directo incluso desde frontend HTTPS (contenido mixto)
  */
 
 // Importar utilidades
@@ -19,12 +20,12 @@ import {
 // Determinar si estamos usando HTTPS (solo para registro)
 const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
-// Usar la API con HTTPS - Comunicación directa sin proxies
+// Usar la API con HTTP directamente - Sin proxies CORS
 const BASE_URL = API_URL;
 const API_BASE_URL = API_URL;
 
 // Registrar la URL de la API usada
-console.log(`🌐 Usando API en: ${API_URL}`);
+console.log(`🌐 Usando API en: ${API_URL} - Acceso directo sin proxies`);
 console.log(`🔒 Frontend en: ${isHttps ? 'HTTPS' : 'HTTP'} - ${window.location.origin}`);
 
 // Función auxiliar para esperar un tiempo específico
@@ -33,10 +34,15 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 // Función para manejar errores con límite de intentos
 export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
   try {
-    // Construir la URL completa
+    // Construir la URL completa - Siempre en HTTP
     let url = combineUrls(BASE_URL, endpoint.startsWith('/') ? endpoint : `/${endpoint}`);
     
-    console.log(`🔄 Enviando solicitud a: ${url}`);
+    // Asegurar que siempre sea HTTP para el backend
+    if (url.startsWith('https://')) {
+      url = url.replace('https://', 'http://');
+    }
+    
+    console.log(`🔄 Enviando solicitud directa a: ${url}`);
     
     // Configuración por defecto de fetch
     const fetchOptions = {
@@ -46,7 +52,8 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
         'Accept': 'application/json',
         ...options.headers
       },
-      mode: 'cors',
+      // Usar modo 'no-cors' si estamos en HTTPS para evitar problemas de CORS
+      mode: isHttps ? 'no-cors' : 'cors',
       credentials: 'include'
     };
     
@@ -62,8 +69,14 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
       }
     }
     
-    // Intentar realizar la solicitud
+    // Intentar realizar la solicitud directa
     const response = await fetch(url, fetchOptions);
+    
+    // En modo no-cors no podemos leer la respuesta como JSON, así que devolvemos un objeto vacío
+    if (isHttps && fetchOptions.mode === 'no-cors') {
+      console.log(`⚠️ Modo no-cors: No es posible leer la respuesta directamente`);
+      return {};
+    }
     
     // Verificar respuesta
     if (!response.ok) {
@@ -82,7 +95,7 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     
     // Reintentar solo en caso de error de red, con tiempo máximo
     if ((error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) && retryCount < 2) {
-      console.log(`🔄 Reintentando solicitud (${retryCount + 1}/2)...`);
+      console.log(`🔄 Reintentando solicitud directa (${retryCount + 1}/2)...`);
       
       // Esperar un poco antes de reintentar
       await sleep(1000 * (retryCount + 1));

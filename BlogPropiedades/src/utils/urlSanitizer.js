@@ -1,13 +1,13 @@
 /**
  * Utilidades para sanitizar y validar URLs
- * Este archivo proporciona funciones para asegurar que las URLs
- * siempre tengan el formato correcto para HTTP (ya que HTTPS no está disponible).
+ * Este archivo proporciona funciones para asegurar que las URLs de API
+ * siempre sean HTTP, incluso cuando el frontend está en HTTPS.
  */
 
 /**
- * Sanitiza una URL asegurando que tenga el protocolo HTTP para conexión al backend
+ * Sanitiza una URL asegurando que las APIs siempre usen HTTP
  * @param {string} url - URL a sanitizar
- * @returns {string} - URL sanitizada con HTTP
+ * @returns {string} - URL sanitizada (HTTP para APIs, HTTPS para recursos externos)
  */
 export const sanitizeUrl = (url) => {
   if (!url) return '';
@@ -18,36 +18,29 @@ export const sanitizeUrl = (url) => {
   // Eliminar comillas si las hay
   sanitized = sanitized.replace(/^["']|["']$/g, '');
   
-  // Si ya tiene protocolo, asegurar que sea HTTP para el backend
+  // Determinar si es una URL de API
+  const isApiUrl = sanitized.includes('gozamadrid-api') || 
+                  sanitized.includes('api.realestategozamadrid.com') ||
+                  sanitized.includes('goza-madrid.onrender.com') ||
+                  sanitized.includes('elasticbeanstalk.com');
+  
+  // Si ya tiene protocolo, ajustar según tipo de URL
   if (sanitized.includes('://')) {
-    // Determinar si es una URL de la API de GozaMadrid
-    const isApiUrl = sanitized.includes('gozamadrid-api') || 
-                    sanitized.includes('api.realestategozamadrid.com') ||
-                    sanitized.includes('goza-madrid.onrender.com') ||
-                    sanitized.includes('elasticbeanstalk.com');
-    
     if (isApiUrl) {
-      // Convertir HTTPS a HTTP para API
+      // Para APIs, SIEMPRE usar HTTP
       sanitized = sanitized.replace(/^https:\/\//, 'http://');
       if (!sanitized.startsWith('http://')) {
         sanitized = sanitized.replace(/^.*:\/\//, 'http://');
       }
     } else {
-      // Para URLs que no son de la API, mantener el protocolo original
+      // Para recursos externos, preferir HTTPS
       if (!sanitized.startsWith('https://') && !sanitized.startsWith('http://')) {
         // Si tiene otro protocolo que no sea HTTP o HTTPS, corregirlo
         sanitized = sanitized.replace(/^.*:\/\//, 'https://');
       }
     }
   } else {
-    // Si no tiene protocolo
-    // Determinar si es una URL de la API de GozaMadrid
-    const isApiUrl = sanitized.includes('gozamadrid-api') || 
-                    sanitized.includes('api.realestategozamadrid.com') ||
-                    sanitized.includes('goza-madrid.onrender.com') ||
-                    sanitized.includes('elasticbeanstalk.com');
-                    
-    // Añadir el protocolo adecuado
+    // Si no tiene protocolo, añadir HTTP para APIs y HTTPS para lo demás
     sanitized = `${isApiUrl ? 'http' : 'https'}://${sanitized}`;
   }
   
@@ -114,7 +107,7 @@ export const extractDomain = (url) => {
  */
 export const combineUrls = (baseUrl, endpoint = '') => {
   try {
-    // Sanitizar la URL base
+    // Sanitizar la URL base (HTTP para APIs)
     let sanitizedBase = sanitizeUrl(baseUrl);
     
     // Eliminar slash final de la base si existe
