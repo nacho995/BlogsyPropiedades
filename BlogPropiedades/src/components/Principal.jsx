@@ -129,7 +129,7 @@ function Principal() {
         
         // Verificar si la URL es válida
         if (typeof imageUrl === 'string' && imageUrl.trim() !== '') {
-          return ensureHttpProtocol(imageUrl);
+          return ensureCorrectProtocol(imageUrl);
         }
       }
       
@@ -138,7 +138,7 @@ function Principal() {
         console.log(`Imagen es un string directo:`, blog.image);
         
         if (blog.image.trim() !== '') {
-          return ensureHttpProtocol(blog.image);
+          return ensureCorrectProtocol(blog.image);
         }
       }
       
@@ -148,9 +148,9 @@ function Principal() {
         
         const firstImage = blog.images[0];
         if (typeof firstImage === 'string') {
-          return ensureHttpProtocol(firstImage);
+          return ensureCorrectProtocol(firstImage);
         } else if (firstImage && typeof firstImage === 'object' && firstImage.src) {
-          return ensureHttpProtocol(firstImage.src);
+          return ensureCorrectProtocol(firstImage.src);
         }
       }
     } catch (error) {
@@ -161,8 +161,8 @@ function Principal() {
     return defaultProfilePic;
   };
   
-  // Función para asegurar que siempre se use HTTP para las APIs
-  const ensureHttpProtocol = (url) => {
+  // Función para asegurar que siempre se use HTTPS para las APIs
+  const ensureCorrectProtocol = (url) => {
     if (!url) return defaultProfilePic;
     
     try {

@@ -7,7 +7,7 @@
 import { getSafeEnvValue } from './validateEnv';
 import { sanitizeUrl, combineUrls, getDefaultApiUrl } from './urlSanitizer';
 
-// URL correcta para la API - siempre HTTP
+// URL correcta para la API - usando HTTP ya que HTTPS no funciona
 const API_DOMAIN = 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
 const PRODUCTION_API_URL = `http://${API_DOMAIN}`;
 

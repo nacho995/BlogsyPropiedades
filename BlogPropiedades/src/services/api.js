@@ -2,9 +2,7 @@
 /**
  * Servicios de API para la aplicación
  * 
- * Este archivo adapta automáticamente el protocolo (HTTP/HTTPS) de la API 
- * para que coincida con el protocolo de la página web, evitando problemas
- * de contenido mixto en navegadores modernos.
+ * Este archivo se conecta directamente al backend HTTPS sin proxies o simulaciones
  */
 
 // Importar utilidades
@@ -15,16 +13,13 @@ import {
 
 import { 
   API_URL, 
-  FALLBACK_API, 
-  SECURE_ASSET_URL,
-  API_GATEWAY_URL
+  FALLBACK_API
 } from '../utils/envConfig';
 
 // Determinar si estamos usando HTTPS (solo para registro)
 const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
-// Usar la API que corresponda según configuración en envConfig
-// SIEMPRE debe ser HTTP para AWS Elastic Beanstalk
+// Usar la API con HTTPS - Comunicación directa sin proxies
 const BASE_URL = API_URL;
 const API_BASE_URL = API_URL;
 
@@ -32,78 +27,15 @@ const API_BASE_URL = API_URL;
 console.log(`🌐 Usando API en: ${API_URL}`);
 console.log(`🔒 Frontend en: ${isHttps ? 'HTTPS' : 'HTTP'} - ${window.location.origin}`);
 
-// Si estamos en HTTPS pero la API es HTTP, mostrar advertencia
-if (isHttps && API_URL.startsWith('http:')) {
-  console.warn('⚠️ ADVERTENCIA: Frontend en HTTPS intentando conectar con API en HTTP');
-  console.warn('⚠️ Se usará un proxy CORS para evitar problemas de contenido mixto');
-  
-  // Registrar este tipo de evento para detectar posibles problemas
-  try {
-    localStorage.setItem('mixedContentWarning', JSON.stringify({
-      timestamp: new Date().toISOString(),
-      frontend: window.location.origin,
-      backend: API_URL
-    }));
-  } catch (e) {
-    console.error("Error al guardar advertencia de contenido mixto:", e);
-  }
-}
-
 // Función auxiliar para esperar un tiempo específico
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Lista de varios proxies CORS para intentar si uno falla
-const CORS_PROXIES = [
-  'https://corsproxy.io/?',
-  'https://api.allorigins.win/raw?url=',
-  'https://cors.sh/?',
-  'https://cors-anywhere.herokuapp.com/'
-];
-
-let currentProxyIndex = 0;
-let useCorsProxy = false;
-// Activar proxy por defecto si estamos en HTTPS y la API está en HTTP
-useCorsProxy = isHttps && API_URL.startsWith('http:');
-let errorCount = 0;
-const MAX_ERRORS = 5;
-
 // Función para manejar errores con límite de intentos
 export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
-  // Verificar si ya estamos en un bucle y romperlo
-  if (errorCount > MAX_ERRORS) {
-    console.error("🛑 DEMASIADOS ERRORES CONSECUTIVOS - OMITIENDO SOLICITUD");
-    // Resetear para futuros intentos pero con un tiempo mínimo
-    setTimeout(() => {
-      errorCount = 0;
-    }, 5000);
-    
-    // Para endpoints críticos, devolver datos vacíos para no romper la UI
-    if (endpoint.includes('/blog') || endpoint.includes('/property')) {
-      return [];
-    }
-    
-    throw new Error("Demasiados errores consecutivos. Intente nuevamente más tarde.");
-  }
-  
   try {
     // Construir la URL completa
     let url = combineUrls(BASE_URL, endpoint.startsWith('/') ? endpoint : `/${endpoint}`);
     
-    // Si estamos en HTTPS y la API es HTTP, siempre usar proxy CORS
-    // No intentar convertir a HTTPS ya que el API no lo soporta
-    if (isHttps && url.startsWith('http:')) {
-      console.log(`🔄 API en HTTP desde frontend HTTPS: ${url}`);
-      useCorsProxy = true;
-    }
-    
-    // Si se detectaron problemas CORS, usar proxy
-    if (useCorsProxy) {
-      // Usar el proxy actual de la lista
-      const proxyUrl = CORS_PROXIES[currentProxyIndex];
-      url = proxyUrl + encodeURIComponent(url);
-      console.log(`🌐 Usando CORS proxy (${currentProxyIndex+1}/${CORS_PROXIES.length}): ${url}`);
-    }
-
     console.log(`🔄 Enviando solicitud a: ${url}`);
     
     // Configuración por defecto de fetch
@@ -114,13 +46,9 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
         'Accept': 'application/json',
         ...options.headers
       },
-      mode: 'cors'
+      mode: 'cors',
+      credentials: 'include'
     };
-    
-    // No enviar credentials con el proxy CORS para evitar problemas
-    if (!useCorsProxy) {
-      fetchOptions.credentials = 'include';
-    }
     
     // Agregar cuerpo si existe
     if (options.body) {
@@ -142,9 +70,6 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
       throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
     }
     
-    // Resetear contador de errores tras éxito
-    errorCount = 0;
-    
     // Procesar respuesta
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {
@@ -153,34 +78,15 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
       return await response.text();
     }
   } catch (error) {
-    console.error(`❌ [req_${Date.now()}_${Math.random().toString(36).slice(2, 7)}] Error en fetchAPI:`, error);
+    console.error(`❌ Error en fetchAPI:`, error);
     
-    // Incrementar contador de errores
-    errorCount++;
-    
-    // Si hay problemas de CORS, contenido mixto o error de red, activar proxy
-    if (error.message.includes('CORS') || 
-        error.message.includes('blocked') || 
-        error.message.includes('NetworkError') || 
-        error.message.includes('Failed to fetch') ||
-        error.message.includes('Mixed Content')) {
+    // Reintentar solo en caso de error de red, con tiempo máximo
+    if ((error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) && retryCount < 2) {
+      console.log(`🔄 Reintentando solicitud (${retryCount + 1}/2)...`);
       
-      // Si ya estamos usando un proxy, intentar con el siguiente
-      if (useCorsProxy) {
-        currentProxyIndex = (currentProxyIndex + 1) % CORS_PROXIES.length;
-      } else {
-        useCorsProxy = true;
-      }
-      
-      console.warn(`⚠️ Detectado posible error de conexión, intentando con proxy ${currentProxyIndex + 1}`);
-      
-      // Si estamos en un número razonable de intentos, reintentamos con proxy
-      if (retryCount < 3) {
-        console.log("🔄 Reintentando solicitud con CORS proxy...");
-        // Esperar un poco antes de reintentar para evitar sobrecarga
-        await sleep(retryCount * 1000);
-        return fetchAPI(endpoint, options, retryCount + 1);
-      }
+      // Esperar un poco antes de reintentar
+      await sleep(1000 * (retryCount + 1));
+      return fetchAPI(endpoint, options, retryCount + 1);
     }
     
     // Para endpoints de propiedades y blogs, devolver array vacío para evitar romper la UI

@@ -1,17 +1,15 @@
 /**
  * Utilidades para sanitizar y validar URLs
  * Este archivo proporciona funciones para asegurar que las URLs
- * siempre tengan el formato correcto, incluso cuando las variables
- * de entorno están mal configuradas.
+ * siempre tengan el formato correcto para HTTP (ya que HTTPS no está disponible).
  */
 
 /**
- * Sanitiza una URL asegurando que tenga el protocolo correcto
+ * Sanitiza una URL asegurando que tenga el protocolo HTTP para conexión al backend
  * @param {string} url - URL a sanitizar
- * @param {boolean} forceHttp - Forzar el uso de HTTP en lugar de HTTPS
- * @returns {string} - URL sanitizada
+ * @returns {string} - URL sanitizada con HTTP
  */
-export const sanitizeUrl = (url, forceHttp = true) => {
+export const sanitizeUrl = (url) => {
   if (!url) return '';
   
   // Eliminar espacios en blanco
@@ -20,31 +18,37 @@ export const sanitizeUrl = (url, forceHttp = true) => {
   // Eliminar comillas si las hay
   sanitized = sanitized.replace(/^["']|["']$/g, '');
   
-  // Si es una API de GozaMadrid, asegurar que use HTTP
-  const isApiUrl = sanitized.includes('gozamadrid-api') || 
-                  sanitized.includes('api.realestategozamadrid.com') ||
-                  sanitized.includes('goza-madrid.onrender.com');
-  
-  // Si ya tiene protocolo, verificar que sea válido
+  // Si ya tiene protocolo, asegurar que sea HTTP para el backend
   if (sanitized.includes('://')) {
-    if (isApiUrl || forceHttp) {
-      // Para APIs de GozaMadrid, usar siempre HTTP ya que el servidor no soporta HTTPS
+    // Determinar si es una URL de la API de GozaMadrid
+    const isApiUrl = sanitized.includes('gozamadrid-api') || 
+                    sanitized.includes('api.realestategozamadrid.com') ||
+                    sanitized.includes('goza-madrid.onrender.com') ||
+                    sanitized.includes('elasticbeanstalk.com');
+    
+    if (isApiUrl) {
+      // Convertir HTTPS a HTTP para API
       sanitized = sanitized.replace(/^https:\/\//, 'http://');
       if (!sanitized.startsWith('http://')) {
         sanitized = sanitized.replace(/^.*:\/\//, 'http://');
       }
     } else {
-      // Para otros URLs, preferir HTTPS
-      if (sanitized.startsWith('http://') && !forceHttp) {
-        sanitized = sanitized.replace('http://', 'https://');
-      } else if (!sanitized.startsWith('https://') && !sanitized.startsWith('http://')) {
-        // Si tiene otro protocolo, corregirlo
-        sanitized = sanitized.replace(/^.*:\/\//, forceHttp ? 'http://' : 'https://');
+      // Para URLs que no son de la API, mantener el protocolo original
+      if (!sanitized.startsWith('https://') && !sanitized.startsWith('http://')) {
+        // Si tiene otro protocolo que no sea HTTP o HTTPS, corregirlo
+        sanitized = sanitized.replace(/^.*:\/\//, 'https://');
       }
     }
   } else {
-    // Si no tiene protocolo, añadir el protocolo según corresponda
-    sanitized = `${isApiUrl || forceHttp ? 'http' : 'https'}://${sanitized}`;
+    // Si no tiene protocolo
+    // Determinar si es una URL de la API de GozaMadrid
+    const isApiUrl = sanitized.includes('gozamadrid-api') || 
+                    sanitized.includes('api.realestategozamadrid.com') ||
+                    sanitized.includes('goza-madrid.onrender.com') ||
+                    sanitized.includes('elasticbeanstalk.com');
+                    
+    // Añadir el protocolo adecuado
+    sanitized = `${isApiUrl ? 'http' : 'https'}://${sanitized}`;
   }
   
   return sanitized;
@@ -113,12 +117,6 @@ export const combineUrls = (baseUrl, endpoint = '') => {
     // Sanitizar la URL base
     let sanitizedBase = sanitizeUrl(baseUrl);
     
-    // Convertir HTTPS a HTTP para Elastic Beanstalk
-    if (sanitizedBase.startsWith('https:') && sanitizedBase.includes('elasticbeanstalk.com')) {
-      console.warn('⚠️ Convirtiendo URL de Elastic Beanstalk de HTTPS a HTTP:', sanitizedBase);
-      sanitizedBase = sanitizedBase.replace('https:', 'http:');
-    }
-    
     // Eliminar slash final de la base si existe
     const base = sanitizedBase.endsWith('/') 
       ? sanitizedBase.slice(0, -1) 
@@ -139,10 +137,10 @@ export const combineUrls = (baseUrl, endpoint = '') => {
 
 /**
  * Devuelve una URL predeterminada segura para casos de error
- * @returns {string} - URL predeterminada
+ * @returns {string} - URL predeterminada con HTTP
  */
 export const getDefaultApiUrl = () => {
-  // Siempre usar HTTP para la API de Elastic Beanstalk
+  // Usar HTTP para la API de Elastic Beanstalk
   return 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
 };
 
