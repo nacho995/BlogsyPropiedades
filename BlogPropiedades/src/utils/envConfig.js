@@ -19,14 +19,10 @@ export const PUBLIC_API_URL = PRODUCTION_API_URL;
 // URL de respaldo para casos de error
 export const FALLBACK_API = PRODUCTION_API_URL;
 
-// URL segura (HTTPS) para recursos públicos
-export const SECURE_ASSET_URL = 'https://api.realestategozamadrid.com';
-
-// URL para el API Gateway de AWS (si está configurado)
-export const API_GATEWAY_URL = 'https://api.realestategozamadrid.com';
-
-// URL para el CDN de archivos estáticos (si está configurado)
-export const STATIC_FILES_URL = 'https://api.realestategozamadrid.com';
+// Eliminar referencias a dominios inexistentes
+export const SECURE_ASSET_URL = null;
+export const API_GATEWAY_URL = null;
+export const STATIC_FILES_URL = null;
 
 // Nivel de depuración para la aplicación
 export const DEBUG_LEVEL = getSafeEnvValue('VITE_DEBUG_LEVEL') || 'error';

@@ -49,110 +49,8 @@ if (isHttps && API_URL.startsWith('http:')) {
   }
 }
 
-// Función para manejar errores de conexión con reintentos
-const API_RETRY_COUNT = 3;
-const API_RETRY_DELAY = 1000; // 1 segundo
-const API_TIMEOUT = 30000; // 30 segundos
-
-// Constantes para mensajes de error
-const ERROR_MESSAGES = {
-  NETWORK: "Error de conexión: No se pudo conectar con el servidor. Por favor, verifica tu conexión a internet y vuelve a intentarlo.",
-  TIMEOUT: "Tiempo de espera agotado: El servidor está tardando demasiado en responder. Por favor, inténtalo más tarde.",
-  SERVER: "Error del servidor: Estamos experimentando problemas técnicos. Por favor, inténtalo de nuevo en unos minutos.",
-  AUTHENTICATION: "Error de autenticación: Tu sesión ha expirado o no tienes permiso para realizar esta acción.",
-  VALIDATION: "Error de validación: Por favor, verifica los datos ingresados e intenta nuevamente.",
-  UNKNOWN: "Ocurrió un error inesperado. Por favor, inténtalo de nuevo.",
-  MIXED_CONTENT: "Error de contenido mixto: La página usa HTTPS pero la API usa HTTP"
-};
-
-// Estado global de la red para detectar problemas persistentes
-let networkHealthStatus = {
-  lastSuccessfulRequest: null,
-  failedRequestCount: 0,
-  isOfflineMode: false,
-  pendingRequests: [],
-  connectionStatus: navigator.onLine,
-  detectedBackendUrl: null,
-  diagnosticInfo: {
-    lastFailureReason: null,
-    lastFailureTimestamp: null,
-    successRate: 100
-  }
-};
-
-// Escuchar eventos de conexión
-window.addEventListener('online', () => {
-  console.log('🌐 Conexión a internet restablecida');
-  networkHealthStatus.connectionStatus = true;
-  
-  // Intentar procesar solicitudes pendientes
-  if (networkHealthStatus.pendingRequests.length > 0) {
-    console.log(`🔄 Procesando ${networkHealthStatus.pendingRequests.length} solicitudes pendientes`);
-    // Implementar lógica para reenviar solicitudes pendientes si es necesario
-  }
-});
-
-window.addEventListener('offline', () => {
-  console.log('🔌 Conexión a internet perdida');
-  networkHealthStatus.connectionStatus = false;
-  networkHealthStatus.isOfflineMode = true;
-});
-
 // Función auxiliar para esperar un tiempo específico
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Función auxiliar para asegurar URLs correctas
-const ensureProtocol = (url) => sanitizeUrl(url);
-
-// Función para detectar tipo de error y mejorar mensajes
-const getEnhancedErrorMessage = (error, response) => {
-  // Mensajes más descriptivos basados en códigos de error HTTP
-  if (response && response.status) {
-    switch (response.status) {
-      case 400:
-        return 'Solicitud incorrecta. Por favor, verifica los datos enviados.';
-      case 401:
-        return 'Sesión expirada o no autorizada. Por favor, inicia sesión nuevamente.';
-      case 403:
-        return 'No tienes permiso para realizar esta acción.';
-      case 404:
-        return 'El recurso solicitado no existe o ha sido movido.';
-      case 500:
-        return 'Error en el servidor. Estamos trabajando para resolverlo.';
-      case 502:
-      case 503:
-      case 504:
-        return 'Servicio temporalmente no disponible. Por favor, intenta más tarde.';
-      default:
-        return `Error HTTP ${response.status}: ${response.statusText || 'Error desconocido'}`;
-    }
-  }
-
-  // Mensajes basados en el tipo de error
-  if (error.name === 'AbortError') {
-    return ERROR_MESSAGES.TIMEOUT;
-  }
-  
-  if (error.message) {
-    if (error.message.includes('Failed to fetch') || 
-        error.message.includes('NetworkError') || 
-        error.message.includes('network error')) {
-      return ERROR_MESSAGES.NETWORK;
-    }
-    
-    if (error.message.includes('timeout') || error.message.includes('Timeout')) {
-      return ERROR_MESSAGES.TIMEOUT;
-    }
-    
-    if (error.message.includes('CORS') || 
-        error.message.includes('access-control-allow-origin') || 
-        error.message.includes('mixed content')) {
-      return ERROR_MESSAGES.MIXED_CONTENT;
-    }
-  }
-  
-  return error.message || ERROR_MESSAGES.UNKNOWN;
-};
 
 // Lista de varios proxies CORS para intentar si uno falla
 const CORS_PROXIES = [
@@ -191,11 +89,11 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     // Construir la URL completa
     let url = combineUrls(BASE_URL, endpoint.startsWith('/') ? endpoint : `/${endpoint}`);
     
-    // Si estamos en HTTPS, pero la URL es HTTP, intentar usar API Gateway
-    if (isHttps && url.startsWith('http:') && !useCorsProxy) {
-      const secureUrl = url.replace('http://', 'https://');
-      url = secureUrl.replace('gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com', 'api.realestategozamadrid.com');
-      console.log(`🔒 Convertida URL a HTTPS: ${url}`);
+    // Si estamos en HTTPS y la API es HTTP, siempre usar proxy CORS
+    // No intentar convertir a HTTPS ya que el API no lo soporta
+    if (isHttps && url.startsWith('http:')) {
+      console.log(`🔄 API en HTTP desde frontend HTTPS: ${url}`);
+      useCorsProxy = true;
     }
     
     // Si se detectaron problemas CORS, usar proxy
