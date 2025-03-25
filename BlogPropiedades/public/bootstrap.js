@@ -9,7 +9,7 @@
   // Verificar si estamos en HTTPS
   const isHttps = window.location.protocol === 'https:';
   
-  // API URL correcta - siempre usar HTTP ya que la API no soporta HTTPS
+  // API URL correcta - SIEMPRE usar la URL de ElasticBeanstalk directamente
   const API_DOMAIN = 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
   const API_URL = `http://${API_DOMAIN}`;
   
@@ -29,6 +29,14 @@
     
     // Sobrescribir fetch para interceptar solicitudes HTTP desde HTTPS
     window.fetch = function(url, options = {}) {
+      // Corregir cualquier URL que intente usar el dominio inexistente api.realestategozamadrid.com
+      if (typeof url === 'string' && url.includes('api.realestategozamadrid.com')) {
+        // Reemplazar con la URL correcta de ElasticBeanstalk
+        const correctedUrl = url.replace(/https?:\/\/api\.realestategozamadrid\.com/g, API_URL);
+        console.log(`🔧 Corrigiendo URL de API incorrecta: ${url} -> ${correctedUrl}`);
+        url = correctedUrl;
+      }
+      
       // Solo interceptar URLs que comienzan con http:// (no https://)
       if (typeof url === 'string' && url.toLowerCase().startsWith('http:')) {
         console.log(`🔄 Interceptada solicitud HTTP: ${url}`);
@@ -37,7 +45,7 @@
         const proxyUrl = CORS_PROXIES[Math.floor(Math.random() * CORS_PROXIES.length)];
         const proxiedUrl = proxyUrl + encodeURIComponent(url);
         
-        console.log(`🔄 Redirigiendo a través de proxy CORS: ${proxiedUrl}`);
+        console.log(`🌐 Redirigiendo a través de proxy CORS: ${proxiedUrl}`);
         
         // Modificar opciones para solicitudes con proxy
         const newOptions = { ...options };
@@ -66,32 +74,6 @@
           });
       }
       
-      // Interceptar también las URLs que han sido convertidas a HTTPS pero deberían ser HTTP
-      if (typeof url === 'string' && 
-          (url.includes('https://api.realestategozamadrid.com') || 
-           url.includes('https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com'))) {
-        
-        // Convertir a la URL HTTP correcta
-        const correctedUrl = url
-          .replace('https://api.realestategozamadrid.com', API_URL)
-          .replace('https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com', API_URL);
-        
-        console.log(`🔄 Corrigiendo URL HTTPS incorrecta: ${url} -> ${correctedUrl}`);
-        
-        // Usar el proxy con la URL corregida
-        const proxyUrl = CORS_PROXIES[Math.floor(Math.random() * CORS_PROXIES.length)];
-        const proxiedUrl = proxyUrl + encodeURIComponent(correctedUrl);
-        
-        // Modificar opciones para solicitudes con proxy
-        const newOptions = { ...options };
-        if (newOptions.credentials === 'include') {
-          delete newOptions.credentials;
-        }
-        
-        console.log(`🔄 Redirigiendo a través de proxy CORS: ${proxiedUrl}`);
-        return originalFetch(proxiedUrl, newOptions);
-      }
-      
       // Para otras URLs, usar el fetch original
       return originalFetch(url, options);
     };
@@ -99,6 +81,14 @@
     // También interceptar XMLHttpRequest para casos donde se use en lugar de fetch
     const originalXHROpen = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
+      // Corregir cualquier URL que intente usar el dominio api.realestategozamadrid.com
+      if (typeof url === 'string' && url.includes('api.realestategozamadrid.com')) {
+        // Reemplazar con la URL correcta de ElasticBeanstalk
+        const correctedUrl = url.replace(/https?:\/\/api\.realestategozamadrid\.com/g, API_URL);
+        console.log(`🔧 XHR - Corrigiendo URL de API incorrecta: ${url} -> ${correctedUrl}`);
+        url = correctedUrl;
+      }
+      
       // Solo interceptar URLs que comienzan con http:// (no https://)
       if (typeof url === 'string' && url.toLowerCase().startsWith('http:')) {
         console.log(`🔄 XMLHttpRequest interceptado: ${url}`);
@@ -111,25 +101,6 @@
         return originalXHROpen.call(this, method, proxyUrl, async, user, password);
       }
       
-      // Interceptar también las URLs que han sido convertidas a HTTPS pero deberían ser HTTP
-      if (typeof url === 'string' && 
-          (url.includes('https://api.realestategozamadrid.com') || 
-           url.includes('https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com'))) {
-        
-        // Convertir a la URL HTTP correcta
-        const correctedUrl = url
-          .replace('https://api.realestategozamadrid.com', API_URL)
-          .replace('https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com', API_URL);
-        
-        console.log(`🔄 XHR - Corrigiendo URL HTTPS incorrecta: ${url} -> ${correctedUrl}`);
-        
-        // Usar el proxy con la URL corregida
-        const proxyUrl = CORS_PROXIES[0] + encodeURIComponent(correctedUrl);
-        console.log(`🔄 XHR - Redirigiendo a través de proxy CORS: ${proxyUrl}`);
-        
-        return originalXHROpen.call(this, method, proxyUrl, async, user, password);
-      }
-      
       // Para otras URLs, usar el open original
       return originalXHROpen.call(this, method, url, async, user, password);
     };
@@ -138,10 +109,13 @@
     window.API_FALLBACKS = {
       HTTP_URL: API_URL,
       HTTPS_URL: null, // La API no tiene HTTPS
-      CORS_PROXIES: CORS_PROXIES
+      CORS_PROXIES: CORS_PROXIES,
+      LOGIN_URL: `${API_URL}/user/login`,
+      REGISTER_URL: `${API_URL}/user/register`,
+      PROFILE_URL: `${API_URL}/user/me`
     };
     
-    // Establecer variables de entorno correctas - SIEMPRE HTTP
+    // Establecer variables de entorno correctas - SIEMPRE HTTP para ElasticBeanstalk
     if (window.ENV_VARS) {
       // Usar siempre HTTP ya que la API no soporta HTTPS
       window.ENV_VARS.VITE_BACKEND_URL = API_URL;

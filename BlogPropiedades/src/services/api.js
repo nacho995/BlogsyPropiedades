@@ -418,230 +418,63 @@ export const createUser = async (data) => {
 };
 
 /**
- * Inicia sesión de usuario
- * @param {Object} userData - Email y contraseña del usuario
- * @returns {Promise<Object>} - Token y datos del usuario
+ * Funciones específicas de autenticación
  */
-export const loginUser = async (userData) => {
-    try {
-        // Verificar si hay un bucle de API activo
-        if (localStorage.getItem('apiRequestLoop') === 'true') {
-            console.error('⚠️ Bucle de API detectado en loginUser, abortando');
-            throw new Error('Bucle de solicitudes detectado. Por favor, recarga la página.');
+export const loginUser = async (email, password) => {
+  console.log(`📝 Intentando login con email: ${email}`);
+  try {
+    // Usar la URL específica para login
+    const loginUrl = '/user/login';
+    
+    // Enviar las credenciales
+    const result = await fetchAPI(loginUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
+    });
+
+    console.log('Resultado login:', result);
+    
+    if (result && result.token) {
+      // Almacenar el token y nombre de usuario
+      localStorage.setItem('token', result.token);
+      if (result.user && result.user.name) {
+        localStorage.setItem('name', result.user.name);
+      }
+
+      // Guardar información adicional del usuario
+      if (result.user) {
+        if (result.user.profilePic) {
+          localStorage.setItem('profilePic', result.user.profilePic);
         }
-        
-        // Verificar si hay demasiados intentos de login en poco tiempo
-        const loginAttemptsKey = 'loginApiAttempts';
-        const now = Date.now();
-        const recentAttempts = JSON.parse(localStorage.getItem(loginAttemptsKey) || '[]');
-        const veryRecentAttempts = recentAttempts.filter(
-            time => (now - time) < 5000 // últimos 5 segundos
-        );
-        
-        // Si hay más de 3 intentos en 5 segundos, abortar para evitar bucles
-        if (veryRecentAttempts.length > 3) {
-            console.error('🛑 Demasiados intentos de login en muy poco tiempo, posible bucle');
-            localStorage.setItem('apiRequestLoop', 'true');
-            
-            // Crear respuesta de emergencia para romper el bucle
-            const emergencyToken = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-            const emergencyUser = {
-                email: userData.email,
-                name: userData.email.split('@')[0] || "Usuario",
-                role: 'user',
-                _emergency: true,
-                _bucleDetected: true
-            };
-            
-            // Limpiar intentos
-            localStorage.removeItem(loginAttemptsKey);
-            
-            // Devolver respuesta de emergencia
-            return {
-                token: emergencyToken,
-                user: emergencyUser,
-                _emergency: true
-            };
+        if (result.user.role) {
+          localStorage.setItem('role', result.user.role);
         }
-        
-        // Registrar este intento
-        veryRecentAttempts.push(now);
-        localStorage.setItem(loginAttemptsKey, JSON.stringify(veryRecentAttempts));
-        
-        console.log('📝 Intentando login con email:', userData.email);
-        
-        // Implementar retry para el login
-        let retries = 0;
-        const maxRetries = 1; // Reducido a 1 para evitar bucles en producción
-        let lastError = null;
-        
-        while (retries <= maxRetries) {
-            try {
-                const response = await fetchAPI('/user/login', {
-                    method: 'POST',
-                    body: JSON.stringify(userData)
-                });
-                
-                console.log('🔑 Respuesta de login recibida:', 
-                    typeof response === 'object' ? 
-                    (Object.keys(response).length > 0 ? 'Objeto con datos' : 'Objeto vacío') : 
-                    `Tipo: ${typeof response}, Valor: ${String(response).substring(0, 50)}`
-                );
-                
-                // Si la respuesta es una cadena vacía, manejar específicamente
-                if (response === '' || response === null || response === undefined) {
-                    console.warn('⚠️ Respuesta de login vacía');
-                    
-                    // Verificar si hay un token previo
-                    const existingToken = localStorage.getItem('token');
-                    if (existingToken) {
-                        console.log('🔑 Usando token existente para mantener sesión');
-                        // Almacenar el email para posible recuperación de sesión
-                        localStorage.setItem('email', userData.email);
-                        return {
-                            token: existingToken,
-                            user: { email: userData.email },
-                            _recovered: true
-                        };
-                    }
-                    
-                    // Si estamos en el último intento y todas las estrategias fallan
-                    if (retries === maxRetries) {
-                        console.warn('⚠️ Todos los intentos de login fallaron con respuesta vacía');
-                        throw new Error('El servidor devolvió una respuesta vacía');
-                    }
-                    
-                    // Incrementar contador de intentos y esperar antes del siguiente
-                    retries++;
-                    console.log(`🔄 Reintentando login (${retries}/${maxRetries})...`);
-                    await new Promise(resolve => setTimeout(resolve, 1500 * retries));
-                    continue;
-                }
-                
-                // Si la respuesta no tiene token, buscar en diferentes estructuras
-                if (response && !response.token) {
-                    console.warn('⚠️ Respuesta sin token estándar, buscando en otras estructuras');
-                    
-                    let processedResponse = { ...response };
-                    
-                    // Buscar token en diferentes estructuras de respuesta
-                    if (response.data && response.data.token) {
-                        processedResponse = {
-                            token: response.data.token,
-                            user: response.data.user || { email: userData.email }
-                        };
-                    } else if (response.user && response.user.token) {
-                        processedResponse = {
-                            token: response.user.token,
-                            user: response.user
-                        };
-                    } else if (response.accessToken) {
-                        processedResponse = {
-                            token: response.accessToken,
-                            user: response.user || { email: userData.email }
-                        };
-                    } else if (response.auth && response.auth.token) {
-                        processedResponse = {
-                            token: response.auth.token,
-                            user: response.auth.user || response.user || { email: userData.email }
-                        };
-                    }
-                    
-                    // Si no se encontró token en ninguna estructura conocida
-                    if (!processedResponse.token) {
-                        console.warn('⚠️ No se encontró token en ninguna estructura conocida');
-                        console.log('Estructura de respuesta:', JSON.stringify(response, null, 2).substring(0, 500));
-                        
-                        // Últimos intentos desesperados de encontrar el token
-                        const responseStr = JSON.stringify(response);
-                        const tokenMatch = responseStr.match(/"token"\s*:\s*"([^"]+)"/);
-                        
-                        if (tokenMatch && tokenMatch[1]) {
-                            console.log('🔍 Token encontrado con regex:', tokenMatch[1].substring(0, 15) + '...');
-                            processedResponse.token = tokenMatch[1];
-                            processedResponse.user = processedResponse.user || { email: userData.email };
-                        } else if (retries < maxRetries) {
-                            // Si estamos en un intento antes del último, reintentar
-                            retries++;
-                            console.log(`🔄 Reintentando login (${retries}/${maxRetries})...`);
-                            await new Promise(resolve => setTimeout(resolve, 1500 * retries));
-                            continue;
-                        } else {
-                            // En el último intento, lanzar error claro
-                            throw new Error('Formato de respuesta de login inesperado: no se encontró token');
-                        }
-                    }
-                    
-                    // Guardar datos del usuario en localStorage para recuperación
-                    if (processedResponse.user) {
-                        if (processedResponse.user.email) {
-                            localStorage.setItem('email', processedResponse.user.email);
-                        } else {
-                            localStorage.setItem('email', userData.email);
-                        }
-                        
-                        if (processedResponse.user.name) {
-                            localStorage.setItem('name', processedResponse.user.name);
-                        }
-                        
-                        if (processedResponse.user.role) {
-                            localStorage.setItem('role', processedResponse.user.role);
-                        }
-                    }
-                    
-                    return processedResponse;
-                }
-                
-                // Procesamiento de respuesta exitosa con token
-                if (response && response.token) {
-                    // Guardar datos del usuario en localStorage para recuperación
-                    if (response.user) {
-                        if (response.user.email) {
-                            localStorage.setItem('email', response.user.email);
-                        } else {
-                            localStorage.setItem('email', userData.email);
-                        }
-                        
-                        if (response.user.name) {
-                            localStorage.setItem('name', response.user.name);
-                        }
-                        
-                        if (response.user.role) {
-                            localStorage.setItem('role', response.user.role);
-                        }
-                    } else {
-                        localStorage.setItem('email', userData.email);
-                    }
-                }
-                
-                return response;
-            } catch (attemptError) {
-                lastError = attemptError;
-                
-                // Si no es el último intento, reintentar
-                if (retries < maxRetries) {
-                    retries++;
-                    console.log(`🔄 Error en intento ${retries}/${maxRetries + 1}, reintentando: ${attemptError.message}`);
-                    await new Promise(resolve => setTimeout(resolve, 1500 * retries));
-                    continue;
-                }
-                
-                // Si es el último intento, lanzar el error
-                throw attemptError;
-            }
+        if (result.user.email) {
+          localStorage.setItem('email', result.user.email);
         }
-        
-        // Si llegamos aquí y hay un error del último intento, lanzarlo
-        if (lastError) {
-            throw lastError;
-        }
-        
-        // Fallback por si alguna razón llegamos aquí
-        throw new Error('Error inesperado en el proceso de login');
-    } catch (error) {
-        console.error('🔥 Error en loginUser:', error);
-        throw error;
+      }
+
+      return { 
+        success: true, 
+        user: result.user || { id: result.id, email }, 
+        token: result.token 
+      };
+    } else {
+      return { 
+        success: false, 
+        message: result.message || 'Error de autenticación' 
+      };
     }
+  } catch (error) {
+    console.error('Error en el login:', error);
+    return { 
+      success: false, 
+      message: 'Error en el servidor. Por favor, intenta más tarde.' 
+    };
+  }
 };
 
 /**
