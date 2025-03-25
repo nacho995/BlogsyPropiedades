@@ -99,43 +99,66 @@ const ensureProtocol = (url) => sanitizeUrl(url);
 
 // Función para detectar tipo de error y mejorar mensajes
 const getEnhancedErrorMessage = (error, response) => {
-  // Error de red (sin conexión)
-  if (error instanceof TypeError && error.message.includes('fetch')) {
-    return ERROR_MESSAGES.NETWORK;
+  // Mensajes más descriptivos basados en códigos de error HTTP
+  if (response && response.status) {
+    switch (response.status) {
+      case 400:
+        return 'Solicitud incorrecta. Por favor, verifica los datos enviados.';
+      case 401:
+        return 'Sesión expirada o no autorizada. Por favor, inicia sesión nuevamente.';
+      case 403:
+        return 'No tienes permiso para realizar esta acción.';
+      case 404:
+        return 'El recurso solicitado no existe o ha sido movido.';
+      case 500:
+        return 'Error en el servidor. Estamos trabajando para resolverlo.';
+      case 502:
+      case 503:
+      case 504:
+        return 'Servicio temporalmente no disponible. Por favor, intenta más tarde.';
+      default:
+        return `Error HTTP ${response.status}: ${response.statusText || 'Error desconocido'}`;
+    }
   }
-  
-  // Error de tiempo de espera
+
+  // Mensajes basados en el tipo de error
   if (error.name === 'AbortError') {
     return ERROR_MESSAGES.TIMEOUT;
   }
   
-  // Error HTTP según código
-  if (response) {
-    // Errores de autenticación
-    if (response.status === 401 || response.status === 403) {
-      return ERROR_MESSAGES.AUTHENTICATION;
+  if (error.message) {
+    if (error.message.includes('Failed to fetch') || 
+        error.message.includes('NetworkError') || 
+        error.message.includes('network error')) {
+      return ERROR_MESSAGES.NETWORK;
     }
     
-    // Errores de validación
-    if (response.status === 400 || response.status === 422) {
-      return ERROR_MESSAGES.VALIDATION;
+    if (error.message.includes('timeout') || error.message.includes('Timeout')) {
+      return ERROR_MESSAGES.TIMEOUT;
     }
     
-    // Errores del servidor
-    if (response.status >= 500) {
-      return ERROR_MESSAGES.SERVER;
+    if (error.message.includes('CORS') || 
+        error.message.includes('access-control-allow-origin') || 
+        error.message.includes('mixed content')) {
+      return ERROR_MESSAGES.MIXED_CONTENT;
     }
   }
   
-  // Error desconocido
   return error.message || ERROR_MESSAGES.UNKNOWN;
 };
 
-// CORS Proxy para situaciones donde hay bloqueo de solicitudes
-const CORS_PROXY = 'https://cors-anywhere.herokuapp.com/';
+// Lista de varios proxies CORS para intentar si uno falla
+const CORS_PROXIES = [
+  'https://corsproxy.io/?',
+  'https://api.allorigins.win/raw?url=',
+  'https://cors.sh/?',
+  'https://cors-anywhere.herokuapp.com/'
+];
+
+let currentProxyIndex = 0;
 let useCorsProxy = false;
 let errorCount = 0;
-const MAX_ERRORS = 3;
+const MAX_ERRORS = 5;
 
 // Función para manejar errores con límite de intentos
 export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
@@ -156,16 +179,15 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
   }
   
   try {
-    // Omitir solicitudes no críticas si hay demasiados errores recientes
-    const isLoginRequest = endpoint.includes('login') || endpoint.includes('register');
-    
     // Construir la URL completa
     let url = combineUrls(BASE_URL, endpoint.startsWith('/') ? endpoint : `/${endpoint}`);
     
     // Si se detectaron problemas CORS, usar proxy
     if (useCorsProxy) {
-      url = CORS_PROXY + url;
-      console.log(`🌐 Usando CORS proxy: ${url}`);
+      // Usar el proxy actual de la lista
+      const proxyUrl = CORS_PROXIES[currentProxyIndex];
+      url = proxyUrl + encodeURIComponent(url);
+      console.log(`🌐 Usando CORS proxy (${currentProxyIndex+1}/${CORS_PROXIES.length}): ${url}`);
     }
 
     console.log(`🔄 Enviando solicitud a: ${url}`);
@@ -178,9 +200,13 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
         'Accept': 'application/json',
         ...options.headers
       },
-      mode: 'cors',
-      credentials: 'include'
+      mode: 'cors'
     };
+    
+    // No enviar credentials con el proxy CORS para evitar problemas
+    if (!useCorsProxy) {
+      fetchOptions.credentials = 'include';
+    }
     
     // Agregar cuerpo si existe
     if (options.body) {
@@ -212,13 +238,25 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     errorCount++;
     
     // Si hay problemas de CORS y aún no estamos usando proxy, activarlo para siguiente intento
-    if (error.message.includes('CORS') || error.message.includes('blocked') || error.message.includes('NetworkError')) {
-      useCorsProxy = true;
-      console.warn("⚠️ Detectado posible error CORS, activando proxy para próximas solicitudes");
+    if (error.message.includes('CORS') || 
+        error.message.includes('blocked') || 
+        error.message.includes('NetworkError') || 
+        error.message.includes('Failed to fetch')) {
       
-      // Si estamos en un intento inicial, reintentamos con proxy
-      if (retryCount < 1) {
+      // Si ya estamos usando un proxy, intentar con el siguiente
+      if (useCorsProxy) {
+        currentProxyIndex = (currentProxyIndex + 1) % CORS_PROXIES.length;
+      } else {
+        useCorsProxy = true;
+      }
+      
+      console.warn(`⚠️ Detectado posible error de conexión, intentando con proxy ${currentProxyIndex + 1}`);
+      
+      // Si estamos en un número razonable de intentos, reintentamos con proxy
+      if (retryCount < 3) {
         console.log("🔄 Reintentando solicitud con CORS proxy...");
+        // Esperar un poco antes de reintentar para evitar sobrecarga
+        await sleep(retryCount * 1000);
         return fetchAPI(endpoint, options, retryCount + 1);
       }
     }
