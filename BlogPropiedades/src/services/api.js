@@ -28,6 +28,9 @@ const API_BASE_URL = API_URL;
 console.log(`🌐 Usando API en: ${API_URL} - Acceso directo sin proxies`);
 console.log(`🔒 Frontend en: ${isHttps ? 'HTTPS' : 'HTTP'} - ${window.location.origin}`);
 
+// Desactivar explícitamente cualquier proxy CORS
+window.useCorsProxy = false;
+
 // Función auxiliar para esperar un tiempo específico
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -44,7 +47,20 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     
     console.log(`🔄 Enviando solicitud directa a: ${url}`);
     
-    // Configuración por defecto de fetch
+    // Verificar que no sea una URL de proxy
+    if (url.includes('corsproxy.io') || 
+        url.includes('allorigins.win') || 
+        url.includes('cors-anywhere') ||
+        url.includes('cors.sh')) {
+      // Extraer la URL original
+      const encodedUrl = url.split('?')[1];
+      if (encodedUrl) {
+        url = decodeURIComponent(encodedUrl);
+        console.log(`🔄 Usando URL original en lugar de proxy: ${url}`);
+      }
+    }
+    
+    // Configuración por defecto de fetch con CORS permisivo
     const fetchOptions = {
       method: options.method || 'GET',
       headers: {
@@ -52,9 +68,8 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
         'Accept': 'application/json',
         ...options.headers
       },
-      // Usar modo 'no-cors' si estamos en HTTPS para evitar problemas de CORS
-      mode: isHttps ? 'no-cors' : 'cors',
-      credentials: 'include'
+      mode: 'cors',
+      credentials: 'omit' // Omitir credenciales para evitar problemas de CORS
     };
     
     // Agregar cuerpo si existe
@@ -71,12 +86,6 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     
     // Intentar realizar la solicitud directa
     const response = await fetch(url, fetchOptions);
-    
-    // En modo no-cors no podemos leer la respuesta como JSON, así que devolvemos un objeto vacío
-    if (isHttps && fetchOptions.mode === 'no-cors') {
-      console.log(`⚠️ Modo no-cors: No es posible leer la respuesta directamente`);
-      return {};
-    }
     
     // Verificar respuesta
     if (!response.ok) {
