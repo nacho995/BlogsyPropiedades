@@ -7,17 +7,9 @@
 import { getSafeEnvValue } from './validateEnv';
 import { sanitizeUrl, combineUrls, getDefaultApiUrl } from './urlSanitizer';
 
-// Determinar si estamos usando HTTPS
-const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
-
-// URL de la API según el protocolo que usa el frontend
+// URL correcta para la API - siempre HTTP
 const API_DOMAIN = 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
-
-// Si el frontend usa HTTPS, usar Cloudflare como proxy HTTPS
-// Nota: Cloudflare debe estar configurado para este dominio
-const PRODUCTION_API_URL = isHttps 
-  ? 'https://api.realestategozamadrid.com' // Cloudflare proxy HTTPS 
-  : `http://${API_DOMAIN}`; // HTTP directo cuando el frontend usa HTTP
+const PRODUCTION_API_URL = `http://${API_DOMAIN}`;
 
 // Variables de backend con sanitización de URLs
 export const API_URL = PRODUCTION_API_URL;

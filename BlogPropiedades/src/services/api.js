@@ -8,7 +8,10 @@
  */
 
 // Importar utilidades
-import { sanitizeUrl, combineUrls } from '../utils/urlSanitizer';
+import { 
+  sanitizeUrl, 
+  combineUrls 
+} from '../utils/urlSanitizer';
 
 import { 
   API_URL, 
@@ -21,6 +24,7 @@ import {
 const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
 // Usar la API que corresponda según configuración en envConfig
+// SIEMPRE debe ser HTTP para AWS Elastic Beanstalk
 const BASE_URL = API_URL;
 const API_BASE_URL = API_URL;
 
@@ -31,7 +35,7 @@ console.log(`🔒 Frontend en: ${isHttps ? 'HTTPS' : 'HTTP'} - ${window.location
 // Si estamos en HTTPS pero la API es HTTP, mostrar advertencia
 if (isHttps && API_URL.startsWith('http:')) {
   console.warn('⚠️ ADVERTENCIA: Frontend en HTTPS intentando conectar con API en HTTP');
-  console.warn('⚠️ Se intentará usar un proxy CORS para evitar problemas de contenido mixto');
+  console.warn('⚠️ Se usará un proxy CORS para evitar problemas de contenido mixto');
   
   // Registrar este tipo de evento para detectar posibles problemas
   try {
