@@ -525,13 +525,14 @@ export function UserProvider({ children }) {
     logAuthEvent('login_attempt');
     
     try {
+      // MEJORA 1: Validación robusta de token
       if (!token) {
         console.error("❌ Error de login: No se proporcionó token");
         logAuthEvent('login_failed_no_token');
         return false;
       }
       
-      // Detectar posibles bucles de redirección
+      // MEJORA 2: Detección de bucles más agresiva
       const now = Date.now();
       const lastLogin = localStorage.getItem('lastLogin');
       const lastLoginTime = lastLogin ? parseInt(lastLogin, 10) : 0;
@@ -539,223 +540,86 @@ export function UserProvider({ children }) {
       if (now - lastLoginTime < 2000) {
         console.warn("⚠️ Múltiples intentos de login en intervalos cortos, posible bucle");
         
-        // Registrar evento de bucle detectado
         try {
+          // Registrar evento de bucle
           localStorage.setItem('loginLoopDetected', JSON.stringify({
             timestamp: new Date().toISOString(),
             timeSinceLastLogin: now - lastLoginTime
           }));
           
-          // Si hay múltiples intentos muy rápidos, interrumpir el flujo de login
+          // Si hay más de 2 intentos en 5 segundos, es definitivamente un bucle
           const loginAttempts = JSON.parse(localStorage.getItem('loginAttempts') || '[]');
-          const recentAttempts = loginAttempts.filter(attempt => (now - attempt) < 5000);
+          loginAttempts.push(now);
+          localStorage.setItem('loginAttempts', JSON.stringify(loginAttempts.slice(-5)));
           
-          if (recentAttempts.length > 3) {
-            console.error("🛑 Demasiados intentos de login en muy poco tiempo, abortando para evitar bucle");
+          const recentAttempts = loginAttempts.filter(time => (now - time) < 5000);
+          
+          if (recentAttempts.length > 2) {
+            console.error("🛑 BUCLE DE LOGIN DETECTADO - Limpiando estado");
             
-            // Limpiar tokens y estado para romper el bucle
+            // MEJORA 3: Limpieza completa para romper el bucle
             localStorage.removeItem('token');
             localStorage.removeItem('tempToken');
             localStorage.removeItem('tokenType');
             localStorage.removeItem('lastLogin');
             localStorage.removeItem('loginAttempts');
+            localStorage.removeItem('user');
             
-            // Actualizar estado
             setUser(null);
             setIsAuthenticated(false);
             
-            // Despachar evento para notificar a otros componentes
+            // Notificar a otros componentes
             window.dispatchEvent(new CustomEvent('loginLoopDetected'));
             
             return false;
           }
-          
-          // Registrar este intento
-          recentAttempts.push(now);
-          localStorage.setItem('loginAttempts', JSON.stringify(recentAttempts));
         } catch (e) {
-          console.error("Error al registrar bucle de login:", e);
+          console.error("Error al manejar detección de bucle:", e);
         }
-      } else {
-        // Si no es un intento rápido, limpiar historial de intentos
-        localStorage.removeItem('loginAttempts');
       }
       
       // Actualizar timestamp de último login
       localStorage.setItem('lastLogin', now.toString());
       
-      // Verificar si el token es válido
-      if (!isValidToken(token) && !token.startsWith('temp_')) {
-        console.warn("⚠️ Token inválido, creando sesión de emergencia");
-        logAuthEvent('login_emergency_session');
-        
-        // Crear sesión de emergencia con datos básicos
-        if (userData && userData.email) {
-          // Crear token temporal
-          const tempToken = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-          
-          try {
-            localStorage.setItem('token', tempToken);
-            localStorage.setItem('tokenType', 'emergency');
-            localStorage.setItem('email', userData.email);
-            
-            if (userData.name) {
-              localStorage.setItem('name', userData.name);
-            } else {
-              localStorage.setItem('name', userData.email.split('@')[0] || "Usuario");
-            }
-            
-            if (userData.role) {
-              localStorage.setItem('role', userData.role);
-            } else {
-              localStorage.setItem('role', 'user');
-            }
-            
-            // Actualizar estado para permitir navegación
-            setUser({
-              ...userData,
-              _emergency: true
-            });
-            setIsAuthenticated(true);
-            console.log("✅ Sesión de emergencia creada");
-            
-            return true;
-          } catch (e) {
-            console.error("Error al crear sesión de emergencia:", e);
-          }
-        }
-        
-        return false;
-      }
-      
-      // Verificar datos de usuario
+      // MEJORA 4: Validación de datos de usuario
       if (!userData || !userData.email) {
-        console.error("❌ Error de login: Datos de usuario incompletos");
-        logAuthEvent('login_failed_incomplete_user_data');
+        console.warn("⚠️ Datos de usuario incompletos, usando valores por defecto");
         
-        // Si el token es válido pero faltan datos, intentar obtener el perfil
-        if (isValidToken(token)) {
-          try {
-            console.log("🔍 Intentando obtener perfil con token válido pero sin datos de usuario");
-            const profileResponse = await getUserProfile();
-            
-            if (profileResponse && profileResponse.user) {
-              userData = profileResponse.user;
-              console.log("✅ Perfil obtenido exitosamente");
-              logAuthEvent('profile_obtained_during_login');
-            }
-          } catch (profileError) {
-            console.error("❌ Error al obtener perfil durante login:", profileError);
-            logAuthEvent('profile_fetch_failed_during_login', { error: profileError.message });
-          }
-        }
-        
-        // Si todavía no tenemos datos suficientes, crear usuario básico
-        if (!userData || !userData.email) {
-          const storedEmail = localStorage.getItem('email');
-          if (storedEmail) {
-            console.log("Usando email almacenado para crear usuario básico");
-            userData = {
-              email: storedEmail,
-              name: localStorage.getItem('name') || storedEmail.split('@')[0] || "Usuario",
-              role: localStorage.getItem('role') || 'user',
-              _created: true
-            };
-          } else {
-            return false;
-          }
-        }
+        // Crear un usuario mínimo usando el email almacenado o un valor por defecto
+        const email = localStorage.getItem('email') || 'usuario@ejemplo.com';
+        userData = {
+          email: email,
+          name: localStorage.getItem('name') || email.split('@')[0] || "Usuario",
+          role: localStorage.getItem('role') || 'user'
+        };
       }
       
-      // Almacenar token en localStorage
+      // MEJORA 5: Almacenamiento de datos simplificado
       try {
+        // Guardar token
         localStorage.setItem('token', token);
-        localStorage.setItem('tokenType', 'normal');
-        console.log("🔑 Token almacenado en localStorage");
-      } catch (e) {
-        console.error("❌ Error al guardar token:", e);
-        logAuthEvent('token_storage_failed', { error: e.message });
-        // Continuar de todos modos, aunque podría haber problemas después
-      }
-      
-      // Almacenar datos básicos del usuario
-      try {
+        localStorage.setItem('tokenType', token.startsWith('temp_') ? 'temporary' : 'normal');
+        
+        // Guardar datos básicos del usuario
         localStorage.setItem('email', userData.email);
+        localStorage.setItem('name', userData.name || userData.email.split('@')[0] || "Usuario");
+        localStorage.setItem('role', userData.role || 'user');
         
-        if (userData.name) {
-          localStorage.setItem('name', userData.name);
-        }
-        
-        if (userData.role) {
-          localStorage.setItem('role', userData.role);
-        }
-        
-        if (userData._id) {
-          localStorage.setItem('userId', userData._id);
-        }
-        
-        // Intentar almacenar el objeto de usuario completo
-        try {
-          localStorage.setItem('user', JSON.stringify(userData));
-        } catch (userStorageError) {
-          console.warn("⚠️ No se pudo almacenar objeto de usuario completo:", userStorageError);
-          logAuthEvent('user_object_storage_failed', { error: userStorageError.message });
-        }
-        
-        console.log("👤 Datos de usuario almacenados en localStorage");
-      } catch (e) {
-        console.error("❌ Error al guardar datos de usuario:", e);
-        logAuthEvent('user_data_storage_failed', { error: e.message });
+        console.log("✅ Datos de sesión guardados correctamente");
+      } catch (storageError) {
+        console.error("❌ Error al guardar datos de sesión:", storageError);
         // Continuar de todos modos
       }
       
-      // Actualizar el estado
-      setUser(userData);
+      // MEJORA 6: Actualización del estado simplificada
+      setUser({...userData});
       setIsAuthenticated(true);
-      console.log("✅ Sesión iniciada correctamente");
       logAuthEvent('login_successful');
-      
-      // Sincronizar imagen de perfil si es necesario
-      if (userData.profileImage) {
-        try {
-          localStorage.setItem('profilePic', userData.profileImage);
-        } catch (e) {
-          console.error("❌ Error al guardar imagen de perfil:", e);
-        }
-      } else {
-        try {
-          await syncProfileImage();
-        } catch (e) {
-          console.error("Error al sincronizar imagen de perfil:", e);
-        }
-      }
       
       return true;
     } catch (error) {
       console.error("❌ Error crítico durante login:", error);
-      logAuthEvent('critical_login_error', { error: error.message });
-      
-      // Intento final de crear una sesión básica para evitar bucles
-      try {
-        if (userData && userData.email) {
-          console.log("🔄 Intentando crear sesión básica tras error crítico");
-          
-          // Actualizar estado para permitir navegación
-          setUser({
-            email: userData.email,
-            name: userData.name || userData.email.split('@')[0] || "Usuario",
-            role: userData.role || 'user',
-            _emergency: true,
-            _afterError: true
-          });
-          setIsAuthenticated(true);
-          
-          return true;
-        }
-      } catch (e) {
-        console.error("Error en el intento final de sesión:", e);
-      }
-      
+      logAuthEvent('login_error', {error: error.message});
       return false;
     }
   };

@@ -122,100 +122,51 @@ const SignIn = ({ isRegistering = false }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        // Verificar si hay un bucle de API activo
-        if (localStorage.getItem('apiRequestLoop') === 'true') {
-            console.warn("⚠️ Bucle de API detectado, limpiando estado y evitando envío");
-            localStorage.removeItem('apiRequestLoop');
-            localStorage.removeItem('recentApiRequests');
-            setError("Se detectó un problema de comunicación. Por favor, espera unos segundos e intenta de nuevo.");
+        // MEJORA 1: Prevención temprana de múltiples envíos
+        if (isSubmitting.current || loading) {
+            console.log("Omitiendo nuevo envío: ya hay una solicitud en curso");
             return;
         }
         
-        // Determinar si estamos usando HTTPS
-        const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
-
-        // Definición de la URL de la API adaptada al protocolo
-        const API_DOMAIN = 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
-        // Necesitamos usar HTTP porque el backend requiere HTTP
-        const API_URL = `http://${API_DOMAIN}`;
-
-        console.log(`🔄 SignIn usando API en: ${API_URL} (HTTP con CORS)`);
-        
-        if (isHttps) {
-            console.log('⚠️ AVISO: La página está en HTTPS pero la API usa HTTP. Puede haber problemas de contenido mixto.');
-            // Registrar este tipo de evento para detectar posibles problemas
-            try {
-                localStorage.setItem('mixedContentWarning', JSON.stringify({
-                    timestamp: new Date().toISOString(),
-                    https: isHttps
-                }));
-            } catch (e) {
-                console.error("Error al guardar advertencia de contenido mixto:", e);
-            }
-        }
-        
-        // Guardar la URL de producción para usar en toda la aplicación
+        // MEJORA 2: Verificar si estamos en un bucle y romperlo definitivamente
         try {
-            localStorage.setItem('definitive_api_url', API_URL);
+            const now = new Date();
+            const loginAttempts = JSON.parse(localStorage.getItem('authAttempts') || '[]');
+            const recentAttempts = loginAttempts.filter(
+                attempt => (now - new Date(attempt.timestamp)) < 3000 // últimos 3 segundos
+            );
+            
+            // Si hay más de 2 intentos en 3 segundos, es un bucle
+            if (recentAttempts.length > 2) {
+                console.error("🛑 BUCLE DE LOGIN DETECTADO - Limpiando todo");
+                // Limpiar datos de sesión para romper cualquier bucle
+                localStorage.clear();
+                // Forzar recarga de la página para reiniciar completamente
+                window.location.reload();
+                return;
+            }
         } catch (e) {
-            console.error("Error al guardar URL de API:", e);
-        }
-        
-        // Evitar múltiples envíos simultáneos
-        if (isSubmitting.current) {
-            console.log("Ya hay una solicitud en curso, ignorando clic");
-            return;
+            console.error("Error al verificar bucles:", e);
         }
         
         isSubmitting.current = true;
         setLoading(true);
         setError("");
         
-        // Registrar intento de autenticación para prevenir bucles
+        // MEJORA 3: Simplificar registro del intento
         try {
-            authAttemptCount.current += 1;
             const attempts = JSON.parse(localStorage.getItem('authAttempts') || '[]');
             attempts.unshift({
                 timestamp: new Date().toISOString(),
                 email
             });
             
-            // Mantener solo los últimos 20 intentos
-            if (attempts.length > 20) {
-                attempts.length = 20;
+            // Mantener solo los últimos 10 intentos
+            if (attempts.length > 10) {
+                attempts.length = 10;
             }
             
             localStorage.setItem('authAttempts', JSON.stringify(attempts));
-            
-            // Si hay demasiados intentos en poco tiempo, mostrar advertencia
-            if (authAttemptCount.current > 3) {
-                console.warn(`⚠️ ${authAttemptCount.current} intentos de autenticación en esta sesión`);
-                
-                // Verificar si hay intentos muy recientes que indican un posible bucle
-                const recentAttempts = attempts.filter(
-                    attempt => (new Date() - new Date(attempt.timestamp)) < 10000 // últimos 10 segundos
-                );
-                
-                if (recentAttempts.length > 2) {
-                    console.error("⚠️ Posible bucle de autenticación detectado - demasiados intentos recientes");
-                    try {
-                        toast("Se ha detectado un posible problema. Espera un momento antes de intentar nuevamente.", {
-                            icon: "⚠️",
-                            duration: 5000
-                        });
-                    } catch (e) {
-                        console.error("Error al mostrar notificación:", e);
-                    }
-                    
-                    // Esperar más tiempo para evitar bucles
-                    setTimeout(() => {
-                        setLoading(false);
-                        isSubmitting.current = false;
-                    }, 2000);
-                    
-                    return;
-                }
-            }
         } catch (e) {
             console.error("Error al registrar intento:", e);
         }
@@ -231,186 +182,81 @@ const SignIn = ({ isRegistering = false }) => {
 
                 const response = await createUser({ email, password });
                 if (response) {
-                    try {
-                        toast("Registro exitoso", {
-                            icon: "✅",
-                            duration: 4000
-                        });
-                    } catch (e) {
-                        console.error("Error al mostrar notificación:", e);
-                    }
+                    toast("Registro exitoso", {
+                        icon: "✅",
+                        duration: 4000
+                    });
                     
                     // Intentar el login y verificar que fue exitoso
                     const loginSuccess = await login(response.token, response.user);
                     
                     if (loginSuccess) {
                         console.log("✅ Login exitoso después del registro");
-                        navigate("/");
+                        setTimeout(() => navigate("/"), 300);
                     } else {
                         console.warn("⚠️ El registro fue exitoso pero el login falló");
                         setError("El registro fue exitoso pero hubo un problema al iniciar sesión automáticamente. Por favor, intenta iniciar sesión manualmente.");
                     }
                 }
             } else {
+                // MEJORA 4: Simplificar el flujo de login y manejar errores
                 console.log("Intentando iniciar sesión con:", { email });
                 
                 try {
-                    // Si hay demasiados intentos recientes, simulamos un login exitoso con datos locales
-                    const attempts = JSON.parse(localStorage.getItem('authAttempts') || '[]');
-                    const veryRecentAttempts = attempts.filter(
-                        attempt => (new Date() - new Date(attempt.timestamp)) < 5000 // últimos 5 segundos
-                    );
+                    // Paso 1: Intentar login con la API
+                    const response = await loginUser({ email, password });
                     
-                    if (veryRecentAttempts.length > 2) {
-                        console.warn("⚠️ Demasiados intentos muy recientes, creando sesión de emergencia");
-                        
-                        // Crear usuario y token de emergencia
-                        const emergencyUser = {
-                            email: email,
-                            name: email.split('@')[0] || "Usuario",
-                            role: 'user',
-                            _emergency: true
-                        };
-                        
-                        const emergencyToken = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-                        
-                        // Intentar login con estos datos de emergencia
-                        const emergencyLogin = await login(emergencyToken, emergencyUser);
-                        
-                        if (emergencyLogin) {
-                            console.log("✅ Sesión de emergencia creada");
-                            try {
-                                toast("Sesión de emergencia iniciada", {
-                                    icon: "⚠️",
-                                    duration: 4000
-                                });
-                            } catch (e) {
-                                console.error("Error al mostrar notificación:", e);
-                            }
-                            
-                            navigate("/");
-                            setLoading(false);
-                            isSubmitting.current = false;
-                            return;
-                        }
+                    // Paso 2: Verificar si tenemos una respuesta válida
+                    if (!response) {
+                        throw new Error("No se recibió respuesta del servidor");
                     }
                     
-                    // Continuar con el flujo normal de login
-                    const response = await loginUser({ email, password });
-                    console.log("Respuesta de inicio de sesión:", response);
+                    // Paso 3: Intentar login en el contexto
+                    let loginSuccess = false;
                     
-                    if (response) {
-                        if (typeof response === "string" && response.trim() === "") {
-                            console.warn("Respuesta de inicio de sesión vacía, intentando mantener sesión");
-                            try {
-                                toast("Sesión mantenida con token existente", {
-                                    icon: "⚠️",
-                                    duration: 4000
-                                });
-                            } catch (e) {
-                                console.error("Error al mostrar notificación:", e);
-                            }
-                        } else {
-                            try {
-                                toast("¡Inicio de sesión exitoso!", {
-                                    icon: "✅",
-                                    duration: 4000
-                                });
-                            } catch (e) {
-                                console.error("Error al mostrar notificación de éxito:", e);
-                            }
-                        }
-                        
-                        let loginSuccess = false;
-                        
-                        if (response.token && response.user) {
-                            loginSuccess = await login(response.token, response.user);
-                        } else if (response.temporaryToken) {
-                            console.warn("Usando token temporal para mantener sesión básica");
-                            const minimalUser = {
-                                email,
-                                name: email.split('@')[0] || "Usuario",
-                                role: 'user',
-                                _recoveredLogin: true
-                            };
-                            loginSuccess = await login(response.temporaryToken, minimalUser);
-                        }
-                        
-                        if (loginSuccess) {
-                            console.log("✅ Login exitoso");
-                            navigate("/");
-                        } else {
-                            console.warn("⚠️ La API devolvió una respuesta pero el login falló");
-                            setError("Hubo un problema al iniciar sesión. Por favor, inténtalo de nuevo.");
-                        }
+                    if (response.token && response.user) {
+                        // Caso normal: tenemos token y usuario
+                        loginSuccess = await login(response.token, response.user);
+                    } else if (response.token) {
+                        // Caso parcial: solo tenemos token
+                        const minimalUser = {
+                            email,
+                            name: email.split('@')[0] || "Usuario",
+                            role: 'user'
+                        };
+                        loginSuccess = await login(response.token, minimalUser);
+                    } else {
+                        // No tenemos token, no podemos hacer login
+                        throw new Error("La respuesta del servidor no incluye un token válido");
+                    }
+                    
+                    // Paso 4: Redireccionar si el login fue exitoso
+                    if (loginSuccess) {
+                        toast("¡Inicio de sesión exitoso!", { icon: "✅", duration: 3000 });
+                        // MEJORA 5: Retardo para evitar redireccionamiento inmediato
+                        setTimeout(() => navigate("/"), 300);
+                    } else {
+                        throw new Error("No se pudo iniciar sesión con los datos proporcionados");
                     }
                 } catch (loginError) {
-                    console.error("Error durante loginUser:", loginError);
-                    
-                    // Manejar errores específicos
-                    if (loginError.message && loginError.message.includes('contenido mixto')) {
-                        console.warn("Error de contenido mixto detectado, intentando sesión de emergencia");
-                        
-                        // Crear sesión de emergencia para evitar bucles
-                        const emergencyUser = {
-                            email: email,
-                            name: email.split('@')[0] || "Usuario",
-                            role: 'user',
-                            _emergency: true,
-                            _mixedContent: true
-                        };
-                        
-                        const emergencyToken = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-                        
-                        try {
-                            const emergencyLogin = await login(emergencyToken, emergencyUser);
-                            
-                            if (emergencyLogin) {
-                                setError("Sesión iniciada en modo de emergencia debido a problemas de conexión");
-                                toast("Sesión limitada iniciada debido a problemas de conexión", {
-                                    icon: "⚠️",
-                                    duration: 5000
-                                });
-                                
-                                navigate("/");
-                                return;
-                            }
-                        } catch (e) {
-                            console.error("Error en sesión de emergencia:", e);
-                        }
-                    }
-                    
-                    // Mostrar el error normalmente
+                    console.error("Error durante login:", loginError);
                     setError(loginError.message || "Error durante la autenticación");
                     
-                    try {
-                        toast("Error de autenticación: " + (loginError.message || "Credenciales inválidas"), {
-                            icon: "❌",
-                            duration: 4000
-                        });
-                    } catch (e) {
-                        console.error("Error al mostrar notificación de error:", e);
-                    }
+                    toast("Error de autenticación: " + (loginError.message || "Credenciales inválidas"), {
+                        icon: "❌",
+                        duration: 4000
+                    });
                 }
             }
         } catch (err) {
-            console.error("Error durante la autenticación:", err);
+            console.error("Error general durante la autenticación:", err);
             setError(err.message || "Error durante la autenticación");
-            
-            try {
-                toast("Error de autenticación: " + (err.message || "Credenciales inválidas"), {
-                    icon: "❌",
-                    duration: 4000
-                });
-            } catch (e) {
-                console.error("Error al mostrar notificación de error:", e);
-            }
         } finally {
             setLoading(false);
-            // Permitir nuevos envíos
+            // MEJORA 6: Permitir nuevos envíos con un retardo más largo
             setTimeout(() => {
                 isSubmitting.current = false;
-            }, 1000); // Esperar 1 segundo antes de permitir otro envío
+            }, 1500); // Esperar 1.5 segundos antes de permitir otro envío
         }
     };
 

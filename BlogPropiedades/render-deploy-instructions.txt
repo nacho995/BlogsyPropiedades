@@ -1,0 +1,63 @@
+INSTRUCCIONES PARA DESPLIEGUE EN RENDER Y SOLUCIÓN DE BUCLE DE INICIO DE SESIÓN
+
+1. DESPLIEGUE EN RENDER:
+
+   a) Inicia sesión en tu cuenta de Render: https://dashboard.render.com/
+   
+   b) Ve a la sección "Static Sites" y haz clic en tu sitio existente o "New Static Site" si es la primera vez
+   
+   c) Si es un nuevo sitio:
+      - Conecta con tu repositorio de GitHub (o sube el código manualmente)
+      - Configura los siguientes parámetros:
+        * Name: blog-gozamadrid
+        * Build Command: npm ci && npm run build
+        * Publish Directory: dist
+      - En "Environment Variables", añade:
+        * NODE_VERSION: 18
+        * VITE_BACKEND_URL: http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com
+        * VITE_API_URL: http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com
+      
+   d) Si actualizas un sitio existente:
+      - Puedes subir directamente el archivo ZIP que hemos generado (blog-gozamadrid-login-fixed.zip)
+      - Ve a "Manual Deploy" y sube el archivo
+      - O actualiza el repositorio de GitHub y haz deploy
+
+2. CONFIGURACIÓN DE CORS Y CONTENIDO MIXTO:
+
+   a) En Render, ve a tu sitio y accede a "Settings" > "Headers"
+   
+   b) Agrega los siguientes encabezados personalizados:
+      
+      Para todas las rutas (/*):
+      - Access-Control-Allow-Origin: *
+      - Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
+      - Access-Control-Allow-Headers: Content-Type, Authorization
+      - Content-Security-Policy: default-src 'self' http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com; connect-src 'self' http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com http://*.elasticbeanstalk.com; img-src 'self' data: http: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval';
+
+   c) Asegúrate de que el archivo _headers en la carpeta public tenga el mismo contenido
+
+3. VERIFICACIÓN:
+
+   Una vez desplegado, prueba el inicio de sesión en la aplicación. Si sigue habiendo problemas, intenta:
+   
+   a) Borrar completamente el caché del navegador y localStorage:
+      - Abre las Herramientas de Desarrollo (F12)
+      - Ve a Application > Storage > Clear Site Data
+      - Marca todas las opciones y haz clic en "Clear"
+   
+   b) Prueba en modo incógnito o en otro navegador
+
+   c) Si persisten los problemas de CORS o contenido mixto, tendrás que considerar:
+      - Configurar HTTPS en tu backend de AWS Elastic Beanstalk
+      - Usar un proxy HTTPS como AWS API Gateway o CloudFront delante de tu backend
+      - Configurar cors-anywhere u otro proxy CORS en Render
+
+4. SOLUCIÓN DEFINITIVA:
+
+   Para una solución definitiva al problema, lo mejor es hacer que tu backend en AWS Elastic Beanstalk soporte HTTPS:
+   
+   a) Usando AWS Certificate Manager para obtener un certificado SSL
+   
+   b) Configurando un Application Load Balancer (ALB) con SSL delante de tu instancia Elastic Beanstalk
+   
+   c) Configurando AWS API Gateway como proxy HTTPS a tu backend HTTP 

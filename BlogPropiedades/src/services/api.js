@@ -10,19 +10,37 @@
 // Importar utilidades
 import { sanitizeUrl, combineUrls } from '../utils/urlSanitizer';
 
-// Determinar si estamos usando HTTPS
+// Determinar si estamos usando HTTPS (solo para registro)
 const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
-// Definición única de la URL de la API para todo el archivo
-// Adaptar al protocolo de la página (HTTP o HTTPS)
+// FORZAR HTTP para la API, independientemente del protocolo del frontend
+// Esto es necesario porque el backend de AWS Elastic Beanstalk no soporta HTTPS directamente
 const API_DOMAIN = 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
-const API_URL = `${isHttps ? 'https' : 'http'}://${API_DOMAIN}`;
+const API_URL = `http://${API_DOMAIN}`;
 const BASE_URL = API_URL;
 const FALLBACK_API = API_URL;
 const API_BASE_URL = API_URL;
 
 // Registrar la URL de la API usada
-console.log(`🌐 Usando API en: ${API_URL} (${isHttps ? 'HTTPS' : 'HTTP'})`);
+console.log(`🌐 Usando API en: ${API_URL} (HTTP forzado - El backend no soporta HTTPS)`);
+console.log(`🔒 Frontend en: ${isHttps ? 'HTTPS' : 'HTTP'} - ${window.location.origin}`);
+
+// Si estamos en HTTPS, advertir sobre posibles problemas de contenido mixto
+if (isHttps) {
+  console.warn('⚠️ ADVERTENCIA: Frontend en HTTPS intentando conectar con API en HTTP');
+  console.warn('⚠️ Para evitar problemas, asegúrate de configurar Cloudflare correctamente');
+  
+  // Registrar este tipo de evento para detectar posibles problemas
+  try {
+    localStorage.setItem('mixedContentWarning', JSON.stringify({
+      timestamp: new Date().toISOString(),
+      frontend: window.location.origin,
+      backend: API_URL
+    }));
+  } catch (e) {
+    console.error("Error al guardar advertencia de contenido mixto:", e);
+  }
+}
 
 // Función para manejar errores de conexión con reintentos
 const API_RETRY_COUNT = 3;

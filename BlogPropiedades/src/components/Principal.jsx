@@ -56,7 +56,7 @@ function Principal() {
             // Si la advertencia es reciente (menos de 1 hora)
             if ((now - warningTime) < 3600000) {
               console.warn('⚠️ Detectados recientes problemas de contenido mixto (HTTP vs HTTPS)');
-              console.log('Para mejor compatibilidad, considere usar la aplicación con HTTP en lugar de HTTPS');
+              console.log('Para mejor compatibilidad, considere usar HTTP en lugar de HTTPS o configurar Cloudflare correctamente');
             }
           } catch (e) {
             console.error('Error al procesar advertencia de contenido mixto:', e);
@@ -161,7 +161,7 @@ function Principal() {
     return defaultProfilePic;
   };
   
-  // Función para asegurar que siempre se use HTTP para las APIs de GozaMadrid
+  // Función para asegurar que siempre se use HTTP para las APIs
   const ensureHttpProtocol = (url) => {
     if (!url) return defaultProfilePic;
     
@@ -192,7 +192,7 @@ function Principal() {
       
       // Fallback: limpiar manualmente localStorage y redireccionar
       try {
-        localStorage.removeItem('token');
+        localStorage.clear(); // Limpiar todo para prevenir problemas
         navigate('/login');
       } catch (e) {
         console.error("Error en el fallback de cierre de sesión:", e);
