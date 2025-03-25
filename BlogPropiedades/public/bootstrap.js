@@ -4,156 +4,129 @@
  * valores por defecto para las variables de entorno críticas
  */
 (function() {
-  // Detectar y corregir URLs sin protocolo en localStorage
-  const ENV_VARS = [
-    'VITE_BACKEND_URL',
-    'VITE_API_URL',
-    'VITE_API_PUBLIC_API_URL',
-    'VITE_FALLBACK_API'
-  ];
+  console.log('🔄 Inicializando bootstrap...');
   
-  // Valores por defecto para casos de error
-  const DEFAULT_API = 'https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+  // Verificar si estamos en HTTPS
+  const isHttps = window.location.protocol === 'https:';
   
-  // Función para sanitizar URLs
-  function sanitizeUrl(url) {
-    if (!url) return '';
+  if (isHttps) {
+    // Si estamos en HTTPS, necesitamos manejar las solicitudes a HTTP adecuadamente
+    console.log('🔒 Detectado HTTPS - Configurando protección de contenido mixto');
     
-    // Eliminar espacios en blanco
-    let sanitized = url.trim();
+    // Crear un proxy local para solicitudes HTTP desde HTTPS
+    const originalFetch = window.fetch;
     
-    // Eliminar comillas si las hay
-    sanitized = sanitized.replace(/^["']|["']$/g, '');
-    
-    // Si ya tiene protocolo, verificar que sea válido
-    if (sanitized.includes('://')) {
-      // Asegurarse de que sea http o https, preferiblemente https
-      if (sanitized.startsWith('http://')) {
-        sanitized = sanitized.replace('http://', 'https://');
-      } else if (!sanitized.startsWith('https://')) {
-        // Si tiene otro protocolo, corregirlo
-        sanitized = sanitized.replace(/^.*:\/\//, 'https://');
-      }
-    } else {
-      // Si no tiene protocolo, añadir https://
-      sanitized = `https://${sanitized}`;
-    }
-    
-    return sanitized;
-  }
-  
-  // Función para verificar si hay errores en localStorage
-  function checkForErrorState() {
-    try {
-      // Verificar si hay errores almacenados
-      const storedErrors = localStorage.getItem('env_validation');
-      if (storedErrors) {
-        try {
-          const data = JSON.parse(storedErrors);
-          // Si hay más de 5 recargas en menos de 1 minuto, limpiar localStorage
-          if (data.reloadCount && data.reloadCount > 5 && data.timestamp) {
-            const timestamp = new Date(data.timestamp);
-            const now = new Date();
-            const diff = now - timestamp;
-            
-            if (diff < 60000) { // 1 minuto
-              console.warn('🔄 Detectado posible bucle de recargas, limpiando localStorage');
-              
-              // Guardar token y datos importantes
-              const token = localStorage.getItem('token');
-              const profilePic = localStorage.getItem('profilePic');
-              
-              // Limpiar localStorage
-              localStorage.clear();
-              
-              // Restaurar datos importantes
-              if (token) localStorage.setItem('token', token);
-              if (profilePic) localStorage.setItem('profilePic', profilePic);
-              
-              return true;
-            }
-          }
-        } catch (e) {
-          // Ignorar errores
-        }
-      }
-    } catch (e) {
-      // Ignorar errores
-    }
-    
-    return false;
-  }
-  
-  // Función principal de inicialización
-  function init() {
-    try {
-      console.log('🔄 Inicializando bootstrap...');
-      
-      // Verificar si hay errores almacenados
-      const isErrorState = checkForErrorState();
-      
-      // Si estamos en un estado de error, no continuar con más correcciones
-      if (isErrorState) {
-        console.log('⚠️ Detectado estado de error, omitiendo correcciones adicionales');
-        return;
-      }
-      
-      // Recorremos el localStorage buscando claves que puedan contener URLs
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
+    // Sobrescribir fetch para interceptar solicitudes HTTP desde HTTPS
+    window.fetch = function(url, options = {}) {
+      // Solo interceptar URLs que comienzan con http:// (no https://)
+      if (typeof url === 'string' && url.toLowerCase().startsWith('http:')) {
+        console.log(`🔄 Interceptada solicitud HTTP: ${url}`);
         
-        // Si la clave contiene alguna de las palabras clave de URL
-        if (key && (key.includes('URL') || key.includes('API') || key.includes('BACKEND'))) {
-          try {
-            const value = localStorage.getItem(key);
-            
-            // Si el valor parece ser una URL sin protocolo
-            if (value && !value.includes('://') && !value.startsWith('{') && !value.startsWith('[')) {
-              console.log(`🔄 Corrigiendo URL en localStorage: ${key}`);
-              localStorage.setItem(key, sanitizeUrl(value));
-            }
-          } catch (e) {
-            // Ignorar errores
-          }
+        // Intentar usar un proxy CORS si está disponible
+        // Lista de proxies CORS que podemos usar
+        const CORS_PROXIES = [
+          'https://corsproxy.io/?',
+          'https://api.allorigins.win/raw?url=',
+          'https://cors.sh/?'
+        ];
+        
+        // Elegir un proxy aleatorio para distribuir la carga
+        const proxyUrl = CORS_PROXIES[Math.floor(Math.random() * CORS_PROXIES.length)];
+        const proxiedUrl = proxyUrl + encodeURIComponent(url);
+        
+        console.log(`🔄 Redirigiendo a través de proxy CORS: ${proxiedUrl}`);
+        
+        // Modificar opciones para solicitudes con proxy
+        const newOptions = { ...options };
+        
+        // No incluir credenciales con el proxy CORS (causaría errores)
+        if (newOptions.credentials === 'include') {
+          delete newOptions.credentials;
         }
+        
+        // Realizar la solicitud a través del proxy
+        return originalFetch(proxiedUrl, newOptions)
+          .catch(error => {
+            console.error(`❌ Error con proxy ${proxyUrl}:`, error);
+            
+            // Si falla, intentar con otro proxy
+            const alternativeProxy = CORS_PROXIES.find(p => p !== proxyUrl);
+            if (alternativeProxy) {
+              console.log(`🔄 Reintentando con proxy alternativo: ${alternativeProxy}`);
+              const altProxiedUrl = alternativeProxy + encodeURIComponent(url);
+              return originalFetch(altProxiedUrl, newOptions);
+            }
+            
+            // Si todos los proxies fallan, intentar directamente con HTTPS
+            console.log('🔄 Reintentando con protocolo HTTPS');
+            const httpsUrl = url.replace('http:', 'https:');
+            
+            // Intentar reemplazar el dominio del backend si es necesario
+            const apiDomain = 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+            const httpsWithApi = httpsUrl.includes(apiDomain) 
+              ? httpsUrl.replace(apiDomain, 'api.realestategozamadrid.com')
+              : httpsUrl;
+            
+            return originalFetch(httpsWithApi, options);
+          });
       }
       
-      // Verificar si hay errores de URL y establecer valores por defecto
-      if (window.ENV_VARS) {
-        ENV_VARS.forEach(key => {
-          const value = window.ENV_VARS[key];
-          if (!value || (typeof value === 'string' && !value.includes('://'))) {
-            console.log(`🔄 Corrigiendo variable de entorno: ${key}`);
-            window.ENV_VARS[key] = sanitizeUrl(value || DEFAULT_API);
-          }
-        });
+      // Para otras URLs, usar el fetch original
+      return originalFetch(url, options);
+    };
+    
+    // También interceptar XMLHttpRequest para casos donde se use en lugar de fetch
+    const originalXHROpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
+      // Solo interceptar URLs que comienzan con http:// (no https://)
+      if (typeof url === 'string' && url.toLowerCase().startsWith('http:')) {
+        console.log(`🔄 XMLHttpRequest interceptado: ${url}`);
+        
+        // Convertir a HTTPS primero
+        const httpsUrl = url.replace('http:', 'https:');
+        
+        // Intentar reemplazar el dominio del backend si es necesario
+        const apiDomain = 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+        if (httpsUrl.includes(apiDomain)) {
+          const secureUrl = httpsUrl.replace(apiDomain, 'api.realestategozamadrid.com');
+          return originalXHROpen.call(this, method, secureUrl, async, user, password);
+        }
+        
+        return originalXHROpen.call(this, method, httpsUrl, async, user, password);
       }
       
-      console.log('✅ Bootstrap completado');
-    } catch (e) {
-      console.error('❌ Error en bootstrap:', e);
+      // Para otras URLs, usar el open original
+      return originalXHROpen.call(this, method, url, async, user, password);
+    };
+    
+    // Definir fallbacks para URLs de API
+    window.API_FALLBACKS = {
+      HTTP_URL: 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com',
+      HTTPS_URL: 'https://api.realestategozamadrid.com',
+      CORS_PROXIES: CORS_PROXIES
+    };
+    
+    // Establecer variables de entorno correctas
+    if (window.ENV_VARS) {
+      window.ENV_VARS.VITE_BACKEND_URL = 'https://api.realestategozamadrid.com';
+      window.ENV_VARS.VITE_API_URL = 'https://api.realestategozamadrid.com';
+      window.ENV_VARS.VITE_API_PUBLIC_API_URL = 'https://api.realestategozamadrid.com';
+      window.ENV_VARS.VITE_FALLBACK_API = 'https://api.realestategozamadrid.com';
     }
   }
   
-  // Ejecutar init cuando el DOM esté cargado
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
+  // Limpiar localStorage para evitar problemas persistentes
+  try {
+    // Eliminar solo datos relacionados con errores para no afectar sesión
+    localStorage.removeItem('mixedContentWarning');
+    localStorage.removeItem('apiRequestLoop');
+    localStorage.removeItem('api_errors');
+    localStorage.removeItem('app_errors');
+    localStorage.removeItem('loginApiAttempts');
+    localStorage.removeItem('profileApiAttempts');
+  } catch (e) {
+    console.error('Error al limpiar localStorage:', e);
   }
   
-  // Capturar errores no manejados
-  window.addEventListener('error', function(e) {
-    if (document.body && document.body.innerHTML === '') {
-      document.body.innerHTML = '<div style="padding: 20px; text-align: center;">'+
-        '<h1 style="color: #e53e3e;">Error en la aplicación</h1>'+
-        '<p>Ha ocurrido un error inesperado. Por favor, intente recargar la página.</p>'+
-        '<button onclick="window.location.reload()" style="background: #3182ce; color: white; '+
-        'padding: 8px 16px; border: none; border-radius: 4px; margin-top: 16px; cursor: pointer;">'+
-        'Recargar página</button>'+
-        '<button onclick="localStorage.clear(); window.location.reload()" style="background: #718096; color: white; '+
-        'padding: 8px 16px; border: none; border-radius: 4px; margin-top: 16px; margin-left: 8px; cursor: pointer;">'+
-        'Limpiar caché y recargar</button></div>';
-    }
-  });
+  console.log('✅ Bootstrap completado');
 })(); 

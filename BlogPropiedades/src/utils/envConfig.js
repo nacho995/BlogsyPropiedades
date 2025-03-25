@@ -7,21 +7,43 @@
 import { getSafeEnvValue } from './validateEnv';
 import { sanitizeUrl, combineUrls, getDefaultApiUrl } from './urlSanitizer';
 
-// Forzar la URL de la API en producción para evitar problemas
-const PRODUCTION_API_URL = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+// Determinar si estamos usando HTTPS
+const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
-// Variables de backend con sanitización de URLs - Siempre usar la URL de producción
+// URL de la API según el protocolo que usa el frontend
+const API_DOMAIN = 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+
+// Si el frontend usa HTTPS, usar Cloudflare como proxy HTTPS
+// Nota: Cloudflare debe estar configurado para este dominio
+const PRODUCTION_API_URL = isHttps 
+  ? 'https://api.realestategozamadrid.com' // Cloudflare proxy HTTPS 
+  : `http://${API_DOMAIN}`; // HTTP directo cuando el frontend usa HTTP
+
+// Variables de backend con sanitización de URLs
 export const API_URL = PRODUCTION_API_URL;
-export const BACKEND_URL = PRODUCTION_API_URL;
+
 export const PUBLIC_API_URL = PRODUCTION_API_URL;
 
 // URL de respaldo para casos de error
 export const FALLBACK_API = PRODUCTION_API_URL;
 
-// Variables de configuración
-export const APP_MODE = getSafeEnvValue('VITE_APP_MODE') || 'production';
-export const MAIN_DOMAIN = getSafeEnvValue('VITE_MAIN_DOMAIN') || 'realestategozamadrid.com';
+// URL segura (HTTPS) para recursos públicos
+export const SECURE_ASSET_URL = 'https://api.realestategozamadrid.com';
+
+// URL para el API Gateway de AWS (si está configurado)
+export const API_GATEWAY_URL = 'https://api.realestategozamadrid.com';
+
+// URL para el CDN de archivos estáticos (si está configurado)
+export const STATIC_FILES_URL = 'https://api.realestategozamadrid.com';
+
+// Nivel de depuración para la aplicación
 export const DEBUG_LEVEL = getSafeEnvValue('VITE_DEBUG_LEVEL') || 'error';
+
+// Modo de la aplicación (development, production, etc.)
+export const APP_MODE = getSafeEnvValue('VITE_APP_MODE') || 'production';
+
+// Dominio principal para cookies
+export const MAIN_DOMAIN = getSafeEnvValue('VITE_MAIN_DOMAIN') || 'realestategozamadrid.com';
 
 // Función para determinar si estamos en producción
 export const isProduction = () => {

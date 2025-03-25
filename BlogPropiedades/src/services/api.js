@@ -10,25 +10,28 @@
 // Importar utilidades
 import { sanitizeUrl, combineUrls } from '../utils/urlSanitizer';
 
+import { 
+  API_URL, 
+  FALLBACK_API, 
+  SECURE_ASSET_URL,
+  API_GATEWAY_URL
+} from '../utils/envConfig';
+
 // Determinar si estamos usando HTTPS (solo para registro)
 const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
-// FORZAR HTTP para la API, independientemente del protocolo del frontend
-// Esto es necesario porque el backend de AWS Elastic Beanstalk no soporta HTTPS directamente
-const API_DOMAIN = 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
-const API_URL = `http://${API_DOMAIN}`;
+// Usar la API que corresponda según configuración en envConfig
 const BASE_URL = API_URL;
-const FALLBACK_API = API_URL;
 const API_BASE_URL = API_URL;
 
 // Registrar la URL de la API usada
-console.log(`🌐 Usando API en: ${API_URL} (HTTP forzado - El backend no soporta HTTPS)`);
+console.log(`🌐 Usando API en: ${API_URL}`);
 console.log(`🔒 Frontend en: ${isHttps ? 'HTTPS' : 'HTTP'} - ${window.location.origin}`);
 
-// Si estamos en HTTPS, advertir sobre posibles problemas de contenido mixto
-if (isHttps) {
+// Si estamos en HTTPS pero la API es HTTP, mostrar advertencia
+if (isHttps && API_URL.startsWith('http:')) {
   console.warn('⚠️ ADVERTENCIA: Frontend en HTTPS intentando conectar con API en HTTP');
-  console.warn('⚠️ Para evitar problemas, asegúrate de configurar Cloudflare correctamente');
+  console.warn('⚠️ Se intentará usar un proxy CORS para evitar problemas de contenido mixto');
   
   // Registrar este tipo de evento para detectar posibles problemas
   try {
@@ -157,6 +160,8 @@ const CORS_PROXIES = [
 
 let currentProxyIndex = 0;
 let useCorsProxy = false;
+// Activar proxy por defecto si estamos en HTTPS y la API está en HTTP
+useCorsProxy = isHttps && API_URL.startsWith('http:');
 let errorCount = 0;
 const MAX_ERRORS = 5;
 
@@ -181,6 +186,13 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
   try {
     // Construir la URL completa
     let url = combineUrls(BASE_URL, endpoint.startsWith('/') ? endpoint : `/${endpoint}`);
+    
+    // Si estamos en HTTPS, pero la URL es HTTP, intentar usar API Gateway
+    if (isHttps && url.startsWith('http:') && !useCorsProxy) {
+      const secureUrl = url.replace('http://', 'https://');
+      url = secureUrl.replace('gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com', 'api.realestategozamadrid.com');
+      console.log(`🔒 Convertida URL a HTTPS: ${url}`);
+    }
     
     // Si se detectaron problemas CORS, usar proxy
     if (useCorsProxy) {
@@ -210,7 +222,14 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     
     // Agregar cuerpo si existe
     if (options.body) {
-      fetchOptions.body = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
+      // Si es FormData, no convertir a JSON ni establecer Content-Type
+      if (options.body instanceof FormData) {
+        fetchOptions.body = options.body;
+        // Eliminar Content-Type para que el navegador lo establezca automáticamente con el boundary
+        delete fetchOptions.headers['Content-Type'];
+      } else {
+        fetchOptions.body = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
+      }
     }
     
     // Intentar realizar la solicitud
@@ -237,11 +256,12 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     // Incrementar contador de errores
     errorCount++;
     
-    // Si hay problemas de CORS y aún no estamos usando proxy, activarlo para siguiente intento
+    // Si hay problemas de CORS, contenido mixto o error de red, activar proxy
     if (error.message.includes('CORS') || 
         error.message.includes('blocked') || 
         error.message.includes('NetworkError') || 
-        error.message.includes('Failed to fetch')) {
+        error.message.includes('Failed to fetch') ||
+        error.message.includes('Mixed Content')) {
       
       // Si ya estamos usando un proxy, intentar con el siguiente
       if (useCorsProxy) {
