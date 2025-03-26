@@ -7,6 +7,35 @@ import { initializeErrorHandlers, logError, handleUrlErrors } from "./utils/erro
 import { initEnvValidation, getSafeEnvValue } from "./utils/validateEnv";
 import { cleanupStorage, fixRenderCycleIssues } from './utils/storageCleanup';
 
+// SCRIPT DE RECUPERACIÓN DE EMERGENCIA
+// Este script debe ejecutarse antes que nada para permitir la recuperación
+// en caso de errores críticos durante la inicialización
+const setupEmergencyRecovery = () => {
+  try {
+    const script = document.createElement('script');
+    script.innerHTML = `
+      window.addEventListener('error', function(e) {
+        if (e && e.message && e.message.includes("Cannot access") && e.message.includes("before initialization")) {
+          console.error("Detectado error crítico de inicialización:", e.message);
+          
+          // Recargar automáticamente después de error crítico
+          localStorage.setItem('lastCriticalError', JSON.stringify({
+            timestamp: new Date().toISOString(),
+            message: e.message
+          }));
+          window.location.reload();
+        }
+      });
+    `;
+    document.head.appendChild(script);
+  } catch (e) {
+    console.error("Error al configurar recuperación de emergencia:", e);
+  }
+};
+
+// Configurar la recuperación de emergencia de inmediato
+setupEmergencyRecovery();
+
 // Limpieza preventiva de localStorage antes de inicializar la aplicación
 try {
   console.log("🔍 Verificando posibles problemas de almacenamiento...");
@@ -246,28 +275,26 @@ try {
     document.body.appendChild(newRoot);
   }
 
-createRoot(document.getElementById("root")).render(
-    getSafeEnvValue('MODE') === 'production' ? (
-      <ErrorBoundary>
-        <AppContainer />
-      </ErrorBoundary>
-    ) : (
-  <StrictMode>
-        <ErrorBoundary>
-          <AppContainer />
-        </ErrorBoundary>
-  </StrictMode>
-    )
-  );
-} catch (e) {
-  console.error("Error fatal al renderizar la aplicación:", e);
-  document.body.innerHTML = `
-    <div style="padding: 20px; text-align: center;">
-      <h1 style="color: #e53e3e;">Error fatal en la aplicación</h1>
-      <p>No se pudo inicializar la aplicación. Por favor, intente recargar la página.</p>
-      <button onclick="window.location.reload()" style="background: #3182ce; color: white; 
-      padding: 8px 16px; border: none; border-radius: 4px; margin-top: 16px; cursor: pointer;">
-      Recargar página</button>
-    </div>
-  `;
+  // Añadir un retraso para asegurarse de que todos los módulos estén inicializados
+  setTimeout(() => {
+    try {
+      createRoot(document.getElementById("root")).render(
+        getSafeEnvValue('MODE') === 'production' ? (
+          <ErrorBoundary>
+            <AppContainer />
+          </ErrorBoundary>
+        ) : (
+          <StrictMode>
+            <ErrorBoundary>
+              <AppContainer />
+            </ErrorBoundary>
+          </StrictMode>
+        )
+      );
+    } catch(error) {
+      console.error("Error al renderizar la aplicación:", error);
+    }
+  }, 150);
+} catch (error) {
+  console.error("Error crítico en la inicialización:", error);
 }

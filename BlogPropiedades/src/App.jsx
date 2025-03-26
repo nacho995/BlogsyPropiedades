@@ -1,20 +1,24 @@
-import React, { useEffect, useState, lazy, Suspense, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { UserProvider, useUser } from './context/UserContext';
+import { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
+
+// Primero cargar componentes básicos y utilidades
 import Navbar from './components/NavBar';
 import ImageLoader from './components/ImageLoader';
+import ErrorHandler from './utils/errorHandler';
 
+// Luego cargar componentes de páginas
+import Principal from './components/Principal';
 import SignIn from './components/SignIn';
 import BlogCreation from './components/blogCreation';
 import BlogDetail from './components/BlogDetail';
-import { Toaster, toast } from 'react-hot-toast';
-
-import Principal from './components/Principal';
 import SeeBlogs from './components/SeeBlogs';
 import SeeProperty from './components/SeeProperties';
-import CambiarPerfil from './components/CambiarPerfil';
 import PropertyCreation from './components/addProperties';
 import PropertyDetail from './components/PropertyDetail';
+import CambiarPerfil from './components/CambiarPerfil';
 import SubirPage from './components/SubirPage';
 import DiagnosticPage from './components/DiagnosticPage';
 import NotFound from './components/NotFound';
