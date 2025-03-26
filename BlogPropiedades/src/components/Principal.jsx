@@ -36,38 +36,6 @@ function Principal() {
   const { user, isAuthenticated: userAuthenticated, logout } = useUser();
   const navigate = useNavigate(); // Replace useHistory with useNavigate
 
-  // Verificar si hay un problema de contenido mixto debido a la configuración de la API
-  useEffect(() => {
-    try {
-      const currentProtocol = window.location.protocol;
-      
-      if (currentProtocol === 'https:') {
-        console.log('La aplicación está cargada con HTTPS, verificando compatibilidad con API...');
-        
-        // Verificar si hay una advertencia de contenido mixto
-        const mixedContentWarning = localStorage.getItem('mixedContentWarning');
-        
-        if (mixedContentWarning) {
-          try {
-            const warningData = JSON.parse(mixedContentWarning);
-            const now = new Date();
-            const warningTime = new Date(warningData.timestamp);
-            
-            // Si la advertencia es reciente (menos de 1 hora)
-            if ((now - warningTime) < 3600000) {
-              console.warn('⚠️ Detectados recientes problemas de contenido mixto (HTTP vs HTTPS)');
-              console.log('Para mejor compatibilidad, considere usar HTTP en lugar de HTTPS o configurar Cloudflare correctamente');
-            }
-          } catch (e) {
-            console.error('Error al procesar advertencia de contenido mixto:', e);
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Error al verificar protocolo:', e);
-    }
-  }, []);
-
   // Cargar datos reales de la API con protección contra errores
   useEffect(() => {
     let isMounted = true;
@@ -96,15 +64,18 @@ function Principal() {
           propertiesData = []; // Usar array vacío en caso de error
         }
         
-        // Incluso si ambas peticiones fallan, continuamos con arrays vacíos
-        setBlogs(blogsData || []);
-        setProperties(propertiesData || []);
-        setLoading(false);
+        if (isMounted) {
+          setBlogs(blogsData || []);
+          setProperties(propertiesData || []);
+          setLoading(false);
+        }
       } catch (generalError) {
         console.error("Error general al cargar datos:", generalError);
-        setBlogs([]);
-        setProperties([]);
-        setLoading(false);
+        if (isMounted) {
+          setBlogs([]);
+          setProperties([]);
+          setLoading(false);
+        }
       }
     };
     

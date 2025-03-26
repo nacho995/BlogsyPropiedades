@@ -46,19 +46,6 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     
     console.log(`🔄 Enviando solicitud directa a: ${url}`);
     
-    // Verificar que no sea una URL de proxy
-    if (url.includes('corsproxy.io') || 
-        url.includes('allorigins.win') || 
-        url.includes('cors-anywhere') ||
-        url.includes('cors.sh')) {
-      // Extraer la URL original
-      const encodedUrl = url.split('?')[1];
-      if (encodedUrl) {
-        url = decodeURIComponent(encodedUrl);
-        console.log(`🔄 Usando URL original en lugar de proxy: ${url}`);
-      }
-    }
-    
     // Configuración por defecto de fetch con CORS permisivo
     const fetchOptions = {
       method: options.method || 'GET',
@@ -88,6 +75,8 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     
     // Verificar respuesta
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error HTTP ${response.status}:`, errorText);
       throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
     }
     
@@ -102,11 +91,11 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     console.error(`❌ Error en fetchAPI:`, error);
     
     // Reintentar solo en caso de error de red, con tiempo máximo
-    if ((error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) && retryCount < 2) {
-      console.log(`🔄 Reintentando solicitud directa (${retryCount + 1}/2)...`);
+    if ((error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) && retryCount < 1) {
+      console.log(`🔄 Reintentando solicitud directa (${retryCount + 1}/1)...`);
       
       // Esperar un poco antes de reintentar
-      await sleep(1000 * (retryCount + 1));
+      await sleep(1000);
       return fetchAPI(endpoint, options, retryCount + 1);
     }
     
