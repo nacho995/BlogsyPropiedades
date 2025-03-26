@@ -44,14 +44,30 @@ const useProfileImage = ({
       const newImageUrl = event.detail?.imageUrl;
       
       if (newImageUrl && typeof newImageUrl === 'string') {
-        console.log("✅ Nueva URL de imagen recibida:", newImageUrl);
+        console.log("✅ Nueva URL de imagen recibida:", newImageUrl.substring(0, 30) + "...");
+        
+        // Actualizar el estado local inmediatamente
         setProfileImage(newImageUrl);
         
         // Guardar en localStorage para persistencia
         try {
           localStorage.setItem('profilePic', newImageUrl);
+          localStorage.setItem('profilePic_backup', newImageUrl);
+          localStorage.setItem('profilePic_temp', newImageUrl);
+          console.log("✓ Imagen guardada en múltiples ubicaciones");
         } catch (err) {
           console.error("Error al guardar imagen en localStorage:", err);
+        }
+        
+        // Actualizar userData para mantener todo coherente
+        try {
+          const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+          userData.profilePic = newImageUrl;
+          userData.profileImage = newImageUrl;
+          localStorage.setItem('userData', JSON.stringify(userData));
+          console.log("✓ Actualizado en userData");
+        } catch (e) {
+          console.warn('Error al actualizar userData con imagen:', e);
         }
       } else {
         // Si no hay imagen específica, forzar sincronización
@@ -78,19 +94,53 @@ const useProfileImage = ({
       }
     };
     
+    // Manejar evento de login
+    const handleLogin = () => {
+      console.log("🔄 Evento de login detectado en useProfileImage");
+      
+      // Intentar recuperar imagen de la sesión anterior
+      try {
+        const tempImage = localStorage.getItem('profilePic_temp');
+        if (tempImage) {
+          console.log("✅ Recuperando imagen de sesión anterior");
+          localStorage.setItem('profilePic', tempImage);
+          setProfileImage(tempImage);
+          
+          // Actualizar userData
+          try {
+            const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+            userData.profilePic = tempImage;
+            userData.profileImage = tempImage;
+            localStorage.setItem('userData', JSON.stringify(userData));
+          } catch (e) {
+            console.warn('Error al actualizar userData en login:', e);
+          }
+        }
+      } catch (e) {
+        console.warn("Error al recuperar imagen temporal en login:", e);
+      }
+      
+      // Forzar sincronización después de login para obtener datos actualizados
+      setTimeout(() => {
+        if (isMounted.current) {
+          syncImage(true).catch(e => {
+            console.warn("Error al sincronizar después de login:", e);
+          });
+        }
+      }, 1000);
+    };
+    
     // Añadir detector de eventos personalizado para actualizaciones
     window.addEventListener('profileImageUpdated', handleProfileImageUpdate);
     window.addEventListener('userLoggedOut', handleLogout);
-    
-    // Añadir detector para evento de sesión iniciada
-    window.addEventListener('userLoggedIn', () => syncImage(true));
+    window.addEventListener('userLoggedIn', handleLogin);
     
     return () => {
       window.removeEventListener('profileImageUpdated', handleProfileImageUpdate);
-      window.removeEventListener('userLoggedIn', () => syncImage(true));
       window.removeEventListener('userLoggedOut', handleLogout);
+      window.removeEventListener('userLoggedIn', handleLogin);
     };
-  }, []);
+  }, [syncImage]);
 
   // Función para manejar errores de carga de imagen
   const handleImageError = useCallback((e) => {
@@ -449,13 +499,19 @@ const useProfileImage = ({
       
       // Guardar en localStorage para acceso inmediato
       if (typeof imageUrl === 'string') {
+        // Almacenar en múltiples ubicaciones para garantizar persistencia
         localStorage.setItem('profilePic', imageUrl);
+        localStorage.setItem('profilePic_backup', imageUrl);
+        localStorage.setItem('profilePic_temp', imageUrl);
         
-        // También almacenar en localStorage alternativo para mayor persistencia
+        // Actualizar userData para mantener todo coherente
         try {
-          localStorage.setItem('profilePic_backup', imageUrl);
+          const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+          userData.profilePic = imageUrl;
+          userData.profileImage = imageUrl;
+          localStorage.setItem('userData', JSON.stringify(userData));
         } catch (e) {
-          console.warn('Error al guardar copia de seguridad de imagen:', e);
+          console.warn('Error al actualizar userData en updateProfileImage:', e);
         }
       } else {
         throw new Error('Formato de imagen no válido');
@@ -472,6 +528,7 @@ const useProfileImage = ({
         window.dispatchEvent(new CustomEvent('profileImageUpdated', {
           detail: { imageUrl }
         }));
+        console.log("🔔 Evento de actualización enviado desde updateProfileImage");
       } catch (e) {
         console.warn('Error al notificar actualización de imagen:', e);
       }

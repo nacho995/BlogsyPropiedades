@@ -1086,12 +1086,22 @@ export const deleteData = async (endpoint) => {
  */
 export const syncProfileImage = async (newImage = null) => {
   try {
+    // Almacenar timestamp de la sincronización para depuración
+    try {
+      localStorage.setItem('lastProfileSyncAttempt', Date.now().toString());
+    } catch (e) {
+      console.warn('Error al almacenar timestamp de sincronización:', e);
+    }
+    
+    console.log("⏱️ Iniciando sincronización de imagen de perfil");
+    
     // Si se proporciona una nueva imagen, procesarla
     if (newImage) {
       let imageUrl = null;
       
       // Evitar errores con tipos no esperados
       if (newImage === null || newImage === undefined) {
+        console.warn("Se proporcionó un valor nulo o indefinido para sincronización");
         return null;
       }
       
@@ -1099,25 +1109,32 @@ export const syncProfileImage = async (newImage = null) => {
       if (typeof newImage === 'string') {
         // Si es una cadena, usarla directamente
         imageUrl = newImage;
+        console.log("💾 Sincronizando imagen directamente desde string");
       } else if (newImage && typeof newImage === 'object') {
+        console.log("💾 Intentando extraer URL de objeto para sincronización");
         try {
           // Extraer URL de diferentes formatos de objeto
           if (newImage.src) {
             imageUrl = newImage.src;
+            console.log("- Usando src:", newImage.src.substring(0, 30) + "...");
           } else if (newImage.url) {
             imageUrl = newImage.url;
+            console.log("- Usando url:", newImage.url.substring(0, 30) + "...");
           } else if (newImage.imageUrl) {
             imageUrl = newImage.imageUrl;
+            console.log("- Usando imageUrl:", newImage.imageUrl.substring(0, 30) + "...");
           } else if (newImage.profileImage) {
             // Si profileImage es string, usarla; si es objeto, intentar extraer src o url
             imageUrl = typeof newImage.profileImage === 'string' ? 
                       newImage.profileImage : 
                       ((newImage.profileImage?.src || newImage.profileImage?.url) || null);
+            console.log("- Usando profileImage");
           } else if (newImage.profilePic) {
             // Si profilePic es string, usarla; si es objeto, intentar extraer src o url
             imageUrl = typeof newImage.profilePic === 'string' ? 
                       newImage.profilePic : 
                       ((newImage.profilePic?.src || newImage.profilePic?.url) || null);
+            console.log("- Usando profilePic");
           }
         } catch (extractError) {
           console.error('Error al extraer URL de imagen:', extractError);
@@ -1127,12 +1144,15 @@ export const syncProfileImage = async (newImage = null) => {
       
       // Si se encontró una URL válida, guardarla en múltiples ubicaciones para redundancia
       if (imageUrl && typeof imageUrl === 'string') {
+        console.log("✅ URL válida encontrada para sincronización");
+        
         try {
           // Guardar en localStorage principal
           localStorage.setItem('profilePic', imageUrl);
           
           // Guardar en respaldo
           localStorage.setItem('profilePic_backup', imageUrl);
+          localStorage.setItem('profilePic_temp', imageUrl);
           
           // Asegurar que userData tenga la imagen actualizada
           const userData = JSON.parse(localStorage.getItem('userData') || '{}');
@@ -1147,6 +1167,7 @@ export const syncProfileImage = async (newImage = null) => {
               userResponse.profilePic = imageUrl;
               userResponse.profileImage = imageUrl;
               localStorage.setItem('userResponse', JSON.stringify(userResponse));
+              console.log("✓ También actualizada en userResponse");
             }
           } catch (e) {
             console.warn('Error al actualizar userResponse:', e);
@@ -1160,6 +1181,7 @@ export const syncProfileImage = async (newImage = null) => {
             window.dispatchEvent(new CustomEvent('profileImageUpdated', {
               detail: { imageUrl }
             }));
+            console.log("🔔 Evento de actualización enviado a otros componentes");
           } catch (e) {
             console.warn('Error al disparar evento de actualización:', e);
           }
@@ -1178,11 +1200,22 @@ export const syncProfileImage = async (newImage = null) => {
     }
 
     // Si no se proporcionó imagen, intentar usar la actual del localStorage con estrategia de redundancia
+    console.log("🔍 Buscando imagen existente en varias ubicaciones");
     const sources = [
       localStorage.getItem('profilePic'),
       localStorage.getItem('profilePic_backup'),
+      localStorage.getItem('profilePic_temp'),
       localStorage.getItem('profilePic_local')
     ];
+    
+    // Log para depuración
+    sources.forEach((src, index) => {
+      if (src) {
+        console.log(`Fuente #${index + 1}: ${src.substring(0, 30)}...`);
+      } else {
+        console.log(`Fuente #${index + 1}: No disponible`);
+      }
+    });
     
     // Buscar primera fuente válida
     const currentImage = sources.find(src => src && typeof src === 'string' && 
@@ -1190,9 +1223,13 @@ export const syncProfileImage = async (newImage = null) => {
     
     // Si encontramos imagen en alguna fuente, asegurar que esté en todas las ubicaciones
     if (currentImage) {
+      console.log("✅ Imagen encontrada en caché local:", currentImage.substring(0, 30) + "...");
+      
       try {
         localStorage.setItem('profilePic', currentImage);
         localStorage.setItem('profilePic_backup', currentImage);
+        localStorage.setItem('profilePic_temp', currentImage);
+        console.log("✓ Sincronizadas todas las ubicaciones de caché");
         
         // Actualizar userData para mantener todo coherente
         try {
@@ -1200,8 +1237,19 @@ export const syncProfileImage = async (newImage = null) => {
           userData.profilePic = currentImage;
           userData.profileImage = currentImage;
           localStorage.setItem('userData', JSON.stringify(userData));
+          console.log("✓ Actualizado en userData");
         } catch (e) {
           console.warn('Error al actualizar userData con imagen:', e);
+        }
+        
+        // Disparar evento para notificar a otros componentes
+        try {
+          window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+            detail: { imageUrl: currentImage }
+          }));
+          console.log("🔔 Evento de actualización enviado a otros componentes");
+        } catch (e) {
+          console.warn('Error al disparar evento de actualización:', e);
         }
       } catch (e) {
         console.warn('Error al sincronizar fuentes de imagen:', e);
@@ -1211,6 +1259,7 @@ export const syncProfileImage = async (newImage = null) => {
     }
     
     // Si no encontramos imagen en localStorage, buscar en userData
+    console.log("⚠️ No se encontró imagen en caché, buscando en userData");
     try {
       const userData = JSON.parse(localStorage.getItem('userData') || '{}');
       let profileUrl = null;
@@ -1219,8 +1268,10 @@ export const syncProfileImage = async (newImage = null) => {
       if (userData.profileImage) {
         if (typeof userData.profileImage === 'string') {
           profileUrl = userData.profileImage;
+          console.log("✓ Imagen encontrada en userData.profileImage");
         } else if (userData.profileImage && typeof userData.profileImage === 'object') {
           profileUrl = userData.profileImage.src || userData.profileImage.url || null;
+          if (profileUrl) console.log("✓ Imagen (objeto) encontrada en userData.profileImage");
         }
       }
       
@@ -1228,8 +1279,10 @@ export const syncProfileImage = async (newImage = null) => {
       if (!profileUrl && userData.profilePic) {
         if (typeof userData.profilePic === 'string') {
           profileUrl = userData.profilePic;
+          console.log("✓ Imagen encontrada en userData.profilePic");
         } else if (userData.profilePic && typeof userData.profilePic === 'object') {
           profileUrl = userData.profilePic.src || userData.profilePic.url || null;
+          if (profileUrl) console.log("✓ Imagen (objeto) encontrada en userData.profilePic");
         }
       }
       
@@ -1237,12 +1290,25 @@ export const syncProfileImage = async (newImage = null) => {
       if (profileUrl && (profileUrl.startsWith('http') || profileUrl.startsWith('data:'))) {
         localStorage.setItem('profilePic', profileUrl);
         localStorage.setItem('profilePic_backup', profileUrl);
+        localStorage.setItem('profilePic_temp', profileUrl);
+        
+        // Notificar a otros componentes
+        try {
+          window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+            detail: { imageUrl: profileUrl }
+          }));
+          console.log("🔔 Evento de actualización enviado a otros componentes");
+        } catch (e) {
+          console.warn('Error al disparar evento de actualización:', e);
+        }
+        
         return profileUrl;
       }
     } catch (parseError) {
       console.warn('Error al procesar datos de usuario del localStorage:', parseError);
     }
     
+    console.warn("❌ No se pudo encontrar ninguna imagen de perfil válida");
     return null;
   } catch (error) {
     console.error('Error en syncProfileImage:', error);
@@ -1251,11 +1317,17 @@ export const syncProfileImage = async (newImage = null) => {
       const sources = [
         localStorage.getItem('profilePic'),
         localStorage.getItem('profilePic_backup'),
+        localStorage.getItem('profilePic_temp'),
         localStorage.getItem('profilePic_local')
       ];
       
-      return sources.find(src => src && typeof src === 'string');
+      const validImage = sources.find(src => src && typeof src === 'string');
+      if (validImage) {
+        console.log("🛟 Recuperada imagen de respaldo después de error:", validImage.substring(0, 30) + "...");
+      }
+      return validImage;
     } catch (e) {
+      console.error("Error crítico en recuperación de emergencia:", e);
       return null;
     }
   }

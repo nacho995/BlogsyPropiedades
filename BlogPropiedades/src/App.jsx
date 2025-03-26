@@ -664,14 +664,31 @@ function App() {
         }
       };
       
-      // Suscribirse a eventos de error
+      // Escuchar evento de cierre de sesión para sincronizar la aplicación
+      const handleUserLogout = (event) => {
+        console.log("🔐 Evento de cierre de sesión detectado en App:", event.detail?.reason || "desconocido");
+        
+        // Si el cierre es por token expirado, mostrar mensaje
+        if (event.detail?.reason === 'token_expired') {
+          toast.error('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+          
+          // Forzar redirección si no estamos ya en la página de login
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
+        }
+      };
+      
+      // Suscribirse a eventos
       window.addEventListener('error', errorHandler);
       window.addEventListener('unhandledrejection', errorHandler);
+      window.addEventListener('userLoggedOut', handleUserLogout);
       
       return () => {
         clearInterval(healthCheck);
         window.removeEventListener('error', errorHandler);
         window.removeEventListener('unhandledrejection', errorHandler);
+        window.removeEventListener('userLoggedOut', handleUserLogout);
       };
     }, [appHealth.errors.length]);
     

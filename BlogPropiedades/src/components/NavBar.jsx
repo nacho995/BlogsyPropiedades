@@ -55,6 +55,37 @@ export default function Navbar({ showOnlyAuth = false }) {
         logout(true);
       }
     }
+    
+    // Verificar el token cada minuto para detectar expiración
+    const tokenVerifier = setInterval(() => {
+      const currentToken = localStorage.getItem('token');
+      if (currentToken) {
+        try {
+          const payload = JSON.parse(atob(currentToken.split('.')[1]));
+          // Si expira en menos de 5 minutos o ya expiró
+          if (payload.exp * 1000 < Date.now()) {
+            console.log('Token expirado durante la verificación periódica, cerrando sesión...');
+            logout(true);
+            clearInterval(tokenVerifier);
+          }
+        } catch (e) {
+          console.error('Error al verificar token periódicamente:', e);
+        }
+      }
+    }, 60000); // Verificar cada minuto
+    
+    // Escuchar evento de cierre de sesión
+    const handleLogout = (event) => {
+      console.log('Evento de cierre de sesión detectado:', event.detail?.reason || 'sin razón');
+      // Actualizar la UI o realizar acciones adicionales si es necesario
+    };
+    
+    window.addEventListener('userLoggedOut', handleLogout);
+    
+    return () => {
+      clearInterval(tokenVerifier);
+      window.removeEventListener('userLoggedOut', handleLogout);
+    };
   }, [logout]);
   
   // Definir las rutas de navegación

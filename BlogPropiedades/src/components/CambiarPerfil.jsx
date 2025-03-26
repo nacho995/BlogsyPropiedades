@@ -76,6 +76,16 @@ export default function CambiarPerfil() {
           // Envolver en un bloque try-catch adicional
           const imageData = event.target.result;
           
+          // Guardar imagen en múltiples ubicaciones para mayor robustez
+          try {
+            localStorage.setItem('profilePic', imageData);
+            localStorage.setItem('profilePic_backup', imageData);
+            localStorage.setItem('profilePic_temp', imageData);
+            console.log("Imagen guardada en múltiples ubicaciones para persistencia");
+          } catch (storageError) {
+            console.warn("Error al guardar imagen en localStorage:", storageError);
+          }
+          
           // Actualizar imagen en el sistema de sincronización
           updateProfileImage(imageData)
             .then(() => {
@@ -131,22 +141,61 @@ export default function CambiarPerfil() {
       setError(null);
       setSuccess(null);
 
+      // Verificar si hay un token válido
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error("No hay sesión activa. Por favor, inicia sesión nuevamente.");
+      }
+
       const userData = {
         name: name || user?.name,
         profilePic: profilePic?.file ? await validateAndProcessImage(profilePic.file) : null
       };
+
+      // Guardar la imagen localmente incluso antes de enviarla al servidor
+      if (profilePic?.localUrl) {
+        localStorage.setItem('profilePic_temp', profilePic.localUrl);
+      }
 
       // Llamada al backend para actualizar el perfil
       const response = await fetch(`${API_URL}/user/update-profile`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(userData)
       });
 
       if (!response.ok) {
+        // Si hay error de autorización, intentar actualizar solo localmente
+        if (response.status === 401) {
+          console.warn("Error de autorización al actualizar perfil. Actualizando solo localmente.");
+          
+          // Actualizar datos locales
+          if (name) {
+            localStorage.setItem('name', name);
+          }
+          
+          if (profilePic?.localUrl) {
+            localStorage.setItem('profilePic', profilePic.localUrl);
+            localStorage.setItem('profilePic_backup', profilePic.localUrl);
+            
+            // Notificar a otros componentes del cambio
+            try {
+              window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+                detail: { imageUrl: profilePic.localUrl }
+              }));
+            } catch (e) {
+              console.warn("Error al notificar actualización local:", e);
+            }
+          }
+          
+          setSuccess("Perfil actualizado localmente. Los cambios se sincronizarán cuando inicies sesión.");
+          setTimeout(() => navigate("/"), 2000);
+          return;
+        }
+        
         const errorData = await response.json();
         throw new Error(errorData.message || `Error al actualizar el perfil: ${response.status}`);
       }
@@ -162,6 +211,7 @@ export default function CambiarPerfil() {
         if (typeof data.profilePic === 'string') {
           localStorage.setItem('profilePic', data.profilePic);
           localStorage.setItem('profilePic_backup', data.profilePic);
+          localStorage.setItem('profilePic_temp', data.profilePic);
           
           // Actualizar userData para mantener todo coherente
           try {
