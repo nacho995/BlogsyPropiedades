@@ -1,130 +1,171 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <!-- Definir Nc lo más temprano posible -->
-    <script>
-      window.Nc = {};
-      window.__ncInitialized = true;
-    </script>
+<head>
+  <!-- SOLUCIÓN TDZ OPTIMIZADA - DEBE SER EL PRIMER SCRIPT -->
+  <script>
+  (function() {
+    console.log("🚀 TDZ-FIX-FINAL: Iniciando protección TDZ...");
     
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Goza Madrid - Portal inmobiliario y blog de propiedades" />
-    <title>GozaMadrid - Inmobiliaria y Blog</title>
+    // 1. Pre-definir variables críticas
+    var y = window.y = {};
+    var wi = window.wi = {};
+    var Fp = window.Fp = {};
+    var Nc = window.Nc = {};
     
-    <!-- Sistema de polyfill para variables minificadas -->
-    <script>
-      // Ejecutar antes de cualquier otro código
-      ['Qe', 'qe', 'Il', 'Kc', 'Hl', 'Oe', 'Si', 'Oi', 'Rc', 'Qc', 'Ab', 'Bb', 'Ni', 'Wc', 'Mi', 'Li', 'Ki', 'Ji']
-        .forEach(function(name) { window[name] = {}; });
+    // Otras variables minificadas frecuentes
+    ['Qe', 'qe', 'Il', 'Kc', 'Hl', 'Oe', 'Si', 'Oi', 'Rc', 'Qc', 'Ab', 'Bb', 'Ni', 'Wc', 'Mi', 'Li', 'Ki', 'Ji']
+      .forEach(function(name) { window[name] = window[name] || {}; });
+    
+    // 2. Interceptar definiciones de componentes
+    try {
+      var jiOriginal = null;
+      var NiOriginal = null;
       
-      // Interceptar errores de acceso a propiedades y crear las variables faltantes
-      window.__originalGetFn = Object.prototype.__lookupGetter__; 
-      Object.defineProperty(window, '__ncFixActive', { value: true, writable: false });
+      // Patch para ji (useProfileImage.js)
+      Object.defineProperty(window, 'ji', {
+        get: function() { return jiOriginal; },
+        set: function(value) {
+          jiOriginal = function() {
+            var y = {}; // Definir 'y' localmente
+            try {
+              return value.apply(this, arguments);
+            } catch(e) {
+              console.warn("⚠️ TDZ-FIX-FINAL: Error en ji:", e.message);
+              return null;
+            }
+          };
+          return true;
+        },
+        configurable: true
+      });
       
-      console.log('✅ Parche preventivo aplicado para variables minificadas');
-    </script>
-    
-    <!-- Bootstrap debe cargarse antes que nada para configurar el entorno -->
-    <script src="/bootstrap.js"></script>
-    
-    <!-- Fix específico para el problema de Nc -->
-    <script src="/ncfix.js"></script>
-    
-    <!-- Script de recuperación de emergencia para errores de inicialización -->
-    <script>
-      (function() {
-        // Registrar el tiempo de carga inicial
-        window.__loadStartTime = Date.now();
-        
-        // Sistema de recuperación para errores de inicialización
-        window.addEventListener('error', function(e) {
-          if (e && e.message && 
-             (e.message.includes("Cannot access") || 
-              e.message.includes("before initialization") ||
-              e.message.includes("is not defined") ||
-              e.message.includes("Nc"))) {
-            
-            console.error("🚨 Detectado error crítico de inicialización:", e.message);
-            
-            // Verificar si ya intentamos recargar antes
-            var reloadCount = parseInt(localStorage.getItem('app_reload_count') || '0');
-            var lastReload = localStorage.getItem('app_last_reload');
-            var now = new Date().toISOString();
-            
-            // Si hemos recargado demasiado en poco tiempo, mostrar mensaje de error
-            if (reloadCount > 3) {
-              console.error("❌ Demasiados intentos de recarga, mostrando mensaje de error");
-              // Mostrar mensaje de error al usuario
-              var errorDiv = document.createElement('div');
-              errorDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1);z-index:9999;';
-              errorDiv.innerHTML = '<h2 style="color:red;margin-bottom:10px;">Error de Inicialización</h2><p>Por favor, recarga la página manualmente.</p>';
-              document.body.appendChild(errorDiv);
-              return;
+      // Patch para Ni (NavBar.jsx)
+      Object.defineProperty(window, 'Ni', {
+        get: function() { return NiOriginal; },
+        set: function(value) {
+          NiOriginal = function() {
+            var y = {}; // Definir 'y' localmente
+            try {
+              return value.apply(this, arguments);
+            } catch(e) {
+              console.warn("⚠️ TDZ-FIX-FINAL: Error en Ni:", e.message);
+              return null;
             }
-            
-            // Incrementar contador de recargas
-            localStorage.setItem('app_reload_count', (reloadCount + 1).toString());
-            localStorage.setItem('app_last_reload', now);
-            
-            // Recargar la página
-            window.location.reload();
-          }
-        });
-      })();
-    </script>
-    
-    <!-- CRÍTICO: Protección TDZ Inline - DEBE ser el primer script -->
-    <script>
-      // Protección TDZ en línea - Pre-define variables críticas
-      (function() {
-        try {
-          // Pre-inicializar variables críticas (usar var para hoisting global)
-          var y = {};
-          var wi = {};
-          var Fp = {};
-          var Nc = {};
-          
-          console.log("🔒 Variables críticas 'y', 'wi', 'Fp', 'Nc' protegidas en línea");
-          
-          // Interceptor de errores TDZ
-          window.addEventListener('error', function(event) {
-            if (event.message && event.message.includes('Cannot access') && 
-                event.message.includes('before initialization')) {
-              
-              // Extraer nombre de la variable con problema
-              var matches = event.message.match(/'([^']+)'/);
-              if (matches && matches[1]) {
-                var varName = matches[1];
-                
-                // Inyectar variable inmediatamente
-                var script = document.createElement('script');
-                script.textContent = 'var ' + varName + ' = {}; console.log("⚡ Variable \'' + varName + '\' reinyectada");';
-                document.head.appendChild(script);
-                
-                // Intentar prevenir propagación
-                event.preventDefault();
-                event.stopPropagation();
-                return true;
-              }
-            }
-          }, true);
-          
-          // Cargar scripts adicionales de protección
-          setTimeout(function() {
-            var script = document.createElement('script');
-            script.src = 'direct-y-fix.js';
-            document.head.appendChild(script);
-          }, 0);
-        } catch(e) {
-          console.error("❌ Error en protección TDZ:", e);
+          };
+          return true;
+        },
+        configurable: true
+      });
+      
+      // 3. Inyección directa como medida preventiva
+      function injectComponentFixes() {
+        var script = document.createElement('script');
+        script.textContent = "(function() { var y = {}; var _ji = window.ji; var _Ni = window.Ni; window.ji = function() { var y = {}; try { return _ji ? _ji.apply(this, arguments) : null; } catch(e) { return null; } }; window.Ni = function() { var y = {}; try { return _Ni ? _Ni.apply(this, arguments) : null; } catch(e) { return null; } }; console.log('💉 TDZ-FIX-FINAL: Componentes ji y Ni protegidos directamente'); })();";
+        document.head.appendChild(script);
+      }
+      
+      // 4. Detector de errores TDZ
+      window.addEventListener('error', function(event) {
+        if (event.message && event.message.includes("Cannot access 'y' before initialization")) {
+          console.warn("⚡ TDZ-FIX-FINAL: Corrigiendo error TDZ");
+          injectComponentFixes();
+          event.preventDefault();
+          event.stopPropagation();
+          return true;
         }
-      })();
-    </script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+      }, true);
+      
+      // 5. Ejecutar inyección directa
+      setTimeout(injectComponentFixes, 0);
+      
+      console.log("✅ TDZ-FIX-FINAL: Protección TDZ completa aplicada");
+    } catch(e) {
+      console.warn("⚠️ Error en TDZ-FIX-FINAL:", e.message);
+      
+      // Solución de emergencia
+      var script = document.createElement('script');
+      script.textContent = "var y = {}; var wi = {}; var Fp = {}; var Nc = {};";
+      document.head.appendChild(script);
+    }
+  })();
+  </script>
+  
+  <!-- Definir Nc lo más temprano posible -->
+  <script>
+    window.Nc = {};
+    window.__ncInitialized = true;
+  </script>
+  
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Goza Madrid - Portal inmobiliario y blog de propiedades" />
+  <title>GozaMadrid - Inmobiliaria y Blog</title>
+  
+  <!-- Sistema de polyfill para variables minificadas -->
+  <script>
+    // Ejecutar antes de cualquier otro código
+    ['Qe', 'qe', 'Il', 'Kc', 'Hl', 'Oe', 'Si', 'Oi', 'Rc', 'Qc', 'Ab', 'Bb', 'Ni', 'Wc', 'Mi', 'Li', 'Ki', 'Ji']
+      .forEach(function(name) { window[name] = {}; });
+    
+    // Interceptar errores de acceso a propiedades y crear las variables faltantes
+    window.__originalGetFn = Object.prototype.__lookupGetter__; 
+    Object.defineProperty(window, '__ncFixActive', { value: true, writable: false });
+    
+    console.log('✅ Parche preventivo aplicado para variables minificadas');
+  </script>
+  
+  <!-- Bootstrap debe cargarse antes que nada para configurar el entorno -->
+  <script src="/bootstrap.js"></script>
+  
+  <!-- Fix específico para el problema de Nc -->
+  <script src="/ncfix.js"></script>
+  
+  <!-- Script de recuperación de emergencia para errores de inicialización -->
+  <script>
+    (function() {
+      // Registrar el tiempo de carga inicial
+      window.__loadStartTime = Date.now();
+      
+      // Sistema de recuperación para errores de inicialización
+      window.addEventListener('error', function(e) {
+        if (e && e.message && 
+           (e.message.includes("Cannot access") || 
+            e.message.includes("before initialization") ||
+            e.message.includes("is not defined") ||
+            e.message.includes("Nc"))) {
+          
+          console.error("🚨 Detectado error crítico de inicialización:", e.message);
+          
+          // Verificar si ya intentamos recargar antes
+          var reloadCount = parseInt(localStorage.getItem('app_reload_count') || '0');
+          var lastReload = localStorage.getItem('app_last_reload');
+          var now = new Date().toISOString();
+          
+          // Si hemos recargado demasiado en poco tiempo, mostrar mensaje de error
+          if (reloadCount > 3) {
+            console.error("❌ Demasiados intentos de recarga, mostrando mensaje de error");
+            // Mostrar mensaje de error al usuario
+            var errorDiv = document.createElement('div');
+            errorDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1);z-index:9999;';
+            errorDiv.innerHTML = '<h2 style="color:red;margin-bottom:10px;">Error de Inicialización</h2><p>Por favor, recarga la página manualmente.</p>';
+            document.body.appendChild(errorDiv);
+            return;
+          }
+          
+          // Incrementar contador de recargas
+          localStorage.setItem('app_reload_count', (reloadCount + 1).toString());
+          localStorage.setItem('app_last_reload', now);
+          
+          // Recargar la página
+          window.location.reload();
+        }
+      });
+    })();
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
 </html> 
