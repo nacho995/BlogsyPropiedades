@@ -34,31 +34,29 @@
     
     // Crear un proxy global para interceptar accesos a variables no definidas
     if (!window.__variableProxy) {
-      window.__variableProxy = function(varName) {
-        // Si la variable no existe, crearla
-        if (typeof window[varName] === 'undefined') {
-          console.log(`⚠️ Definición automática de variable: ${varName}`);
-          window[varName] = new Proxy({}, {
-            get: function(target, prop) {
-              if (!(prop in target)) {
-                console.log(`⚠️ Acceso a propiedad indefinida: ${varName}.${String(prop)}`);
-                target[prop] = {};
-              }
-              return target[prop];
-            }
-          });
+      window.__variableProxy = new Proxy({}, {
+        get: function(target, name) {
+          // Si la propiedad no existe, crearla
+          if (!(name in target)) {
+            console.log(`⚠️ Definición automática de variable: ${name}`);
+            target[name] = {};
+          }
+          return target[name];
         }
-        return window[varName];
-      };
+      });
       
       // Nombres comunes de variables minificadas que podrían causar problemas
       ['Nc', 'qe', 'Qe', 'ec', 'En', 'In', 'Ht', 'Gt', 'wa', 'qa', 'Na', 'Ma', 'Sa', 'Se',
        'Bc', 'Mc', 'Dc', 'Jc', 'Kc', 'Lc', 'Rc', 'Sc', 'Tc', 'Uc', 'Vc', 'Wc', 'Xc', 'Yc', 'Zc',
        'Ka', 'La', 'Oa', 'Pa', 'Aa', 'Ba', 'Ca', 'Da', 'Ea', 'Fa'].forEach(name => {
-        window.__variableProxy(name);
+        if (typeof window[name] === 'undefined') {
+          window[name] = window.__variableProxy;
+        }
       });
     }
     
+    // Marcar que la inicialización se ha completado
+    window.__ncFixCompleted = true;
     console.log('✅ ncfix.js completado');
   } catch (error) {
     console.error('❌ Error en ncfix.js:', error);

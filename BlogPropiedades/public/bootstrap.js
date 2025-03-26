@@ -6,26 +6,29 @@
 
   // SOLUCIÓN ESPECÍFICA PARA ERRORES DE INICIALIZACIÓN EN CÓDIGO MINIFICADO
   try {
-    // Definir Nc globalmente para evitar el error "Cannot access 'Nc' before initialization"
-    // Esta es una solución para evitar errores en código minificado
+    // Verificar si Nc ya está definido
     if (typeof window.Nc === 'undefined') {
       console.log('🔧 Aplicando parche para evitar error de Nc');
       window.Nc = {};
       window.__ncPatched = true;
+    } else {
+      console.log('✅ Nc ya está definido');
     }
     
     // Otros nombres de variables minificadas comunes que podrían causar problemas similares
     // Esto crea un proxy global que captura intentos de acceder a propiedades indefinidas
-    window.__safeInitProxy = new Proxy({}, {
-      get: function(target, name) {
-        // Si la propiedad no existe, crearla como un objeto vacío
-        if (!(name in target)) {
-          console.log(`🔧 Interceptando acceso a variable indefinida: ${String(name)}`);
-          target[name] = {};
+    if (!window.__safeInitProxy) {
+      window.__safeInitProxy = new Proxy({}, {
+        get: function(target, name) {
+          // Si la propiedad no existe, crearla como un objeto vacío
+          if (!(name in target)) {
+            console.log(`🔧 Interceptando acceso a variable indefinida: ${String(name)}`);
+            target[name] = {};
+          }
+          return target[name];
         }
-        return target[name];
-      }
-    });
+      });
+    }
     
     // Asignar las variables más comunes que causan problemas
     ['qe', 'Qe', 'ec', 'En', 'In', 'Ht', 'Gt', 'wa', 'qa', 'Na', 'Ma', 'Sa', 'Se'].forEach(varName => {
@@ -54,64 +57,27 @@
     });
   };
 
-  // 1. Configurar sistema de acceso a API seguro
-  const setupApiAccess = async () => {
+  // Configurar el sistema de acceso a API
+  try {
     console.log('🔧 Configurando sistema de acceso a API');
     
-    try {
-      // Esperar un momento para asegurar que todo está cargado
-      await waitAndExecute(() => {}, 100);
-      
-      // Función para convertir URLs HTTP a HTTPS
-      const ensureHttps = (url) => {
-        if (!url) return url;
-        
-        // Convertir explícitamente a HTTPS las URLs de API
-        if (url.startsWith('http://')) {
-          url = url.replace('http://', 'https://');
-        }
-        return url;
-      };
-
-      // Guardar las funciones originales para no sobrecargar
-      if (!window._originalFetch) {
-        window._originalFetch = window.fetch;
-      }
-
-      // Sobrescribir la función fetch para asegurar HTTPS
-      window.fetch = async function(...args) {
-        if (args.length > 0 && typeof args[0] === 'string') {
-          args[0] = ensureHttps(args[0]);
-        }
-        return window._originalFetch.apply(this, args);
-      };
-
-      // Configurar XMLHttpRequest para HTTPS
-      const originalOpen = XMLHttpRequest.prototype.open;
-      XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-        const secureUrl = ensureHttps(url);
-        return originalOpen.call(this, method, secureUrl, ...rest);
-      };
-      
-      console.log('✅ Sistema de acceso a API configurado');
-      return true;
-    } catch (error) {
-      console.error('❌ Error al configurar sistema de acceso a API:', error);
-      return false;
+    // Asegurar que Nc esté disponible antes de continuar
+    if (typeof window.Nc === 'undefined') {
+      window.Nc = {};
     }
-  };
+    
+    // Configurar el sistema de acceso a API
+    window.__apiConfig = {
+      baseUrl: 'https://api.realestategozamadrid.com',
+      timeout: 10000,
+      retries: 3,
+      retryDelay: 1000
+    };
+    
+    console.log('✅ Sistema de acceso a API configurado');
+  } catch (error) {
+    console.error('Error al configurar sistema de acceso a API:', error);
+  }
 
-  // Ejecutar la configuración con manejo de errores
-  const init = async () => {
-    try {
-      // Paso 1: Configurar acceso a API
-      await setupApiAccess();
-      console.log('✅ Bootstrap completado - Acceso directo a API configurado');
-    } catch (error) {
-      console.error('❌ Error durante bootstrap:', error);
-    }
-  };
-
-  // Iniciar con un pequeño retraso para evitar problemas de orden de carga
-  setTimeout(init, 50);
+  console.log('✅ Bootstrap completado - Acceso directo a API configurado');
 })(); 
