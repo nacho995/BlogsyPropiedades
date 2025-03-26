@@ -1124,73 +1124,42 @@ export const deleteData = async (endpoint) => {
  */
 export const syncProfileImage = async (newImage = null) => {
   try {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      console.log('Sincronización de imagen omitida: No hay token de autenticación');
-      return { 
-        imageUrl: localStorage.getItem('profilePic') || 
-                localStorage.getItem('profilePic_local') || 
-                localStorage.getItem('profilePic_base64') || 
-                null,
-        status: 'token_missing'
-      };
-    }
-
+    // Si se proporciona una nueva imagen, actualizar directamente
     if (newImage) {
-      // Si hay una nueva imagen, usar el endpoint de actualización de perfil
-      let formData;
-      
-      // Verificar si newImage es un objeto File o un string base64/URL
-      if (newImage instanceof File) {
-        formData = new FormData();
-        formData.append('profilePic', newImage);
-      } else {
-        // Si es un string (base64 o URL), enviar como JSON
-        return await fetchAPI('/user/update-profile', {
-          method: 'POST',
-          body: JSON.stringify({ profilePic: newImage })
-        });
+      if (typeof newImage === 'string') {
+        localStorage.setItem('profilePic', newImage);
+        return newImage;
+      } else if (newImage && typeof newImage === 'object' && newImage.src) {
+        localStorage.setItem('profilePic', newImage.src);
+        return newImage.src;
       }
-
-      const response = await fetchAPI('/user/update-profile', {
-        method: 'POST',
-        body: formData,
-        omitContentType: true,
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      console.log('Respuesta al actualizar imagen:', response);
-      
-      // Procesar la URL para asegurar que use el mismo protocolo que la página
-      let imageUrl = response.profilePic || response.profileImage || response.imageUrl;
-      if (imageUrl && isHttps && imageUrl.startsWith('http:')) {
-        imageUrl = imageUrl.replace('http://', 'https://');
-      }
-      
-      return { imageUrl };
+      throw new Error('Formato de imagen no válido');
     }
 
-    // Si no hay nueva imagen, usar datos locales en lugar de hacer una llamada al servidor
-    const localImage = localStorage.getItem('profilePic') || 
-                      localStorage.getItem('profilePic_local') || 
-                      localStorage.getItem('profilePic_base64');
-    
-    return { 
-      imageUrl: localImage,
-      status: 'local_data'
-    };
+    // Obtener la imagen actual del localStorage
+    const currentImage = localStorage.getItem('profilePic');
+    if (!currentImage) return null;
+
+    // Verificar si la imagen es una URL válida
+    if (typeof currentImage !== 'string' || !currentImage.startsWith('http')) {
+      console.warn('URL de imagen de perfil no válida:', currentImage);
+      localStorage.removeItem('profilePic');
+      return null;
+    }
+
+    // Verificar accesibilidad de la imagen
+    const isAccessible = await checkImageAccessibility(currentImage);
+    if (!isAccessible) {
+      console.warn('Imagen de perfil no accesible:', currentImage);
+      localStorage.removeItem('profilePic');
+      return null;
+    }
+
+    return currentImage;
   } catch (error) {
     console.error('Error en syncProfileImage:', error);
-    return { 
-      imageUrl: localStorage.getItem('profilePic') || 
-               localStorage.getItem('profilePic_local') || 
-               localStorage.getItem('profilePic_base64') || 
-               null,
-      error: error.message,
-      status: 'error'
-    };
+    localStorage.removeItem('profilePic');
+    return null;
   }
 };
 

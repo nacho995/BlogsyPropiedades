@@ -1,6 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { fallbackImageBase64, validateAndProcessImage } from '../utils';
 import { syncProfileImage } from '../services/api';
+
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1 segundo
+const REQUEST_TIMEOUT = 5000; // 5 segundos
 
 /**
  * Hook personalizado para manejar la imagen de perfil
@@ -17,20 +21,25 @@ import { syncProfileImage } from '../services/api';
  * @returns {Object} Estado y funciones de manejo de la imagen de perfil
  */
 const useProfileImage = ({ 
-  autoSync = false,
-  listenForUpdates = false
+  autoSync = true,
+  listenForUpdates = true,
+  syncInterval = 300000 // 5 minutos por defecto
 } = {}) => {
   const [profileImage, setProfileImage] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
   
-  // Función para manejar errores de imagen
+  const lastRequestTime = useRef(0);
+  const requestTimeoutRef = useRef(null);
+  const retryTimeoutRef = useRef(null);
+  const isMounted = useRef(true);
+
+  // Función para manejar errores de carga de imagen
   const handleImageError = useCallback((e) => {
-    console.error('Error al cargar imagen de perfil');
-    if (e?.target) {
-      e.target.src = fallbackImageBase64;
-    }
+    console.warn('Error al cargar imagen de perfil:', e);
     setProfileImage(fallbackImageBase64);
+    setError(new Error('Error al cargar la imagen de perfil'));
   }, []);
   
   // Cargar imagen desde localStorage
@@ -58,81 +67,109 @@ const useProfileImage = ({
     }
   }, [profileImage]);
   
-  // Sincronizar imagen con el servidor
-  const syncImage = useCallback(async () => {
-    // Solo sincronizar si hay un token
-    const token = localStorage.getItem('token');
-    if (!token) {
-      console.log('No hay token, no se puede sincronizar imagen');
-      return null;
+  // Función para sincronizar la imagen
+  const syncImage = useCallback(async (force = false) => {
+    if (!isMounted.current) return;
+
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastRequestTime.current;
+
+    // Evitar solicitudes demasiado frecuentes
+    if (!force && timeSinceLastRequest < 1000) {
+      console.warn('🛑 Demasiadas solicitudes de sincronización. Ignorando...');
+      return;
     }
-    
+
     try {
       setIsLoading(true);
       setError(null);
-      
-      const result = await syncProfileImage();
-      
-      if (result && result.imageUrl) {
-        // Verificar y procesar la URL antes de guardarla
-        const processedImage = await validateAndProcessImage(result.imageUrl);
-        
-        // Guardar en localStorage
-        localStorage.setItem('profilePic', processedImage);
-        setProfileImage(processedImage);
-        
-        setIsLoading(false);
-        return processedImage;
-      } else {
-        setIsLoading(false);
-        return null;
+      lastRequestTime.current = now;
+
+      // Limpiar timeout anterior si existe
+      if (requestTimeoutRef.current) {
+        clearTimeout(requestTimeoutRef.current);
       }
-    } catch (error) {
-      console.error('Error al sincronizar imagen de perfil:', error);
-      setError(error);
-      setIsLoading(false);
-      return null;
+
+      // Establecer timeout para la solicitud
+      requestTimeoutRef.current = setTimeout(() => {
+        if (isMounted.current) {
+          throw new Error('Timeout al sincronizar imagen');
+        }
+      }, REQUEST_TIMEOUT);
+
+      const image = await syncProfileImage();
+      
+      if (isMounted.current) {
+        if (image) {
+          setProfileImage(image);
+          setRetryCount(0);
+        } else {
+          setProfileImage(fallbackImageBase64);
+          setError(new Error('No se encontró imagen de perfil'));
+        }
+      }
+    } catch (err) {
+      console.error('Error al sincronizar imagen:', err);
+      
+      if (isMounted.current) {
+        if (retryCount < MAX_RETRIES) {
+          // Intentar de nuevo después de un delay
+          retryTimeoutRef.current = setTimeout(() => {
+            if (isMounted.current) {
+              setRetryCount(prev => prev + 1);
+            }
+          }, RETRY_DELAY);
+        } else {
+          setProfileImage(fallbackImageBase64);
+          setError(err);
+        }
+      }
+    } finally {
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
     }
-  }, []);
+  }, [retryCount]);
   
-  // Efecto para cargar la imagen al montar el componente
+  // Efecto para sincronización automática
   useEffect(() => {
-    loadLocalImage();
-    
-    // Si autoSync está habilitado, sincronizar con el servidor
     if (autoSync) {
-      syncImage().catch(err => {
-        console.error('Error en sincronización automática de imagen:', err);
-      });
+      syncImage(true);
     }
-  }, [loadLocalImage, autoSync, syncImage]);
-  
-  // Efecto para escuchar actualizaciones desde otras partes de la app
+  }, [autoSync, syncImage]);
+
+  // Efecto para sincronización periódica
   useEffect(() => {
-    if (!listenForUpdates) return;
-    
-    const handleStorageChange = (e) => {
-      if (e.key === 'profilePic') {
-        loadLocalImage();
+    if (listenForUpdates) {
+      const interval = setInterval(() => {
+        if (isMounted.current) {
+          syncImage();
+        }
+      }, syncInterval);
+
+      return () => clearInterval(interval);
+    }
+  }, [listenForUpdates, syncInterval, syncImage]);
+
+  // Limpieza al desmontar
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+      if (requestTimeoutRef.current) {
+        clearTimeout(requestTimeoutRef.current);
+      }
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
       }
     };
-    
-    window.addEventListener('storage', handleStorageChange);
-    document.addEventListener('profile-image-updated', loadLocalImage);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      document.removeEventListener('profile-image-updated', loadLocalImage);
-    };
-  }, [loadLocalImage, listenForUpdates]);
+  }, []);
   
   return {
     profileImage,
     isLoading,
     error,
-    syncImage,
     handleImageError,
-    setProfileImage
+    syncImage
   };
 };
 
