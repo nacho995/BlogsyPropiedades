@@ -2,15 +2,55 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/src/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/logo.jpg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Blog y Propiedades | GozaMadrid</title>
+    <title>Blog y Propiedades - GozaMadrid</title>
     <meta name="description" content="Portal para la publicación de blogs y propiedades de Madrid">
     
-    <!-- Precargar bootstrap para la gestión de contenido mixto HTTP/HTTPS -->
-    <script src="/bootstrap.js"></script>
+    <!-- Resolver errores de TDZ "Cannot access variable before initialization" -->
+    <script>
+      // Definir todas las variables de una sola letra que podrían causar error TDZ
+      window.a = window.a || {};
+      window.b = window.b || {};
+      window.c = window.c || {};
+      window.d = window.d || {};
+      window.e = window.e || {};
+      window.f = window.f || {};
+      window.g = window.g || {};
+      window.h = window.h || {};
+      window.i = window.i || {};
+      window.j = window.j || {};
+      window.k = window.k || {};
+      window.l = window.l || {};
+      window.m = window.m || {};
+      window.n = window.n || {};
+      window.o = window.o || {};
+      window.p = window.p || {};
+      window.q = window.q || {};
+      window.r = window.r || {};
+      window.s = window.s || {};
+      window.t = window.t || {};
+      window.u = window.u || {};
+      window.v = window.v || {};
+      window.w = window.w || {};
+      window.x = window.x || {};
+      window.y = window.y || {};
+      window.z = window.z || {};
+      
+      console.log("✅ Variables preventivas TDZ inicializadas");
+    </script>
     
-    <!-- Mostrar mensaje de carga retrasado -->
+    <!-- Precargar scripts de inicialización -->
+    <link rel="preload" href="/bootstrap.js" as="script" />
+    <link rel="preload" href="/ncfix.js" as="script" />
+    <link rel="preload" href="/tdz-fix.js" as="script" />
+    
+    <!-- Ejecutar scripts de inicialización primero -->
+    <script src="/tdz-fix.js"></script>
+    <script src="/bootstrap.js"></script>
+    <script src="/ncfix.js"></script>
+    
+    <!-- Resto del código actual -->
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -68,6 +108,15 @@
       // Manejar errores de JavaScript
       window.addEventListener('error', function(e) {
         console.error('Error JavaScript interceptado:', e.error || e.message);
+        
+        // Si hay un error de TDZ, intentar solucionarlo dinámicamente
+        if (e.message && (e.message.includes("Cannot access") || e.message.includes("before initialization"))) {
+          const varName = e.message.match(/'([^']+)'/);
+          if (varName && varName[1]) {
+            console.warn(`⚠️ Detectado error TDZ con variable: ${varName[1]}, inicializando...`);
+            window[varName[1]] = {};
+          }
+        }
       });
       
       // Variables de entorno predeterminadas - siempre HTTPS para la API
