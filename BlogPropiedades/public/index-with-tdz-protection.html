@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blog Propiedades - Con Protección TDZ</title>
+  <!-- TDZ Protection: Cargamos antes que cualquier otro script -->
+  <script src="tdz-loader.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <!-- Aquí irían los scripts normales de la aplicación -->
+  <script>
+    // Script de ejemplo para mostrar que 'y' ya está protegido
+    window.addEventListener('DOMContentLoaded', function() {
+      // Verificar si 'y' está definido y protegido
+      console.log('Estado de la variable y:', typeof window.y !== 'undefined' ? 'Definida ✅' : 'No definida ❌');
+      
+      // Verificar si los scripts de protección se cargaron
+      const protectionLoaded = localStorage.getItem('tdz_protection_loaded');
+      console.log('Protección TDZ cargada:', protectionLoaded ? 'Sí ✅' : 'No ❌');
+      
+      // Mostrar en la página
+      const rootDiv = document.getElementById('root');
+      rootDiv.innerHTML = `
+        <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+          <h1>Blog Propiedades - Protección TDZ</h1>
+          <div style="background-color: #f0f0f0; padding: 20px; border-radius: 5px;">
+            <h2>Estado de la Protección</h2>
+            <ul>
+              <li>Variable 'y': <strong>${typeof window.y !== 'undefined' ? 'Definida ✅' : 'No definida ❌'}</strong></li>
+              <li>Protección TDZ: <strong>${protectionLoaded ? 'Activa ✅' : 'No activa ❌'}</strong></li>
+              <li>Hora de carga: <strong>${localStorage.getItem('tdz_protection_time') || 'N/A'}</strong></li>
+            </ul>
+            <p><em>Consulta la consola para más detalles.</em></p>
+          </div>
+          <div style="margin-top: 20px;">
+            <h2>Uso</h2>
+            <p>Para usar esta protección en tu aplicación React, incluye el script <code>tdz-loader.js</code> como primer script en el <code>&lt;head&gt;</code> de tu HTML.</p>
+            <code style="display: block; background-color: #272822; color: #f8f8f2; padding: 10px; border-radius: 5px;">
+              &lt;script src="tdz-loader.js"&gt;&lt;/script&gt;
+            </code>
+          </div>
+        </div>
+      `;
+    });
+  </script>
+</body>
+</html> 

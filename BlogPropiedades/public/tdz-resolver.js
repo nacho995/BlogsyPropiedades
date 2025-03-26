@@ -8,12 +8,22 @@
   try {
     // Función para inicializar variables de forma segura
     function initVariable(name) {
-      Object.defineProperty(window, name, {
-        value: {},
-        writable: true,
-        configurable: true,
-        enumerable: false // No enumerable para evitar contaminación
-      });
+      // Verificar si la propiedad ya existe y es configurable
+      const descriptor = Object.getOwnPropertyDescriptor(window, name);
+      if (descriptor && descriptor.configurable === false) {
+        console.warn(`⚠️ TDZ-RESOLVER: No se puede redefinir '${name}', ya está definida como no configurable`);
+        return;
+      }
+      
+      // Solo definir si no existe o es configurable
+      if (!descriptor || descriptor.configurable) {
+        Object.defineProperty(window, name, {
+          value: {},
+          writable: true,
+          configurable: true,
+          enumerable: false // No enumerable para evitar contaminación
+        });
+      }
     }
     
     // Inicializar variables de una sola letra (prioridad alta)
@@ -43,20 +53,28 @@
     problemVars.forEach(initVariable);
     
     // Implementar observador de ejecución para interceptar errores TDZ
-    let previousY = window.y;
+    let previousY = undefined;
     
-    // Redefinir 'y' como un proxy para capturar todas las interacciones
-    Object.defineProperty(window, 'y', {
-      get: function() {
-        return previousY || {};
-      },
-      set: function(val) {
-        previousY = val;
-        return true;
-      },
-      configurable: true,
-      enumerable: true
-    });
+    // Intentar definir 'y' como un proxy solo si es configurable
+    const yDescriptor = Object.getOwnPropertyDescriptor(window, 'y');
+    if (!yDescriptor || yDescriptor.configurable) {
+      try {
+        previousY = window.y;
+        Object.defineProperty(window, 'y', {
+          get: function() {
+            return previousY || {};
+          },
+          set: function(val) {
+            previousY = val;
+            return true;
+          },
+          configurable: true,
+          enumerable: true
+        });
+      } catch (e) {
+        console.warn(`⚠️ TDZ-RESOLVER: No se pudo definir proxy para 'y': ${e.message}`);
+      }
+    }
     
     // Monitoreo en tiempo real de errores TDZ 
     window.addEventListener('error', function(event) {
@@ -98,6 +116,7 @@
     
     // Implementar hook de monitoreo continuo con intervalos
     let monitoringActive = true;
+    const startTime = Date.now();
     const tdz_monitor = setInterval(function() {
       // Verificar si 'y' sigue definido
       if (typeof window.y === 'undefined') {
@@ -119,8 +138,6 @@
         monitoringActive = false;
       }
     }, 500);
-    
-    const startTime = Date.now();
     
     console.log("✅ TDZ-RESOLVER: Protección avanzada aplicada");
   } catch (error) {
