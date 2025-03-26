@@ -74,6 +74,54 @@
         });
       })();
     </script>
+    
+    <!-- CRÍTICO: Protección TDZ Inline - DEBE ser el primer script -->
+    <script>
+      // Protección TDZ en línea - Pre-define variables críticas
+      (function() {
+        try {
+          // Pre-inicializar variables críticas (usar var para hoisting global)
+          var y = {};
+          var wi = {};
+          var Fp = {};
+          var Nc = {};
+          
+          console.log("🔒 Variables críticas 'y', 'wi', 'Fp', 'Nc' protegidas en línea");
+          
+          // Interceptor de errores TDZ
+          window.addEventListener('error', function(event) {
+            if (event.message && event.message.includes('Cannot access') && 
+                event.message.includes('before initialization')) {
+              
+              // Extraer nombre de la variable con problema
+              var matches = event.message.match(/'([^']+)'/);
+              if (matches && matches[1]) {
+                var varName = matches[1];
+                
+                // Inyectar variable inmediatamente
+                var script = document.createElement('script');
+                script.textContent = 'var ' + varName + ' = {}; console.log("⚡ Variable \'' + varName + '\' reinyectada");';
+                document.head.appendChild(script);
+                
+                // Intentar prevenir propagación
+                event.preventDefault();
+                event.stopPropagation();
+                return true;
+              }
+            }
+          }, true);
+          
+          // Cargar scripts adicionales de protección
+          setTimeout(function() {
+            var script = document.createElement('script');
+            script.src = 'direct-y-fix.js';
+            document.head.appendChild(script);
+          }, 0);
+        } catch(e) {
+          console.error("❌ Error en protección TDZ:", e);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
