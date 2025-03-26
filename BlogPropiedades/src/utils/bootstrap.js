@@ -9,9 +9,9 @@
   // Verificar si estamos en HTTPS
   const isHttps = window.location.protocol === 'https:';
   
-  // API URL siempre en HTTP
-  const API_DOMAIN = 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
-  const API_URL = `http://${API_DOMAIN}`;
+  // API URL siempre en HTTPS
+  const API_DOMAIN = 'api.realestategozamadrid.com';
+  const API_URL = `https://${API_DOMAIN}`;
   
   console.log('🔧 Configurando sistema de acceso a API');
   
@@ -99,9 +99,7 @@
       );
       
       const isApiUrl = typeof url === 'string' && (
-        url.includes('gozamadrid-api') || 
-        url.includes('api.realestategozamadrid.com') ||
-        url.includes('elasticbeanstalk.com')
+        url.includes('api.realestategozamadrid.com')
       );
       
       // Si es una solicitud a través de un proxy CORS, extraer la URL original
@@ -119,9 +117,9 @@
             const parts = url.split('/');
             if (parts.length > 3) {
               originalUrl = parts.slice(3).join('/');
-              // Añadir http:// si no está presente
+              // Añadir https:// si no está presente
               if (!originalUrl.startsWith('http')) {
-                originalUrl = 'http://' + originalUrl;
+                originalUrl = 'https://' + originalUrl;
               }
             }
           }
@@ -132,7 +130,7 @@
         console.log(`🔄 Desviando solicitud de proxy CORS`);
         
         // Si estamos en HTTPS y la API es HTTP, simular respuesta
-        if (isHttps && originalUrl.startsWith('http:') && originalUrl.includes('gozamadrid-api')) {
+        if (isHttps && originalUrl.startsWith('http:') && originalUrl.includes('api.realestategozamadrid.com')) {
           console.log(`⚠️ Navegador bloqueando solicitud HTTP desde HTTPS - Modo de emergencia`);
           
           const method = options.method || 'GET';
@@ -201,64 +199,62 @@
       
       // Si es una URL de la API, manejarla según protocolo
       if (isApiUrl && typeof url === 'string') {
-        // Convertir HTTPS a HTTP si es necesario
+        // Asegurar que la URL use HTTPS
         let apiUrl = url;
-        if (url.startsWith('https://')) {
-          apiUrl = url.replace('https://', 'http://');
-          console.log(`🔄 Convirtiendo URL API de HTTPS a HTTP: ${apiUrl}`);
+        if (url.startsWith('http://')) {
+          apiUrl = url.replace('http://', 'https://');
+          console.log(`🔄 Convirtiendo URL API de HTTP a HTTPS: ${apiUrl}`);
         }
         
-        // Si estamos en HTTPS y la API es HTTP, probar fetch pero estar listo para simular respuesta
-        if (isHttps && apiUrl.startsWith('http:')) {
-          console.log(`🔄 Intentando acceso a API HTTP desde HTTPS (puede fallar): ${apiUrl}`);
+        // Intentar conexión directa con HTTPS
+        console.log(`🔄 Intentando acceso a API HTTPS: ${apiUrl}`);
+        
+        return originalFetch(apiUrl, options).catch(error => {
+          console.error('Error en solicitud HTTPS:', error);
+          console.log('⚠️ Activando modo de emergencia para solicitud bloqueada');
           
-          return originalFetch(apiUrl, options).catch(error => {
-            console.error('Error en solicitud HTTP desde HTTPS (esperado):', error);
-            console.log('⚠️ Activando modo de emergencia para solicitud bloqueada');
-            
-            // Extraer método y datos
-            const method = options.method || 'GET';
-            let requestData = null;
-            
-            try {
-              if (options.body) {
-                if (typeof options.body === 'string') {
-                  requestData = JSON.parse(options.body);
-                } else if (options.body instanceof FormData) {
-                  requestData = Object.fromEntries(options.body);
-                } else if (typeof options.body === 'object') {
-                  requestData = options.body;
-                }
+          // Extraer método y datos
+          const method = options.method || 'GET';
+          let requestData = null;
+          
+          try {
+            if (options.body) {
+              if (typeof options.body === 'string') {
+                requestData = JSON.parse(options.body);
+              } else if (options.body instanceof FormData) {
+                requestData = Object.fromEntries(options.body);
+              } else if (typeof options.body === 'object') {
+                requestData = options.body;
               }
-            } catch (e) {
-              console.error('Error procesando cuerpo de solicitud:', e);
             }
+          } catch (e) {
+            console.error('Error procesando cuerpo de solicitud:', e);
+          }
+          
+          // Procesar login
+          if (apiUrl.includes('/user/login') && method === 'POST' && requestData) {
+            console.log('🔑 Detectada solicitud de login, simulando respuesta');
+            const loginResponse = simulateLogin(requestData.email, requestData.password);
             
-            // Procesar login
-            if (apiUrl.includes('/user/login') && method === 'POST' && requestData) {
-              console.log('🔑 Detectada solicitud de login, simulando respuesta');
-              const loginResponse = simulateLogin(requestData.email, requestData.password);
-              
-              return {
-                ok: true,
-                status: 200,
-                json: () => Promise.resolve(loginResponse),
-                text: () => Promise.resolve(JSON.stringify(loginResponse)),
-                headers: new Headers({'Content-Type': 'application/json'})
-              };
-            }
-            
-            // Generar respuesta simulada
-            const mockData = generateMockResponse(apiUrl, method, requestData);
             return {
               ok: true,
               status: 200,
-              json: () => Promise.resolve(mockData),
-              text: () => Promise.resolve(JSON.stringify(mockData)),
+              json: () => Promise.resolve(loginResponse),
+              text: () => Promise.resolve(JSON.stringify(loginResponse)),
               headers: new Headers({'Content-Type': 'application/json'})
             };
-          });
-        }
+          }
+          
+          // Generar respuesta simulada para otros endpoints
+          const mockData = generateMockResponse(apiUrl, method, requestData);
+          return {
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve(mockData),
+            text: () => Promise.resolve(JSON.stringify(mockData)),
+            headers: new Headers({'Content-Type': 'application/json'})
+          };
+        });
       }
       
       // Para cualquier otra URL, usar fetch original

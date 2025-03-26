@@ -4,7 +4,7 @@
   Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With
   Access-Control-Allow-Credentials: true
   Access-Control-Max-Age: 86400
-  Content-Security-Policy: default-src * 'unsafe-inline' 'unsafe-eval'; connect-src * http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com http://*.elasticbeanstalk.com ws: wss:; img-src * data: blob:; font-src * data:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline';
+  Content-Security-Policy: default-src * 'unsafe-inline' 'unsafe-eval'; connect-src * https://api.realestategozamadrid.com ws: wss:; img-src * data: blob:; font-src * data:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline';
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer-when-downgrade
 */ 
