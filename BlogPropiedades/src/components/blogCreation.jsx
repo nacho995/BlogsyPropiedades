@@ -470,6 +470,7 @@ export default function BlogCreation() {
     title: '',
     subtitle: '',
     content: '',
+    description: '',
     category: 'Inmobiliaria',
     tags: [],
     url: '',
@@ -503,12 +504,26 @@ export default function BlogCreation() {
     const queryParams = new URLSearchParams(location.search);
     const editBlogId = queryParams.get('edit');
     
+    console.log("Parámetros de URL detectados:", location.search);
+    console.log("ID de blog a editar:", editBlogId);
+    
     if (editBlogId) {
       setIsEditMode(true);
       setBlogId(editBlogId);
       loadBlogData(editBlogId);
+    } else {
+      // Si no estamos en modo edición, asegurarse de que estamos en el paso 1
+      setCurrentStep(1);
+      // Y resetear el form si es necesario
+      setFormData(prevData => ({
+        ...prevData,
+        title: prevData.title || '',
+        description: prevData.description || '',
+        content: prevData.content || '',
+        category: prevData.category || 'Inmobiliaria'
+      }));
     }
-  }, [location]);
+  }, [location.search]);
   
   // Función para cargar los datos del blog a editar
   const loadBlogData = async (id) => {
@@ -871,6 +886,19 @@ export default function BlogCreation() {
   // Actualiza la función renderStep para manejar correctamente todos los pasos
   function renderStep() {
     console.log('Renderizando paso:', currentStep);
+    
+    // Asegurarnos de que formData tenga todas las propiedades necesarias
+    const safeFormData = {
+      title: formData.title || '',
+      description: formData.description || '',
+      content: formData.content || '',
+      category: formData.category || 'Inmobiliaria',
+      tags: Array.isArray(formData.tags) ? formData.tags : [],
+      // Resto de propiedades con valores por defecto seguros
+      image: formData.image || { src: '', alt: '' },
+      images: Array.isArray(formData.images) ? formData.images : [],
+      readTime: formData.readTime || '5'
+    };
     
     switch (currentStep) {
         case 1:
@@ -1615,23 +1643,40 @@ export default function BlogCreation() {
   };
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
-      <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
-        {/* Encabezado */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-6">
-          <h1 className="text-3xl font-bold text-white">
+    <div className="bg-gray-100 min-h-screen">
+      <div className="bg-indigo-600 text-white py-6 px-6 md:px-12">
+        <div className="container mx-auto">
+          <h1 className="text-3xl font-bold">
             {isEditMode ? 'Editar Blog' : 'Crear Nuevo Blog'}
           </h1>
-          <p className="text-blue-100 mt-2">
-            {isEditMode 
-              ? 'Actualiza el contenido de tu blog' 
-              : 'Comparte información valiosa con tus lectores'}
+          <p className="mt-2 text-indigo-200">
+            Comparte información valiosa con tus lectores
           </p>
         </div>
-        
-        {/* Contenido */}
-        <div className="px-8 py-6">
-          {/* ... existing code ... */}
+      </div>
+
+      <div className="container mx-auto px-4 py-8">
+        <div className="bg-white rounded-lg shadow-lg p-6 md:p-8">
+          {/* Pasos simples */}
+          <div className="mb-8 flex justify-between border-b pb-4">
+            <div className="flex space-x-4">
+              <span className={currentStep === 1 ? "font-bold text-blue-600" : "text-gray-500"}>1. Información</span>
+              <span className={currentStep === 2 ? "font-bold text-blue-600" : "text-gray-500"}>2. Contenido</span>
+              <span className={currentStep === 3 ? "font-bold text-blue-600" : "text-gray-500"}>3. Imágenes</span>
+              <span className={currentStep === 4 ? "font-bold text-blue-600" : "text-gray-500"}>4. Publicar</span>
+            </div>
+          </div>
+          
+          {/* Contenido del paso actual */}
+          <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
+            {error && (
+              <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 text-red-700">
+                <p>{error}</p>
+              </div>
+            )}
+            
+            {renderStep()}
+          </form>
         </div>
       </div>
     </div>

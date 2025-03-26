@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom"; // Replace useHistory with useNavigate
 import { useUser } from "../context/UserContext";
 import { getBlogPosts, getPropertyPosts, testApiConnection } from "../services/api"; // Removed syncProfileImage import
@@ -22,6 +22,10 @@ function Principal() {
   const [dataError, setDataError] = useState(null);
   const [apiStatus, setApiStatus] = useState({ testing: true, status: 'pendiente' });
   
+  // Estado para controlar la visibilidad del menú de perfil
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileMenuRef = useRef(null);
+  
   // Usar el hook personalizado para manejar la imagen de perfil
   const { 
     profileImage, 
@@ -36,6 +40,20 @@ function Principal() {
   // Obtener datos del usuario
   const { user, isAuthenticated: userAuthenticated, logout } = useUser();
   const navigate = useNavigate(); // Replace useHistory with useNavigate
+
+  // Efecto para cerrar el menú de perfil al hacer clic fuera de él
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
+        setShowProfileMenu(false);
+      }
+    }
+    
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [profileMenuRef]);
 
   // Cargar datos reales de la API con protección contra errores
   useEffect(() => {
@@ -459,22 +477,45 @@ function Principal() {
               </div>
             ) : (
               <div className="flex items-center space-x-3">
-                <div className="relative">
+                <div className="relative" ref={profileMenuRef}>
                   <img 
                     src={profileImage || defaultProfilePic} 
                     alt="Perfil" 
-                    className="h-14 w-14 rounded-full border-3 border-yellow-300 object-cover shadow-lg" 
+                    className="h-14 w-14 rounded-full border-3 border-yellow-300 object-cover shadow-lg cursor-pointer" 
                     onError={handleImageError}
+                    onClick={() => setShowProfileMenu(!showProfileMenu)}
+                    title="Haz clic para opciones de perfil"
                   />
+                  
+                  {/* Menú desplegable */}
+                  {showProfileMenu && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                      <div className="px-4 py-2 border-b border-gray-100">
+                        <p className="text-sm font-medium text-gray-700">Hola, {name || 'Usuario'}</p>
+                      </div>
+                      <Link 
+                        to="/profile/edit" 
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 flex items-center"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        Cambiar mi perfil
+                      </Link>
+                      <button 
+                        onClick={handleLogout}
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-red-50 flex items-center"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Cerrar sesión
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-col">
                   <span className="text-white font-medium">Hola, {name || 'Usuario'}</span>
-                  <button 
-                    onClick={handleLogout}
-                    className="px-3 py-1 bg-yellow-400 hover:bg-yellow-500 text-blue-900 text-sm font-semibold rounded-md transition duration-200 mt-1"
-                  >
-                    Salir
-                  </button>
                 </div>
               </div>
             )}
@@ -498,11 +539,15 @@ function Principal() {
                 className="h-28 w-28 rounded-full border-4 border-blue-500 object-cover shadow-lg" 
                 onError={handleImageError}
               />
-              <div className="absolute -bottom-2 -right-2 bg-yellow-400 rounded-full p-2 shadow-md">
+              <Link 
+                to="/profile/edit"
+                className="absolute -bottom-2 -right-2 bg-yellow-400 rounded-full p-2 shadow-md hover:bg-yellow-500 transition-colors"
+                title="Editar mi perfil"
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                 </svg>
-              </div>
+              </Link>
             </div>
             <div>
               <h2 className="text-3xl font-bold text-blue-800 mb-2">
@@ -517,6 +562,12 @@ function Principal() {
                 </Link>
                 <Link to="/add-property" className="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-blue-900 font-medium rounded-md transition duration-200">
                   Añadir propiedad
+                </Link>
+                <Link to="/profile/edit" className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-md transition duration-200 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  Editar mi perfil
                 </Link>
               </div>
             </div>

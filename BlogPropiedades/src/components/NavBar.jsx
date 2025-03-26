@@ -67,13 +67,11 @@ export default function Navbar({ showOnlyAuth = false }) {
   // Agregar rutas adicionales si el usuario está autenticado
   const userRoutes = [
     { name: 'Añadir Blog', href: '/crear-blog', current: location.pathname === '/crear-blog' },
-    { name: 'Subir Imágenes', href: '/subir', current: location.pathname === '/subir' },
   ];
   
   // Agregar rutas adicionales si el usuario es administrador
   const adminRoutes = [
     { name: 'Añadir Propiedad', href: '/add-property', current: location.pathname === '/add-property' },
-    { name: 'Documentación', href: '/documentacion', current: location.pathname === '/documentacion' },
   ];
 
   // Si estamos en el modo showOnlyAuth, mostrar menú simplificado
