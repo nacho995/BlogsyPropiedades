@@ -52,7 +52,7 @@ export function UserProvider({ children }) {
         
         // Al detectar token expirado, cerrar sesión automáticamente
         setTimeout(() => {
-          logout(true);
+          logout(true, 'token_expired');
         }, 0);
         
         return false;
@@ -68,6 +68,12 @@ export function UserProvider({ children }) {
     } catch (error) {
       console.error("Error al validar token:", error);
       logAuthEvent('token_validation_error', { error: error.message });
+      
+      // Si hay un error al validar el token, también cerrar sesión
+      setTimeout(() => {
+        logout(true, 'token_invalid');
+      }, 0);
+      
       return false;
     }
   };
@@ -458,7 +464,7 @@ export function UserProvider({ children }) {
   };
 
   // Función de logout
-  const logout = (shouldRedirect = true) => {
+  const logout = (shouldRedirect = true, reason = 'user_action') => {
     // Guardar una copia de la imagen de perfil temporalmente si existe
     try {
       const profileImage = localStorage.getItem('profilePic');
@@ -477,22 +483,29 @@ export function UserProvider({ children }) {
       localStorage.removeItem("token");
       localStorage.removeItem("userData");
       localStorage.removeItem("userResponse");
+      localStorage.removeItem("tempToken");
       
       // No borrar la imagen de perfil para que se mantenga entre sesiones
       // localStorage.removeItem("profilePic");
       
       // Despachar evento de cierre de sesión
       window.dispatchEvent(new CustomEvent('userLoggedOut', {
-        detail: { reason: shouldRedirect ? 'user_action' : 'token_expired' }
+        detail: { reason }
       }));
+      
+      console.log(`🔒 Sesión cerrada. Razón: ${reason}`);
     } catch (e) {
       console.error("❌ Error al eliminar token:", e);
     }
     
     // Redireccionar si es necesario
     if (shouldRedirect) {
-      // Usar history.pushState para garantizar que la redirección ocurra adecuadamente
-      window.location.href = "/login";
+      console.log("🔄 Redirigiendo a página de login...");
+      
+      // Pequeño retraso para permitir que otros componentes reaccionen primero
+      setTimeout(() => {
+        window.location.href = "/login";
+      }, 100);
     }
   };
   

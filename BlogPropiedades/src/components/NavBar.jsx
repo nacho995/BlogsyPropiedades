@@ -47,11 +47,11 @@ export default function Navbar({ showOnlyAuth = false }) {
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
         if (payload.exp * 1000 < Date.now()) {
-          console.log('Token expirado, cerrando sesión...');
+          console.log('Token expirado en NavBar, cerrando sesión...');
           logout(true);
         }
       } catch (error) {
-        console.error('Error al verificar token:', error);
+        console.error('Error al verificar token en NavBar:', error);
         logout(true);
       }
     }
@@ -62,31 +62,63 @@ export default function Navbar({ showOnlyAuth = false }) {
       if (currentToken) {
         try {
           const payload = JSON.parse(atob(currentToken.split('.')[1]));
-          // Si expira en menos de 5 minutos o ya expiró
-          if (payload.exp * 1000 < Date.now()) {
-            console.log('Token expirado durante la verificación periódica, cerrando sesión...');
+          
+          // Calcular tiempo restante en minutos
+          const expiryTime = payload.exp * 1000;
+          const timeRemaining = expiryTime - Date.now();
+          const minutesRemaining = Math.floor(timeRemaining / 60000);
+          
+          // Si expira en menos de 2 minutos, mostrar advertencia
+          if (timeRemaining > 0 && timeRemaining < 120000) {
+            console.warn(`⚠️ Token expirará pronto (en ${minutesRemaining} minutos)`);
+            // Aquí se podría implementar un toast o notificación visual
+          }
+          
+          // Si ya expiró, cerrar sesión
+          if (expiryTime < Date.now()) {
+            console.log('Token expirado durante la verificación periódica en NavBar, cerrando sesión...');
             logout(true);
             clearInterval(tokenVerifier);
           }
         } catch (e) {
           console.error('Error al verificar token periódicamente:', e);
         }
+      } else {
+        // Si no hay token, verificar si debería estar no autenticado
+        if (isAuthenticated) {
+          console.warn('NavBar detectó estado inconsistente: autenticado pero sin token');
+          logout(true);
+        }
       }
     }, 60000); // Verificar cada minuto
     
-    // Escuchar evento de cierre de sesión
+    // Escuchar evento de cierre de sesión para actualizar la UI
     const handleLogout = (event) => {
-      console.log('Evento de cierre de sesión detectado:', event.detail?.reason || 'sin razón');
-      // Actualizar la UI o realizar acciones adicionales si es necesario
+      console.log('NavBar: Evento de cierre de sesión detectado:', event.detail?.reason || 'sin razón');
+      
+      // Forzar actualización de componente si es necesario
+      if (isAuthenticated) {
+        // Esta es una forma de forzar la actualización del componente
+        syncImage().catch(() => {});
+      }
+    };
+    
+    // Escuchar evento de inicio de sesión
+    const handleLogin = (event) => {
+      console.log('NavBar: Evento de inicio de sesión detectado');
+      // Forzar actualización del componente
+      syncImage().catch(() => {});
     };
     
     window.addEventListener('userLoggedOut', handleLogout);
+    window.addEventListener('userLoggedIn', handleLogin);
     
     return () => {
       clearInterval(tokenVerifier);
       window.removeEventListener('userLoggedOut', handleLogout);
+      window.removeEventListener('userLoggedIn', handleLogin);
     };
-  }, [logout]);
+  }, [logout, isAuthenticated, syncImage]);
   
   // Definir las rutas de navegación
   const navigation = [

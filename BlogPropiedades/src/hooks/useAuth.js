@@ -33,12 +33,27 @@ export const AuthProvider = ({ children }) => {
           
           if (decoded.exp < currentTime) {
             // Token expirado
-            console.log('Token expirado, cerrando sesión');
-            logout();
+            console.log('Token expirado en useAuth, cerrando sesión');
+            
+            // Limpiar estado
+            localStorage.removeItem('token');
+            setIsAuthenticated(false);
+            setUser(null);
+            
+            // Enviar evento de cierre de sesión por token expirado
+            window.dispatchEvent(new CustomEvent('userLoggedOut', {
+              detail: { reason: 'token_expired' }
+            }));
+            
+            // Redirigir a página de login
+            if (window.location.pathname !== '/login') {
+              window.location.href = '/login';
+            }
+            
             return;
           }
           
-          console.log('Contenido del token:', decoded);
+          console.log('Contenido del token en useAuth:', decoded);
           
           // Token válido
           setIsAuthenticated(true);
@@ -46,16 +61,32 @@ export const AuthProvider = ({ children }) => {
           // Cargar datos del usuario
           await fetchUserData();
         } catch (decodeError) {
-          console.error('Error al decodificar token:', decodeError);
+          console.error('Error al decodificar token en useAuth:', decodeError);
+          
           // Token inválido
           setIsAuthenticated(false);
           setUser(null);
           localStorage.removeItem('token');
+          
+          // Enviar evento de error de autenticación
+          window.dispatchEvent(new CustomEvent('authError', {
+            detail: { error: decodeError.message }
+          }));
+          
+          // Enviar evento de cierre de sesión por token inválido
+          window.dispatchEvent(new CustomEvent('userLoggedOut', {
+            detail: { reason: 'token_invalid' }
+          }));
         }
       } catch (error) {
-        console.error('Error al verificar autenticación:', error);
+        console.error('Error al verificar autenticación en useAuth:', error);
         setIsAuthenticated(false);
         setUser(null);
+        
+        // Enviar evento de error de autenticación
+        window.dispatchEvent(new CustomEvent('authError', {
+          detail: { error: error.message }
+        }));
       } finally {
         setIsLoading(false);
       }

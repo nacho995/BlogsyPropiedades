@@ -676,19 +676,75 @@ function App() {
           if (window.location.pathname !== '/login') {
             window.location.href = '/login';
           }
+        } else if (event.detail?.reason === 'token_invalid') {
+          toast.error('Tu sesión no es válida. Por favor, inicia sesión nuevamente.');
+          
+          // Forzar redirección a login
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
         }
       };
+      
+      // Evento para detectar cuando se inicia sesión
+      const handleUserLogin = () => {
+        console.log("🔐 Evento de inicio de sesión detectado en App");
+        
+        // Si estamos en la página de login, redirigir a la página principal
+        if (window.location.pathname === '/login') {
+          console.log("Redirigiendo a página principal después de inicio de sesión");
+          window.location.href = '/';
+        }
+      };
+      
+      // Sistema para detectar errores de autenticación repetidos
+      let authErrors = 0;
+      const handleAuthError = () => {
+        authErrors++;
+        
+        // Si hay muchos errores de autenticación seguidos, limpiar el estado
+        if (authErrors > 3) {
+          console.warn("⚠️ Múltiples errores de autenticación detectados, limpiando estado");
+          try {
+            // Preservar solo imagen de perfil
+            const profilePic = localStorage.getItem('profilePic');
+            const profilePic_local = localStorage.getItem('profilePic_local');
+            
+            // Limpiar localStorage
+            localStorage.clear();
+            
+            // Restaurar imágenes
+            if (profilePic) localStorage.setItem('profilePic', profilePic);
+            if (profilePic_local) localStorage.setItem('profilePic_local', profilePic_local);
+            
+            // Redirigir a login
+            window.location.href = '/login';
+          } catch (e) {
+            console.error("Error al limpiar estado tras errores de autenticación:", e);
+          }
+        }
+      };
+      
+      // Resetear contador de errores de autenticación cada 2 minutos
+      const authErrorReset = setInterval(() => {
+        authErrors = 0;
+      }, 120000);
       
       // Suscribirse a eventos
       window.addEventListener('error', errorHandler);
       window.addEventListener('unhandledrejection', errorHandler);
       window.addEventListener('userLoggedOut', handleUserLogout);
+      window.addEventListener('userLoggedIn', handleUserLogin);
+      window.addEventListener('authError', handleAuthError);
       
       return () => {
         clearInterval(healthCheck);
+        clearInterval(authErrorReset);
         window.removeEventListener('error', errorHandler);
         window.removeEventListener('unhandledrejection', errorHandler);
         window.removeEventListener('userLoggedOut', handleUserLogout);
+        window.removeEventListener('userLoggedIn', handleUserLogin);
+        window.removeEventListener('authError', handleAuthError);
       };
     }, [appHealth.errors.length]);
     
