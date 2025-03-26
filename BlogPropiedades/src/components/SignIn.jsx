@@ -5,6 +5,7 @@ import { useUser } from "../context/UserContext";
 import toast from "react-hot-toast";
 import { UserContext } from '../context/UserContext';
 import PropTypes from 'prop-types';
+import ErrorHandler from '../utils/errorHandler';
 
 const SignIn = ({ isRegistering = false }) => {
     const [email, setEmail] = useState("");
@@ -52,7 +53,13 @@ const SignIn = ({ isRegistering = false }) => {
         
         // Solo redirigir si este componente aún está montado y existe información de usuario
         if (isMounted && isAuthenticated && user) {
-            console.log("Usuario ya autenticado, redirigiendo a Principal...");
+            console.log("Usuario ya autenticado, preparando redirección...");
+            
+            // Verificar si ya estamos en un bucle de redirección
+            if (ErrorHandler.detectAndPreventLoopError('auth_redirect', 5000, 3)) {
+                console.warn("⚠️ Posible bucle de redirección detectado, omitiendo redirección automática");
+                return;
+            }
             
             // Usar un temporizador pequeño para evitar redirecciones inmediatas
             // que puedan causar problemas de renders
@@ -61,7 +68,7 @@ const SignIn = ({ isRegistering = false }) => {
                     console.log("Redirigiendo a Principal...");
                     navigate("/");
                 }
-            }, 100);
+            }, 300);
             
             return () => {
                 clearTimeout(redirectTimer);
@@ -85,19 +92,15 @@ const SignIn = ({ isRegistering = false }) => {
         
         // MEJORA 2: Verificar si estamos en un bucle y romperlo definitivamente
         try {
-            const now = new Date();
-            const loginAttempts = JSON.parse(localStorage.getItem('authAttempts') || '[]');
-            const recentAttempts = loginAttempts.filter(
-                attempt => (now - new Date(attempt.timestamp)) < 3000 // últimos 3 segundos
-            );
-            
-            // Si hay más de 2 intentos en 3 segundos, es un bucle
-            if (recentAttempts.length > 2) {
-                console.error("🛑 BUCLE DE LOGIN DETECTADO - Limpiando todo");
-                // Limpiar datos de sesión para romper cualquier bucle
-                localStorage.clear();
-                // Forzar recarga de la página para reiniciar completamente
-                window.location.reload();
+            // Usar el detector de bucles
+            if (ErrorHandler.detectAndPreventLoopError('login_attempts', 3000, 2)) {
+                console.error("🛑 BUCLE DE LOGIN DETECTADO - Limpiando token");
+                // Limpiar token para romper bucle
+                localStorage.removeItem('token');
+                // Mostrar mensaje de error
+                setError("Demasiados intentos en poco tiempo. Por favor, espere unos segundos e intente de nuevo.");
+                setLoading(false);
+                isSubmitting.current = false;
                 return;
             }
         } catch (e) {
@@ -164,6 +167,29 @@ const SignIn = ({ isRegistering = false }) => {
                         password: password 
                     });
                     
+                    // Verificar si tenemos un error de API
+                    if (response.error) {
+                        console.error("Error en respuesta de API:", response.message);
+                        
+                        // Mensajes personalizados según el tipo de error
+                        if (response.message.includes("incorrecta")) {
+                            setError("Contraseña incorrecta. Por favor, verifica tus credenciales.");
+                        } 
+                        else if (response.message.includes("no encontrado") || response.message.includes("not found")) {
+                            setError("Este correo electrónico no está registrado. Por favor, regístrate primero.");
+                        }
+                        else if (response.status === 400) {
+                            setError("Datos de inicio de sesión incorrectos. Por favor, intenta nuevamente.");
+                        }
+                        else {
+                            setError(response.message || "Error de autenticación. Por favor, intente más tarde.");
+                        }
+                        
+                        setLoading(false);
+                        isSubmitting.current = false;
+                        return;
+                    }
+                    
                     // Paso 2: Verificar si tenemos una respuesta válida
                     if (!response) {
                         throw new Error("No se recibió respuesta del servidor");
@@ -193,17 +219,18 @@ const SignIn = ({ isRegistering = false }) => {
                         toast("¡Inicio de sesión exitoso!", { icon: "✅", duration: 3000 });
                         // MEJORA 5: Retardo para evitar redireccionamiento inmediato
                         setTimeout(() => navigate("/"), 300);
-                    } else {
-                        throw new Error("No se pudo iniciar sesión con los datos proporcionados");
                     }
-                } catch (loginError) {
-                    console.error("Error durante login:", loginError);
-                    setError(loginError.message || "Error durante la autenticación");
+                } catch (error) {
+                    console.error("Error durante el login:", error);
                     
-                    toast("Error de autenticación: " + (loginError.message || "Credenciales inválidas"), {
-                        icon: "❌",
-                        duration: 4000
-                    });
+                    // Verificar si es un error de servidor interno
+                    if (error.message && error.message.includes('500')) {
+                        setError("El servidor no está disponible en este momento. Por favor, intente más tarde.");
+                    } else if (error.message && error.message.includes('401')) {
+                        setError("Credenciales incorrectas. Por favor, verifique su email y contraseña.");
+                    } else {
+                        setError(error.message || "Error al iniciar sesión. Por favor, intente de nuevo.");
+                    }
                 }
             }
         } catch (err) {
@@ -211,10 +238,7 @@ const SignIn = ({ isRegistering = false }) => {
             setError(err.message || "Error durante la autenticación");
         } finally {
             setLoading(false);
-            // MEJORA 6: Permitir nuevos envíos con un retardo más largo
-            setTimeout(() => {
-                isSubmitting.current = false;
-            }, 1500); // Esperar 1.5 segundos antes de permitir otro envío
+            isSubmitting.current = false;
         }
     };
 

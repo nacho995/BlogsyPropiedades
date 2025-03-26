@@ -16,6 +16,8 @@ import {
   FALLBACK_API
 } from '../utils/envConfig';
 
+import ErrorHandler from '../utils/errorHandler';
+
 // Determinar si estamos usando HTTPS
 const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
@@ -58,6 +60,12 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
       credentials: 'include' // Incluir credenciales para CORS
     };
     
+    // Agregar token de autorización si existe en localStorage
+    const token = localStorage.getItem('token');
+    if (token && !options.headers?.Authorization) {
+      fetchOptions.headers.Authorization = `Bearer ${token}`;
+    }
+    
     // Agregar cuerpo si existe
     if (options.body) {
       // Si es FormData, no convertir a JSON ni establecer Content-Type
@@ -73,14 +81,46 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     // Intentar realizar la solicitud directa
     const response = await fetch(url, fetchOptions);
     
-    // Verificar respuesta
+    // Si hay un error HTTP, usar el manejador de errores
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Error HTTP ${response.status}:`, errorText);
+      // Obtener el resultado del manejador de errores
+      const handlerResult = ErrorHandler.handleHttpError(response.status, url, endpoint);
+      
+      // Si el error fue manejado, devolver el resultado
+      if (handlerResult.isHandled) {
+        // Para endpoints que deberían devolver arrays, devolver array vacío
+        if (handlerResult.isEmpty) {
+          return [];
+        }
+        
+        // Devolver el resultado manejado
+        return handlerResult;
+      }
+      
+      // Si el error no fue manejado, intentar analizar la respuesta como JSON
+      try {
+        const errorJson = await response.json();
+        console.error(`Error HTTP ${response.status}:`, errorJson);
+        
+        // Si hay un mensaje en la respuesta, usarlo
+        if (errorJson && errorJson.message) {
+          return {
+            error: true,
+            status: response.status,
+            message: errorJson.message
+          };
+        }
+      } catch (jsonError) {
+        // Si no es JSON, obtener el texto
+        const errorText = await response.text();
+        console.error(`Error HTTP ${response.status}:`, errorText);
+      }
+      
+      // Finalmente, si no pudimos manejar mejor el error
       throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
     }
     
-    // Procesar respuesta
+    // Procesar respuesta exitosa
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {
       return await response.json();
@@ -89,6 +129,37 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     }
   } catch (error) {
     console.error(`❌ Error en fetchAPI:`, error);
+    
+    // No reintentar si es un error 401 o 500
+    if (error.message && (error.message.includes('401') || error.message.includes('500'))) {
+      // Verificar si estamos en un bucle de error 401
+      if (error.message.includes('401') && ErrorHandler.detectAndPreventLoopError('api_401_error', 10000, 3)) {
+        console.warn("⚠️ Bucle de errores 401 detectado, limpiando credenciales");
+        localStorage.removeItem('token');
+        localStorage.removeItem('name');
+        localStorage.removeItem('email');
+        localStorage.removeItem('role');
+      }
+      
+      // Para login, devolver objeto de error amigable
+      if (endpoint.includes('/user/login')) {
+        return { 
+          error: true,
+          message: 'Error de autenticación. Por favor, verifique sus credenciales o intente más tarde.'
+        };
+      }
+      
+      // Para endpoints de listas, devolver array vacío
+      if (endpoint.includes('/blog') || endpoint.includes('/property')) {
+        return [];
+      }
+      
+      // Para otros endpoints, devolver objeto de error genérico
+      return {
+        error: true,
+        message: 'Error en la solicitud. Por favor, intente más tarde.'
+      };
+    }
     
     // Reintentar solo en caso de error de red, con tiempo máximo
     if ((error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) && retryCount < 1) {
@@ -385,6 +456,15 @@ export const loginUser = async (credentials) => {
     });
 
     console.log('Resultado login:', result);
+    
+    // Verificar si hay un error en la respuesta
+    if (result && result.error) {
+      console.error(`Error en la autenticación: ${result.message}`);
+      return { 
+        success: false, 
+        message: result.message || 'Error de autenticación'
+      };
+    }
     
     if (result && result.token) {
       // Almacenar el token y nombre de usuario

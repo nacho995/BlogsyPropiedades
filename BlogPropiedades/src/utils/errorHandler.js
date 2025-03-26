@@ -265,7 +265,154 @@ export const getFriendlyErrorMessage = (error) => {
 const ErrorHandler = {
   trackApiError,
   resetApiErrorCounter,
-  getFriendlyErrorMessage
+  getFriendlyErrorMessage,
+  detectAndPreventLoopError,
+  handleHttpError
 };
 
-export default ErrorHandler; 
+export default ErrorHandler;
+
+/**
+ * Módulo para manejar errores y detección de bucles
+ */
+
+// Detector de bucles de error
+export const detectAndPreventLoopError = (errorKey, timeout = 5000, maxCount = 5) => {
+  try {
+    const now = Date.now();
+    const recentErrors = JSON.parse(localStorage.getItem(`recentErrors_${errorKey}`) || '[]');
+    
+    // Filtrar para mantener solo errores recientes
+    const veryRecentErrors = recentErrors.filter(time => (now - time) < timeout);
+    
+    // Guardar el registro del nuevo error
+    veryRecentErrors.push(now);
+    
+    // Mantener solo los últimos 20 errores
+    if (veryRecentErrors.length > 20) {
+      veryRecentErrors.splice(0, veryRecentErrors.length - 20);
+    }
+    
+    // Guardar la lista actualizada
+    localStorage.setItem(`recentErrors_${errorKey}`, JSON.stringify(veryRecentErrors));
+    
+    // Detectar si hay demasiados errores en poco tiempo
+    if (veryRecentErrors.length >= maxCount) {
+      console.error(`🛑 Bucle de errores detectado para: ${errorKey} (${veryRecentErrors.length} errores en ${timeout}ms)`);
+      
+      // Limpiar el historial para romper el bucle
+      localStorage.removeItem(`recentErrors_${errorKey}`);
+      
+      // Registrar el incidente
+      localStorage.setItem('lastLoopBreak', JSON.stringify({
+        timestamp: new Date().toISOString(),
+        type: errorKey,
+        count: veryRecentErrors.length
+      }));
+      
+      return true; // Bucle detectado
+    }
+    
+    return false; // No hay bucle
+  } catch (error) {
+    console.error('Error en detectAndPreventLoopError:', error);
+    return false;
+  }
+};
+
+// Manejar errores HTTP específicos
+export const handleHttpError = (status, url, endpoint) => {
+  try {
+    // Registrar el error
+    console.error(`Error HTTP ${status} al acceder a ${url}`);
+    
+    // Manejar código 401 - No autorizado
+    if (status === 401) {
+      if (detectAndPreventLoopError('auth_401', 10000, 3)) {
+        console.log('Deteniendo bucle de errores 401');
+        // Solo limpiar token de localStorage si no estamos en login/registro
+        if (!endpoint.includes('/login') && !endpoint.includes('/register')) {
+          // Limpiar credenciales para romper el bucle
+          localStorage.removeItem('token');
+          localStorage.removeItem('tokenType');
+        }
+      }
+      
+      // Para login/register, devolver respuesta específica
+      if (endpoint.includes('/login') || endpoint.includes('/register')) {
+        return {
+          error: true,
+          status: 401,
+          message: 'Credenciales incorrectas. Por favor, verifica tu email y contraseña.',
+          isHandled: true
+        };
+      }
+      
+      // Para otros endpoints, indicar que el usuario debe iniciar sesión
+      return {
+        error: true,
+        status: 401,
+        message: 'Sesión expirada. Por favor, inicie sesión nuevamente.',
+        isHandled: true
+      };
+    }
+    
+    // Manejar código 500 - Error de servidor
+    if (status === 500) {
+      if (detectAndPreventLoopError('server_500', 10000, 3)) {
+        console.log('Deteniendo bucle de errores 500');
+      }
+      
+      // Si es login, devolver error amigable
+      if (endpoint.includes('/login')) {
+        return {
+          error: true,
+          status: 500,
+          message: 'El servidor no está disponible en este momento. Por favor, intente más tarde.',
+          isHandled: true
+        };
+      }
+      
+      // Para endpoints de datos, devolver array vacío
+      if (endpoint.includes('/blog') || endpoint.includes('/property')) {
+        return {
+          isHandled: true,
+          isEmpty: true
+        };
+      }
+      
+      return {
+        error: true,
+        status: 500,
+        message: 'Error interno del servidor. Por favor, intente más tarde.',
+        isHandled: true
+      };
+    }
+    
+    // Manejar código 400 - Error de cliente
+    if (status === 400) {
+      // Si es login, devolver error específico
+      if (endpoint.includes('/login')) {
+        return {
+          error: true,
+          status: 400,
+          message: 'Credenciales incorrectas. Por favor, verifica tu email y contraseña.',
+          isHandled: true
+        };
+      }
+      
+      return {
+        error: true,
+        status: 400,
+        message: 'Error en la solicitud. Por favor, verifica los datos ingresados.',
+        isHandled: true
+      };
+    }
+    
+    // Por defecto, indicar que no se manejó el error
+    return { isHandled: false };
+  } catch (error) {
+    console.error('Error en handleHttpError:', error);
+    return { isHandled: false };
+  }
+}; 
