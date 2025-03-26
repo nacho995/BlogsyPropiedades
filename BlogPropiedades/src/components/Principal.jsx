@@ -64,6 +64,112 @@ function Principal() {
           propertiesData = []; // Usar array vacío en caso de error
         }
         
+        // Si no hay datos de la API, usar datos de ejemplo para demostración
+        if (blogsData.length === 0) {
+          console.log("Usando datos de ejemplo para blogs");
+          blogsData = [
+            {
+              id: "mock-blog-1",
+              title: "Las tendencias inmobiliarias para 2025",
+              description: "Descubre las nuevas tendencias que definirán el mercado inmobiliario en los próximos años.",
+              content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+              category: "Tendencias",
+              author: "María García",
+              readTime: "7",
+              createdAt: new Date().toISOString(),
+              image: {
+                src: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1000",
+                alt: "Tendencias inmobiliarias"
+              }
+            },
+            {
+              id: "mock-blog-2",
+              title: "Cómo preparar tu casa para venderla",
+              description: "Consejos prácticos para preparar tu vivienda antes de ponerla en venta en el mercado.",
+              content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+              category: "Consejos",
+              author: "Carlos Rodríguez",
+              readTime: "5",
+              createdAt: new Date().toISOString(),
+              image: {
+                src: "https://images.unsplash.com/photo-1582268611958-ebfd161ef9cf?q=80&w=1000",
+                alt: "Casa en venta"
+              }
+            },
+            {
+              id: "mock-blog-3",
+              title: "Inversión en propiedades: Guía para principiantes",
+              description: "Todo lo que necesitas saber para comenzar a invertir en el mercado inmobiliario con éxito.",
+              content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+              category: "Inversión",
+              author: "Ana Martínez",
+              readTime: "10",
+              createdAt: new Date().toISOString(),
+              image: {
+                src: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=1000",
+                alt: "Inversión inmobiliaria"
+              }
+            }
+          ];
+        }
+        
+        if (propertiesData.length === 0) {
+          console.log("Usando datos de ejemplo para propiedades");
+          propertiesData = [
+            {
+              id: "mock-property-1",
+              title: "Piso de lujo en el centro de Madrid",
+              description: "Espectacular piso reformado en pleno centro con acabados de alta calidad y vistas panorámicas.",
+              price: 450000,
+              bedrooms: 3,
+              bathrooms: 2,
+              area: 120,
+              location: "Madrid, Centro",
+              status: "En venta",
+              images: [
+                {
+                  src: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=1000",
+                  alt: "Exterior de la propiedad"
+                }
+              ]
+            },
+            {
+              id: "mock-property-2",
+              title: "Chalet independiente con piscina",
+              description: "Espectacular chalet con amplio jardín, piscina privada y zona de barbacoa en urbanización exclusiva.",
+              price: 750000,
+              bedrooms: 5,
+              bathrooms: 3,
+              area: 280,
+              location: "Las Rozas, Madrid",
+              status: "En venta",
+              images: [
+                {
+                  src: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?q=80&w=1000",
+                  alt: "Chalet con piscina"
+                }
+              ]
+            },
+            {
+              id: "mock-property-3",
+              title: "Apartamento moderno en zona exclusiva",
+              description: "Apartamento de diseño con amplias terrazas y zonas comunes premium con piscina y gimnasio.",
+              price: 325000,
+              bedrooms: 2,
+              bathrooms: 2,
+              area: 95,
+              location: "Chamberí, Madrid",
+              status: "En venta",
+              images: [
+                {
+                  src: "https://images.unsplash.com/photo-1493809842364-78817add7ffb?q=80&w=1000",
+                  alt: "Interior del apartamento"
+                }
+              ]
+            }
+          ];
+        }
+        
         if (isMounted) {
           setBlogs(blogsData || []);
           setProperties(propertiesData || []);

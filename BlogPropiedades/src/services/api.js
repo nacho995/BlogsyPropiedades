@@ -28,7 +28,12 @@ window.useCorsProxy = false;
 // Función auxiliar para esperar un tiempo específico
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Función para manejar errores con límite de intentos y timeout
+/**
+ * Función genérica para realizar peticiones a la API
+ * @param {string} endpoint - Endpoint de la API
+ * @param {Object} options - Opciones para la petición (method, headers, body, etc.)
+ * @returns {Promise<Object>} - Promise que se resuelve con la respuesta en formato JSON
+ */
 export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
   // Crear un controlador de aborto para limitar el tiempo máximo de espera
   const controller = new AbortController();
@@ -63,189 +68,123 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
       };
     }
     
-    // Configuración por defecto de fetch con CORS permisivo
-    const fetchOptions = {
-      method: options.method || 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...options.headers
-      },
-      mode: 'cors',
-      credentials: 'include', // Incluir credenciales para CORS
-      signal: controller.signal // Añadir la señal para poder abortar
+    // Preparar las cabeceras
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...options.headers
     };
     
-    // Agregar token de autorización si existe en localStorage
+    // Incluir token de autenticación si está disponible
     const token = localStorage.getItem('token');
-    if (token && !options.headers?.Authorization) {
-      fetchOptions.headers.Authorization = `Bearer ${token}`;
+    if (token && !headers['Authorization']) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
     
-    // Agregar cuerpo si existe
-    if (options.body) {
-      // Si es FormData, no convertir a JSON ni establecer Content-Type
-      if (options.body instanceof FormData) {
-        fetchOptions.body = options.body;
-        // Eliminar Content-Type para que el navegador lo establezca automáticamente con el boundary
-        delete fetchOptions.headers['Content-Type'];
-      } else {
-        fetchOptions.body = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
-      }
-    }
+    // Agregar signal a las opciones para el aborto por tiempo
+    const requestOptions = {
+      ...options,
+      headers,
+      signal: controller.signal
+    };
     
-    // Intentar realizar la solicitud directa
-    const response = await fetch(url, fetchOptions);
+    // Realizar la petición fetch
+    const response = await fetch(url, requestOptions);
     
-    // Si hay un error HTTP, manejar según el tipo
+    // Limpiar el timeout independientemente del resultado
+    clearTimeout(timeoutId);
+    
+    // Clonar la respuesta antes de leerla, para evitar el error "body stream already read"
+    const clonedResponse = response.clone();
+    
+    // Manejar diferentes códigos de estado HTTP
     if (!response.ok) {
-      // Si el error fue manejado específicamente
-      if (response.status === 401) {
-        // Si entramos en bucle de 401, limpiar token
-        if (detectAndPreventLoopError('auth_401', 10000, 3)) {
-          console.warn("⚠️ Bucle de errores 401 detectado, limpiando credenciales");
-          // Solo limpiar token de localStorage si no estamos en login/registro
-          if (!endpoint.includes('/login') && !endpoint.includes('/register')) {
-            localStorage.removeItem('token');
-          }
-        }
-        
-        return { 
-          error: true, 
-          status: 401,
-          message: endpoint.includes('/login') ? 
-            'Credenciales incorrectas. Por favor, verifica tu email y contraseña.' : 
-            'Sesión expirada. Por favor, inicie sesión nuevamente.'
-        };
-      }
+      console.error(`❌ Error HTTP: ${response.status} en ${url}`);
       
-      // Para código 404 - Recurso no encontrado
-      if (response.status === 404) {
-        console.warn(`Recurso no encontrado: ${url}`);
-        
-        // Para endpoints de datos, devolver array vacío
-        if (endpoint.includes('/blog') || endpoint.includes('/property')) {
-          console.log(`Endpoint de datos ${endpoint} no encontrado, devolviendo array vacío`);
-          return [];
-        }
-        
-        return {
-          error: true,
-          status: 404,
-          message: 'Recurso no encontrado. La ruta o el servidor pueden no estar disponibles.'
-        };
-      }
-      
-      // Para código 500 - Error de servidor
-      if (response.status >= 500) {
-        // Detectar bucle de errores 500
-        detectAndPreventLoopError('server_500', 10000, 3);
-        
-        // Para endpoints de datos, devolver array vacío
-        if (endpoint.includes('/blog') || endpoint.includes('/property')) {
-          return [];
-        }
-        
-        return {
-          error: true,
-          status: 500,
-          message: 'Error interno del servidor. Por favor, intente más tarde.'
-        };
-      }
-      
-      // Para código 400 - Error de cliente
-      if (response.status === 400) {
-        // Si es login, devolver error específico
-        return {
-          error: true,
-          status: 400,
-          message: endpoint.includes('/login') ? 
-            'Credenciales incorrectas. Por favor, verifica tu email y contraseña.' :
-            'Error en la solicitud. Por favor, verifica los datos ingresados.'
-        };
-      }
-      
-      // Si el error no fue manejado, intentar analizar la respuesta como JSON
-      try {
-        const errorClone = response.clone(); // Clonar la respuesta antes de consumirla
-        const errorJson = await response.json();
-        console.error(`Error HTTP ${response.status}:`, errorJson);
-        
-        // Si hay un mensaje en la respuesta, usarlo
-        if (errorJson && errorJson.message) {
-          return {
-            error: true,
-            status: response.status,
-            message: errorJson.message
-          };
-        }
-      } catch (jsonError) {
-        // Si no es JSON, obtener el texto
-        try {
-          const errorText = await response.clone().text(); // Usar un clon si el body original ya fue consumido
-          console.error(`Error HTTP ${response.status}:`, errorText);
-        } catch (textError) {
-          console.error(`Error HTTP ${response.status}, no se pudo leer el cuerpo de la respuesta`);
-        }
-      }
-      
-      // Finalmente, si no pudimos manejar mejor el error
-      throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
-    }
-    
-    // Procesar respuesta exitosa
-    const contentType = response.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-      return await response.json();
-    } else {
-      return await response.text();
-    }
-  } catch (error) {
-    console.error(`❌ Error en fetchAPI:`, error);
-    
-    // No reintentar si es un error 401 o 500
-    if (error.message && (error.message.includes('401') || error.message.includes('500'))) {
-      // Verificar si estamos en un bucle de error 401
-      if (error.message.includes('401') && detectAndPreventLoopError('api_401_error', 10000, 3)) {
-        console.warn("⚠️ Bucle de errores 401 detectado, limpiando credenciales");
-        localStorage.removeItem('token');
-        localStorage.removeItem('name');
-        localStorage.removeItem('email');
-        localStorage.removeItem('role');
-      }
-      
-      // Para login, devolver objeto de error amigable
-      if (endpoint.includes('/user/login')) {
-        return { 
-          error: true,
-          message: 'Error de autenticación. Por favor, verifique sus credenciales o intente más tarde.'
-        };
-      }
-      
-      // Para otros endpoints, devolver objeto vacío o error según corresponda
-      if (endpoint.includes('/blog') || endpoint.includes('/property')) {
+      // Para 404, retornar un array vacío si el endpoint parece ser una colección de datos
+      if (response.status === 404 && 
+         (endpoint.includes('/blogs') || endpoint.includes('/properties'))) {
+        console.warn(`⚠️ Endpoint ${endpoint} no encontrado, devolviendo array vacío`);
         return [];
       }
       
-      return { error: true, message: error.message };
+      try {
+        // Intentar leer el mensaje de error como JSON
+        const errorData = await clonedResponse.json();
+        console.error('Mensaje de error del servidor:', errorData);
+        return { 
+          error: true, 
+          status: response.status,
+          message: errorData.message || 'Error del servidor',
+          details: errorData
+        };
+      } catch (e) {
+        // Si no es JSON, leer como texto
+        try {
+          const errorText = await response.text();
+          return { 
+            error: true, 
+            status: response.status,
+            message: errorText || 'Error del servidor sin detalles'
+          };
+        } catch (textError) {
+          // Si todo falla, devolver un error genérico
+          return { 
+            error: true, 
+            status: response.status,
+            message: `Error ${response.status} sin detalles disponibles`
+          };
+        }
+      }
     }
     
-    // Si es un error de conexión y no hemos reintentado demasiadas veces, reintentar
-    if (retryCount < 2 && (
-      error.name === 'AbortError' || 
-      error.message.includes('network') || 
-      error.message.includes('connection')
-    )) {
-      console.log(`🔄 Reintentando solicitud (${retryCount + 1}/2)...`);
-      // Esperar un poco antes de reintentar
-      await sleep(1000 * (retryCount + 1));
-      return fetchAPI(endpoint, options, retryCount + 1);
+    // Procesar respuesta exitosa
+    try {
+      // Si es una respuesta vacía (como en un DELETE exitoso)
+      if (response.status === 204 || response.headers.get('content-length') === '0') {
+        return { success: true };
+      }
+      
+      // Intentar parsear como JSON
+      const data = await response.json();
+      return data;
+    } catch (parseError) {
+      console.error('Error al parsear respuesta JSON:', parseError);
+      
+      // En caso de error de parseo, intentar leer como texto
+      try {
+        const textData = await clonedResponse.text();
+        if (!textData) return { success: true, message: 'Operación exitosa sin datos' };
+        
+        return {
+          success: true,
+          raw: textData
+        };
+      } catch (finalError) {
+        console.error('Error al obtener texto de respuesta:', finalError);
+        return { 
+          success: true,
+          warning: 'No se pudo leer el contenido de la respuesta'
+        };
+      }
     }
-    
-    // Propagar el error para otros endpoints
-    throw error;
-  } finally {
+  } catch (error) {
+    // Limpiar el timeout en caso de error
     clearTimeout(timeoutId);
+    
+    // Manejar errores específicos
+    if (error.name === 'AbortError') {
+      console.error('⏱️ La solicitud ha sido abortada por timeout');
+      return { error: true, message: 'Timeout de solicitud', timeout: true };
+    }
+    
+    if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+      console.error('🌐 Error de red:', error.message);
+      return { error: true, message: 'Error de conexión con el servidor', network: true };
+    }
+    
+    console.error('❌ Error en fetchAPI:', error);
+    return { error: true, message: error.message || 'Error desconocido' };
   }
 };
 
@@ -303,7 +242,7 @@ export const createBlogPost = async (data) => {
 
     console.log("Datos del blog preparados para enviar:", blogData);
 
-    const result = await fetchAPI('/blog', {
+    const result = await fetchAPI('/api/blogs', {
       method: 'POST',
       body: JSON.stringify(blogData)
     });
@@ -328,7 +267,7 @@ export const createBlogPost = async (data) => {
 export const getBlogPosts = async () => {
   try {
     console.log("Obteniendo blogs del servidor...");
-    const blogs = await fetchAPI('/blog');
+    const blogs = await fetchAPI('/api/blogs');
     console.log("Blogs recibidos del servidor:", blogs);
     
     // Verificar la estructura de cada blog y procesar las imágenes
@@ -406,7 +345,7 @@ export const deleteBlogPost = async (id) => {
       throw new Error('No hay token de autenticación disponible');
     }
 
-    return await fetchAPI(`/blog/${id}`, {
+    return await fetchAPI(`/api/blogs/${id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -426,9 +365,9 @@ export const deleteBlogPost = async (id) => {
  */
 export const updateBlogPost = async (id, data) => {
   try {
-    console.log(`Enviando PATCH a /blog/${id} con datos:`, data);
+    console.log(`Enviando PATCH a /api/blogs/${id} con datos:`, data);
     
-    return await fetchAPI(`/blog/${id}`, {
+    return await fetchAPI(`/api/blogs/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data)
     });
@@ -445,7 +384,7 @@ export const updateBlogPost = async (id, data) => {
  */
 export const getBlogById = async (id) => {
   try {
-    return await fetchAPI(`/blog/${id}`);
+    return await fetchAPI(`/api/blogs/${id}`);
   } catch (error) {
     console.error(`Error al obtener blog ${id}:`, error);
     throw error;
@@ -689,7 +628,7 @@ export const uploadImageBlog = async (formData) => {
   try {
     console.log('Subiendo imagen para blog...');
     
-    const result = await fetchAPI('/blog/upload', {
+    const result = await fetchAPI('/api/blogs/upload', {
       method: 'POST',
       body: formData
     });
@@ -880,7 +819,7 @@ export const createPropertyPost = async (data) => {
 export const getPropertyPosts = async () => {
   try {
     console.log("Obteniendo propiedades del servidor...");
-    const properties = await fetchAPI('/property');
+    const properties = await fetchAPI('/api/properties');
     console.log("Propiedades recibidas del servidor:", properties);
     
     // Verificar la estructura de cada propiedad y corregir las imágenes si es necesario
@@ -927,7 +866,7 @@ export const getPropertyPosts = async () => {
  */
 export const deletePropertyPost = async (id) => {
   try {
-    return await fetchAPI(`/property/${id}`, {
+    return await fetchAPI(`/api/properties/${id}`, {
       method: 'DELETE'
     });
   } catch (error) {
@@ -944,7 +883,7 @@ export const deletePropertyPost = async (id) => {
  */
 export const updatePropertyPost = async (id, data) => {
   try {
-    return await fetchAPI(`/property/${id}`, {
+    return await fetchAPI(`/api/properties/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
     });
@@ -961,7 +900,7 @@ export const updatePropertyPost = async (id, data) => {
  */
 export const getPropertyById = async (id) => {
   try {
-    return await fetchAPI(`/property/${id}`);
+    return await fetchAPI(`/api/properties/${id}`);
   } catch (error) {
     console.error(`Error al obtener propiedad ${id}:`, error);
     throw error;
@@ -1353,10 +1292,10 @@ export const uploadImageProperty = async (formData) => {
     };
     
     console.log("Token de autorización:", token);
-    console.log("Subiendo imagen de propiedad a:", `${BASE_URL}/property/upload-image`);
+    console.log("Subiendo imagen de propiedad a:", `${BASE_URL}/api/properties/upload-image`);
     console.log("FormData contenido:", Array.from(formData.entries()));
     
-    const response = await fetch(`${BASE_URL}/property/upload-image`, {
+    const response = await fetch(`${BASE_URL}/api/properties/upload-image`, {
       method: 'POST',
       headers: headers,
       body: formData,
