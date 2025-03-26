@@ -33,43 +33,56 @@ export default function Navbar({ showOnlyAuth = false }) {
   const navigate = useNavigate();
   const { isAuthenticated, user, logout } = useUser();
   
-  // Usar el hook de imagen de perfil para la sincronización
-  const { profileImage, handleImageError } = useProfileImage();
+  // Estado local para la imagen de perfil
+  const [profilePicture, setProfilePicture] = useState(fallbackImageBase64);
   
-  // Estado local adicional como respaldo
-  const [localProfileImage, setLocalProfileImage] = useState(fallbackImageBase64);
-  
-  // Efecto adicional para asegurar la sincronización
+  // Obtener la imagen del localStorage directamente cada vez que se renderiza el componente
   useEffect(() => {
-    // Cargar imagen inicial
-    const storedImage = localStorage.getItem('profilePic');
-    if (storedImage) {
-      setLocalProfileImage(storedImage);
-    }
-    
-    // Listener directo para cambios en la imagen
-    const handleImageUpdate = (event) => {
-      if (event.detail && event.detail.profileImage) {
-        setLocalProfileImage(event.detail.profileImage);
+    // Función para obtener la imagen más reciente
+    const updateProfilePicture = () => {
+      try {
+        const storedImage = localStorage.getItem('profilePic');
+        if (storedImage && storedImage !== 'undefined' && storedImage !== 'null') {
+          console.log("🖼️ NavBar: Imagen cargada desde localStorage");
+          setProfilePicture(storedImage);
+        } else {
+          // Intentar con el respaldo
+          const backupImage = localStorage.getItem('profilePic_backup');
+          if (backupImage && backupImage !== 'undefined' && backupImage !== 'null') {
+            console.log("🖼️ NavBar: Imagen cargada desde backup");
+            setProfilePicture(backupImage);
+            // Restaurar la imagen principal
+            localStorage.setItem('profilePic', backupImage);
+          }
+        }
+      } catch (error) {
+        console.error("Error al cargar imagen en NavBar:", error);
       }
     };
     
-    // Registrar listener
-    window.addEventListener('profileImageUpdated', handleImageUpdate);
+    // Actualizar al montar
+    updateProfilePicture();
     
-    // Limpiar al desmontar
+    // Configurar un intervalo para verificar la imagen periódicamente
+    const checkInterval = setInterval(updateProfilePicture, 1000);
+    
+    // También escuchar el evento de actualización
+    const handleProfileUpdate = () => {
+      updateProfilePicture();
+    };
+    
+    window.addEventListener('profileImageUpdated', handleProfileUpdate);
+    
     return () => {
-      window.removeEventListener('profileImageUpdated', handleImageUpdate);
+      clearInterval(checkInterval);
+      window.removeEventListener('profileImageUpdated', handleProfileUpdate);
     };
   }, []);
   
-  // Función para obtener la imagen correcta (con fallbacks)
-  const getProfileImage = () => {
-    if (profileImage && profileImage !== fallbackImageBase64) return profileImage;
-    if (localProfileImage && localProfileImage !== fallbackImageBase64) return localProfileImage;
-    const storedImage = localStorage.getItem('profilePic');
-    if (storedImage) return storedImage;
-    return fallbackImageBase64;
+  // Función para manejar error de imagen
+  const handleImageError = () => {
+    console.log("❌ Error al cargar imagen en NavBar, usando fallback");
+    setProfilePicture(fallbackImageBase64);
   };
   
   // Verificar token expirado
@@ -171,7 +184,7 @@ export default function Navbar({ showOnlyAuth = false }) {
                           <span className="sr-only">Abrir menú de usuario</span>
                           <img
                             className="h-8 w-8 rounded-full object-cover"
-                            src={getProfileImage()}
+                            src={profilePicture}
                             alt="Foto de perfil"
                             onError={handleImageError}
                           />
@@ -275,7 +288,7 @@ export default function Navbar({ showOnlyAuth = false }) {
                         <span className="sr-only">Abrir menú de usuario</span>
                         <img
                           className="h-8 w-8 lg:h-9 lg:w-9 rounded-full object-cover border-2 border-gray-700"
-                          src={getProfileImage()}
+                          src={profilePicture}
                           alt="Perfil"
                           onError={handleImageError}
                         />
@@ -337,7 +350,7 @@ export default function Navbar({ showOnlyAuth = false }) {
                   <div className="flex items-center mr-2">
                     <img
                       className="h-7 w-7 rounded-full object-cover border border-gray-700"
-                      src={getProfileImage()}
+                      src={profilePicture}
                       alt="Perfil"
                       onError={handleImageError}
                     />
@@ -379,7 +392,7 @@ export default function Navbar({ showOnlyAuth = false }) {
                   <div className="flex items-center px-3 py-2">
                     <img
                       className="h-8 w-8 rounded-full mr-2 object-cover"
-                      src={getProfileImage()}
+                      src={profilePicture}
                       alt="Perfil"
                       onError={handleImageError}
                     />

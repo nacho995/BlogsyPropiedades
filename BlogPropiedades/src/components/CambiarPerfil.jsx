@@ -54,7 +54,7 @@ export default function CambiarPerfil() {
     error: profileError, 
     handleImageError, 
     updateProfileImage,
-    notifyImageUpdate
+    broadcastUpdate
   } = useProfileImage();
 
   // Limpiar recursos al desmontar
@@ -66,19 +66,21 @@ export default function CambiarPerfil() {
     };
   }, [profilePic]);
 
-  // Forzar actualización inmediata de imagen cuando se accede a este componente
+  // Forzar actualización inmediata de imagen al iniciar el componente
   useEffect(() => {
-    // Verificar si hay imagen en localStorage
+    console.log("🔄 CambiarPerfil: Verificando imagen al iniciar");
     try {
+      // Intentar cargar desde localStorage
       const storedImage = localStorage.getItem('profilePic');
-      if (storedImage) {
-        // Notificar a otros componentes en caso de que no estén sincronizados
-        notifyImageUpdate(storedImage);
+      if (storedImage && storedImage !== 'undefined' && storedImage !== 'null') {
+        console.log("🖼️ CambiarPerfil: Forzando actualización de imagen");
+        // Forzar una actualización global
+        broadcastUpdate(storedImage);
       }
     } catch (err) {
       console.error("Error al sincronizar imagen al iniciar:", err);
     }
-  }, [notifyImageUpdate]);
+  }, [broadcastUpdate]);
 
   // Determinar si estamos usando HTTPS
   const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
@@ -118,17 +120,17 @@ export default function CambiarPerfil() {
         try {
           const imageData = event.target.result;
           
-          // Actualizar imagen usando el hook simplificado que maneja la sincronización
+          // Actualizar imagen de manera directa y clara
+          console.log("📤 CambiarPerfil: Imagen transformada a base64, actualizando...");
+          
+          // Establecer en localStorage para garantizar disponibilidad inmediata
+          localStorage.setItem('profilePic', imageData);
+          
+          // Actualizar imagen usando el hook (que también notificará a otros componentes)
           updateProfileImage(imageData)
             .then(() => {
-              // Forzar la notificación de actualización para otros componentes
-              window.dispatchEvent(new CustomEvent('profileImageUpdated', { 
-                detail: { profileImage: imageData } 
-              }));
-              
-              // También actualizar en localStorage para asegurar persistencia
-              localStorage.setItem('profilePic', imageData);
-              
+              // Forzar una propagación adicional para mayor seguridad
+              broadcastUpdate(imageData);
               setSuccess("Imagen actualizada correctamente");
               setLoading(false);
             })
@@ -227,26 +229,16 @@ export default function CambiarPerfil() {
       
       // Actualizar imagen local si hay respuesta del servidor
       if (data.profilePic && typeof data.profilePic === 'string') {
-        // Actualizar la imagen local
+        console.log("📤 CambiarPerfil: Recibida imagen del servidor, actualizando...");
+        
+        // Actualizar la imagen localmente primero para respuesta inmediata
+        localStorage.setItem('profilePic', data.profilePic);
+        
+        // Usar updateProfileImage que manejará todo el proceso de notificación
         await updateProfileImage(data.profilePic);
         
-        // Forzar la notificación de actualización para otros componentes
-        window.dispatchEvent(new CustomEvent('profileImageUpdated', { 
-          detail: { profileImage: data.profilePic } 
-        }));
-        
-        // También actualizar en localStorage para asegurar persistencia
-        localStorage.setItem('profilePic', data.profilePic);
-        localStorage.setItem('profilePic_backup', data.profilePic);
-        
-        // Actualizar userData para mantener todo coherente
-        try {
-          const storedUserData = JSON.parse(localStorage.getItem('userData') || '{}');
-          storedUserData.profilePic = data.profilePic;
-          localStorage.setItem('userData', JSON.stringify(storedUserData));
-        } catch (e) {
-          console.warn('Error al actualizar datos de usuario en localStorage:', e);
-        }
+        // Por seguridad, forzar una segunda actualización
+        broadcastUpdate(data.profilePic);
       }
 
       // Actualizar datos de usuario
