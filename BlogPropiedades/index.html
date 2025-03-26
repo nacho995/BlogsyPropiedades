@@ -8,7 +8,7 @@
     <meta name="description" content="Portal para la publicación de blogs y propiedades de Madrid">
     
     <!-- Precargar bootstrap para la gestión de contenido mixto HTTP/HTTPS -->
-    <script src="/src/utils/bootstrap.js"></script>
+    <script src="/bootstrap.js"></script>
     
     <!-- Mostrar mensaje de carga retrasado -->
     <style>
@@ -70,12 +70,12 @@
         console.error('Error JavaScript interceptado:', e.error || e.message);
       });
       
-      // Variables de entorno predeterminadas - siempre HTTP para la API
+      // Variables de entorno predeterminadas - siempre HTTPS para la API
       window.ENV_VARS = {
-        VITE_BACKEND_URL: 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com',
-        VITE_API_URL: 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com',
-        VITE_API_PUBLIC_API_URL: 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com',
-        VITE_FALLBACK_API: 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com'
+        VITE_BACKEND_URL: 'https://api.realestategozamadrid.com',
+        VITE_API_URL: 'https://api.realestategozamadrid.com',
+        VITE_API_PUBLIC_API_URL: 'https://api.realestategozamadrid.com',
+        VITE_FALLBACK_API: 'https://api.realestategozamadrid.com'
       };
     </script>
   </head>
