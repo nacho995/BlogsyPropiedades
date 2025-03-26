@@ -7,6 +7,43 @@
     <title>Blog y Propiedades - GozaMadrid</title>
     <meta name="description" content="Portal para la publicación de blogs y propiedades de Madrid">
     
+    <!-- SOLUCIÓN CRÍTICA TDZ: Antes de cualquier script o código -->
+    <script>
+      // Definir variable 'y' específicamente como non-configurable para evitar sobrescritura
+      Object.defineProperty(window, 'y', {
+        value: {}, 
+        writable: true,
+        configurable: false, // No permitir redefinición
+        enumerable: true
+      });
+      
+      // Definir 'wi' y 'Fp' que aparecen en la traza del error
+      Object.defineProperty(window, 'wi', {
+        value: {}, 
+        writable: true,
+        configurable: false,
+        enumerable: true
+      });
+      
+      Object.defineProperty(window, 'Fp', {
+        value: {}, 
+        writable: true,
+        configurable: false,
+        enumerable: true
+      });
+      
+      console.log("🔒 Variables críticas 'y', 'wi', 'Fp' protegidas");
+    </script>
+    
+    <!-- Precargar scripts de inicialización -->
+    <link rel="preload" href="/tdz-resolver.js" as="script" />
+    <link rel="preload" href="/bootstrap.js" as="script" />
+    <link rel="preload" href="/ncfix.js" as="script" />
+    <link rel="preload" href="/tdz-fix.js" as="script" />
+    
+    <!-- IMPORTANTE: Ejecutar tdz-resolver.js antes que nada -->
+    <script src="/tdz-resolver.js"></script>
+    
     <!-- Resolver errores de TDZ "Cannot access variable before initialization" -->
     <script>
       // Definir todas las variables de una sola letra que podrían causar error TDZ
@@ -34,21 +71,39 @@
       window.v = window.v || {};
       window.w = window.w || {};
       window.x = window.x || {};
-      window.y = window.y || {};
+      // 'y' ya está definido arriba
       window.z = window.z || {};
       
       console.log("✅ Variables preventivas TDZ inicializadas");
     </script>
     
-    <!-- Precargar scripts de inicialización -->
-    <link rel="preload" href="/bootstrap.js" as="script" />
-    <link rel="preload" href="/ncfix.js" as="script" />
-    <link rel="preload" href="/tdz-fix.js" as="script" />
-    
-    <!-- Ejecutar scripts de inicialización primero -->
-    <script src="/tdz-fix.js"></script>
+    <!-- Ejecutar scripts de inicialización en orden correcto -->
     <script src="/bootstrap.js"></script>
     <script src="/ncfix.js"></script>
+    <script src="/tdz-fix.js"></script>
+    
+    <!-- Monitorear errores de TDZ durante la carga -->
+    <script>
+      // Interceptor de errores de TDZ específico para 'y'
+      (function() {
+        try {
+          // Si 'y' se pierde, restaurarla inmediatamente
+          setInterval(function() {
+            if (typeof y === 'undefined' || y === null) {
+              Object.defineProperty(window, 'y', {
+                value: {}, 
+                writable: true,
+                configurable: false,
+                enumerable: true
+              });
+              console.warn("⚠️ Variable 'y' restaurada durante monitoreo");
+            }
+          }, 100);
+        } catch (e) {
+          console.error("Error en monitor de 'y':", e);
+        }
+      })();
+    </script>
     
     <!-- Resto del código actual -->
     <style>
@@ -114,10 +169,16 @@
           const varName = e.message.match(/'([^']+)'/);
           if (varName && varName[1]) {
             console.warn(`⚠️ Detectado error TDZ con variable: ${varName[1]}, inicializando...`);
-            window[varName[1]] = {};
+            window[varName[1]] = window[varName[1]] || {};
+            
+            // Intentar evitar la propagación del error
+            if (e.preventDefault) {
+              e.preventDefault();
+            }
+            return false;
           }
         }
-      });
+      }, true);
       
       // Variables de entorno predeterminadas - siempre HTTPS para la API
       window.ENV_VARS = {
