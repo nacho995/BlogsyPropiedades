@@ -51,19 +51,27 @@ const useProfileImage = ({
           // Verificar y validar la imagen antes de establecerla
           validateAndProcessImage(storedImage)
             .then(validatedImage => {
-              setProfileImage(validatedImage);
+              if (isMounted.current) {
+                setProfileImage(validatedImage);
+              }
             })
             .catch(() => {
               console.warn('Imagen de perfil en localStorage no válida');
-              setProfileImage(fallbackImageBase64);
+              if (isMounted.current) {
+                setProfileImage(fallbackImageBase64);
+              }
             });
         }
       } else {
-        setProfileImage(fallbackImageBase64);
+        if (isMounted.current) {
+          setProfileImage(fallbackImageBase64);
+        }
       }
     } catch (error) {
       console.error('Error al cargar imagen de localStorage:', error);
-      setProfileImage(fallbackImageBase64);
+      if (isMounted.current) {
+        setProfileImage(fallbackImageBase64);
+      }
     }
   }, [profileImage]);
   
@@ -75,7 +83,7 @@ const useProfileImage = ({
     const timeSinceLastRequest = now - lastRequestTime.current;
 
     // Evitar solicitudes demasiado frecuentes
-    if (!force && timeSinceLastRequest < 1000) {
+    if (!force && timeSinceLastRequest < 2000) { // Aumentado a 2 segundos
       console.warn('🛑 Demasiadas solicitudes de sincronización. Ignorando...');
       return;
     }
@@ -104,8 +112,15 @@ const useProfileImage = ({
           setProfileImage(image);
           setRetryCount(0);
         } else {
-          setProfileImage(fallbackImageBase64);
-          setError(new Error('No se encontró imagen de perfil'));
+          // Si no hay imagen, intentar usar profileImage del usuario
+          const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+          if (userData.profileImage) {
+            setProfileImage(userData.profileImage);
+            setRetryCount(0);
+          } else {
+            setProfileImage(fallbackImageBase64);
+            setError(new Error('No se encontró imagen de perfil'));
+          }
         }
       }
     } catch (err) {
@@ -134,7 +149,14 @@ const useProfileImage = ({
   // Efecto para sincronización automática
   useEffect(() => {
     if (autoSync) {
-      syncImage(true);
+      // Esperar un poco antes de la primera sincronización
+      const initialSyncTimeout = setTimeout(() => {
+        if (isMounted.current) {
+          syncImage(true);
+        }
+      }, 1000);
+
+      return () => clearTimeout(initialSyncTimeout);
     }
   }, [autoSync, syncImage]);
 

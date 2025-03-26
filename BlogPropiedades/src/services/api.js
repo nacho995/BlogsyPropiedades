@@ -1126,13 +1126,33 @@ export const syncProfileImage = async (newImage = null) => {
   try {
     // Si se proporciona una nueva imagen, actualizar directamente
     if (newImage) {
+      let imageUrl = null;
+      
+      // Manejar diferentes tipos de entrada
       if (typeof newImage === 'string') {
-        localStorage.setItem('profilePic', newImage);
-        return newImage;
-      } else if (newImage && typeof newImage === 'object' && newImage.src) {
-        localStorage.setItem('profilePic', newImage.src);
-        return newImage.src;
+        imageUrl = newImage;
+      } else if (newImage && typeof newImage === 'object') {
+        // Extraer URL de diferentes formatos de objeto
+        if (newImage.src) {
+          imageUrl = newImage.src;
+        } else if (newImage.url) {
+          imageUrl = newImage.url;
+        } else if (newImage.imageUrl) {
+          imageUrl = newImage.imageUrl;
+        } else if (newImage.profileImage) {
+          imageUrl = newImage.profileImage;
+        } else if (newImage.profilePic) {
+          imageUrl = typeof newImage.profilePic === 'string' ? 
+                    newImage.profilePic : 
+                    newImage.profilePic?.src || newImage.profilePic?.url;
+        }
       }
+      
+      if (imageUrl) {
+        localStorage.setItem('profilePic', imageUrl);
+        return imageUrl;
+      }
+      
       throw new Error('Formato de imagen no válido');
     }
 
@@ -1141,8 +1161,15 @@ export const syncProfileImage = async (newImage = null) => {
     if (!currentImage) return null;
 
     // Verificar si la imagen es una URL válida
-    if (typeof currentImage !== 'string' || !currentImage.startsWith('http')) {
-      console.warn('URL de imagen de perfil no válida:', currentImage);
+    if (typeof currentImage !== 'string') {
+      console.warn('URL de imagen de perfil no válida (no es string):', currentImage);
+      localStorage.removeItem('profilePic');
+      return null;
+    }
+
+    // Verificar si es una URL válida
+    if (!currentImage.startsWith('http') && !currentImage.startsWith('data:')) {
+      console.warn('URL de imagen de perfil no válida (no es URL):', currentImage);
       localStorage.removeItem('profilePic');
       return null;
     }
