@@ -119,6 +119,23 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
         };
       }
       
+      // Para código 404 - Recurso no encontrado
+      if (response.status === 404) {
+        console.warn(`Recurso no encontrado: ${url}`);
+        
+        // Para endpoints de datos, devolver array vacío
+        if (endpoint.includes('/blog') || endpoint.includes('/property')) {
+          console.log(`Endpoint de datos ${endpoint} no encontrado, devolviendo array vacío`);
+          return [];
+        }
+        
+        return {
+          error: true,
+          status: 404,
+          message: 'Recurso no encontrado. La ruta o el servidor pueden no estar disponibles.'
+        };
+      }
+      
       // Para código 500 - Error de servidor
       if (response.status >= 500) {
         // Detectar bucle de errores 500
@@ -150,6 +167,7 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
       
       // Si el error no fue manejado, intentar analizar la respuesta como JSON
       try {
+        const errorClone = response.clone(); // Clonar la respuesta antes de consumirla
         const errorJson = await response.json();
         console.error(`Error HTTP ${response.status}:`, errorJson);
         
@@ -163,8 +181,12 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
         }
       } catch (jsonError) {
         // Si no es JSON, obtener el texto
-        const errorText = await response.text();
-        console.error(`Error HTTP ${response.status}:`, errorText);
+        try {
+          const errorText = await response.clone().text(); // Usar un clon si el body original ya fue consumido
+          console.error(`Error HTTP ${response.status}:`, errorText);
+        } catch (textError) {
+          console.error(`Error HTTP ${response.status}, no se pudo leer el cuerpo de la respuesta`);
+        }
       }
       
       // Finalmente, si no pudimos manejar mejor el error
@@ -1276,7 +1298,7 @@ const checkImageAccessibility = (url) => {
       'cloudinary.com',
       'res.cloudinary.com',
       'images.unsplash.com',
-      'goza-madrid.onrender.com',
+      'www.realestategozamadrid.com',
       'api.realestategozamadrid.com',
       'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com'
     ];

@@ -140,28 +140,70 @@ const useProfileImage = ({
         }
       }
 
+      // Usar imagen del localStorage temporalmente mientras procesamos
+      const cachedImage = localStorage.getItem('profilePic');
+      if (cachedImage && cachedImage.startsWith('http')) {
+        if (isMounted.current) {
+          setProfileImage(cachedImage);
+          console.log('Usando imagen en caché mientras se sincroniza');
+        }
+      }
+
       // Establecer timeout para la solicitud
+      let timeoutOccurred = false;
       requestTimeoutRef.current = setTimeout(() => {
         if (isMounted.current) {
+          timeoutOccurred = true;
           console.warn('Timeout al sincronizar imagen');
           setIsLoading(false);
           
           // Si tenemos datos del usuario, usar la imagen de allí
-          if (userData && userData.profileImage) {
-            if (typeof userData.profileImage === 'string') {
-              setProfileImage(userData.profileImage);
-            } else if (userData.profileImage && typeof userData.profileImage === 'object') {
-              const url = userData.profileImage.src || userData.profileImage.url;
-              if (url) setProfileImage(url);
+          if (userData && (userData.profileImage || userData.profilePic)) {
+            let profileImageUrl = null;
+            
+            // Intentar obtener de profileImage
+            if (userData.profileImage) {
+              if (typeof userData.profileImage === 'string') {
+                profileImageUrl = userData.profileImage;
+              } else if (userData.profileImage && typeof userData.profileImage === 'object') {
+                profileImageUrl = userData.profileImage.src || userData.profileImage.url;
+              }
             }
-          } else {
-            setProfileImage(fallbackImageBase64);
+            
+            // Si no hay profileImage, intentar con profilePic
+            if (!profileImageUrl && userData.profilePic) {
+              if (typeof userData.profilePic === 'string') {
+                profileImageUrl = userData.profilePic;
+              } else if (userData.profilePic && typeof userData.profilePic === 'object') {
+                profileImageUrl = userData.profilePic.src || userData.profilePic.url;
+              }
+            }
+            
+            if (profileImageUrl) {
+              setProfileImage(profileImageUrl);
+              return;
+            }
           }
+          
+          // Si no hay imagen en userData, verificar si hay algo en localStorage
+          const storedImage = localStorage.getItem('profilePic');
+          if (storedImage && storedImage.startsWith('http')) {
+            setProfileImage(storedImage);
+            return;
+          }
+          
+          // Como último recurso, usar la imagen predeterminada
+          setProfileImage(fallbackImageBase64);
         }
       }, REQUEST_TIMEOUT);
 
       // Intentar sincronizar con la API
       const image = await syncProfileImage(userData);
+      
+      // Si ocurrió un timeout, no hacer nada más
+      if (timeoutOccurred) {
+        return;
+      }
       
       // Limpiar timeout ya que obtuvimos respuesta
       if (requestTimeoutRef.current) {

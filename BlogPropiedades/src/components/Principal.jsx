@@ -278,268 +278,295 @@ function Principal() {
     return typeof url === 'string' ? url.replace('http://', 'https://') : url;
   };
 
+  // Datos filtrados para mostrar solo los primeros 3 elementos
+  const topBlogs = useMemo(() => {
+    return blogs.slice(0, 3);
+  }, [blogs]);
+
+  const topProperties = useMemo(() => {
+    return properties.slice(0, 3);
+  }, [properties]);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-amber-600">
-      {/* Hero Section con efecto de vidrio esmerilado */}
-      <header className="relative overflow-hidden py-24 px-4">
-        {/* Círculos decorativos animados */}
-        <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
-          <div className="absolute w-96 h-96 rounded-full bg-amber-500 opacity-20 -top-20 -left-20 animate-pulse"></div>
-          <div className="absolute w-80 h-80 rounded-full bg-blue-500 opacity-20 top-40 right-10 animate-pulse" style={{animationDelay: "1s"}}></div>
-          <div className="absolute w-72 h-72 rounded-full bg-amber-400 opacity-20 bottom-10 left-20 animate-pulse" style={{animationDelay: "2s"}}></div>
-        </div>
-        
-        {/* Contenido principal con efecto de vidrio */}
-        <div className="relative z-10 max-w-6xl mx-auto">
-          <div className="backdrop-blur-lg bg-white/10 rounded-2xl p-8 shadow-2xl border border-white/20">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-              {/* Texto de bienvenida */}
-              <div className="text-center md:text-left">
-                <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4 tracking-tight">
-                  {isAuthenticated 
-                    ? `¡Hola, ${user?.name || "Usuario"}!` 
-                    : "Bienvenido a InmoBlog"}
-                </h1>
-                <p className="text-xl text-blue-100 mb-6 max-w-xl">
-                  {isAuthenticated 
-                    ? "Tu portal inmobiliario y de contenido personalizado" 
-                    : "Descubre propiedades exclusivas y contenido de calidad"}
-                </p>
-                
-                <div className="flex flex-wrap justify-center md:justify-start gap-4">
-                  {isAuthenticated ? (
-                    <>
-                      <Link to="/crear-blog" className="bg-gradient-to-r from-amber-500 to-blue-600 text-white px-6 py-3 rounded-full font-bold transform transition hover:scale-105 hover:shadow-lg">
-                        Crear Blog
-                      </Link>
-                      <Link to="/add-property" className="bg-white text-blue-700 px-6 py-3 rounded-full font-bold transform transition hover:scale-105 hover:shadow-lg">
-                        Añadir Propiedad
-                      </Link>
-                    </>
-                  ) : (
-                    <>
-                      <Link to="/login" className="bg-gradient-to-r from-amber-500 to-blue-600 text-white px-6 py-3 rounded-full font-bold transform transition hover:scale-105 hover:shadow-lg">
-                        Iniciar Sesión
-                      </Link>
-                      <Link to="/register" className="bg-white text-blue-700 px-6 py-3 rounded-full font-bold transform transition hover:scale-105 hover:shadow-lg">
-                        Registrarse
-                      </Link>
-                    </>
-                  )}
-                </div>
-              </div>
-              
-              {/* Perfil de usuario con animación - Diseño mejorado */}
-              {isAuthenticated && (
-                <div className="relative flex justify-center items-center py-8">
-                  {/* Círculos decorativos alrededor de la imagen */}
-                  <div className="absolute w-44 h-44 md:w-56 md:h-56 rounded-full bg-gradient-to-r from-blue-400 to-indigo-500 opacity-20 animate-pulse-slow"></div>
-                  <div className="absolute w-52 h-52 md:w-64 md:h-64 rounded-full bg-gradient-to-r from-amber-400 to-pink-500 opacity-10 animate-spin-slow"></div>
-                  
-                  {/* Contenedor principal de la imagen */}
-                  <div className="relative">
-                    {/* Efecto de brillo alrededor de la imagen */}
-                    <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-amber-400 via-blue-500 to-purple-600 opacity-40 blur-md"></div>
-                    
-                    {/* Imagen de perfil */}
-                    <div className="relative w-40 h-40 md:w-52 md:h-52 rounded-full overflow-hidden border-4 border-white/80 shadow-2xl bg-white transform transition-all duration-500 hover:scale-105 z-10">
-                      <img 
-                        src={profileImage || fallbackImageBase64} 
-                        alt="Foto de perfil" 
-                        className="w-full h-full object-cover"
-                        onError={handleImageError}
-                      />
-                      
-                      {/* Overlay con efecto de brillo */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
+    <motion.div 
+      className="min-h-screen bg-gray-100"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+    >
+      <header className="bg-white shadow-md">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-blue-600">Blog de Propiedades</h1>
+          
+          <div className="flex items-center gap-4">
+            {isAuthenticated ? (
+              <>
+                <div className="flex items-center">
+                  <div className="relative group">
+                    <img 
+                      src={profileImage || defaultProfilePic} 
+                      alt="Perfil" 
+                      className="w-10 h-10 rounded-full border-2 border-blue-400 object-cover cursor-pointer"
+                      onError={handleImageError}
+                    />
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-10">
+                      <div className="px-4 py-2 text-sm text-gray-700 border-b">
+                        <p className="font-bold">{name || 'Usuario'}</p>
+                      </div>
+                      <button 
+                        onClick={handleLogout}
+                        className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                      >
+                        Cerrar sesión
+                      </button>
                     </div>
                   </div>
                 </div>
-              )}
-            </div>
+                <nav className="hidden md:flex space-x-4">
+                  <Link to="/blogs" className="py-2 px-4 text-blue-600 hover:text-blue-800 font-medium rounded-md hover:bg-blue-50 transition duration-300">Blogs</Link>
+                  <Link to="/properties" className="py-2 px-4 text-blue-600 hover:text-blue-800 font-medium rounded-md hover:bg-blue-50 transition duration-300">Propiedades</Link>
+                </nav>
+              </>
+            ) : (
+              <div className="space-x-2">
+                <Link to="/login" className="py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
+                  Iniciar Sesión
+                </Link>
+                <Link to="/register" className="py-2 px-4 border border-blue-600 text-blue-600 rounded hover:bg-blue-50 transition">
+                  Registrarse
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Contenido principal */}
-      <main className="max-w-6xl mx-auto py-12 px-4">
-        {loading ? (
-          <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white"></div>
-          </div>
-        ) : (
-          <div className="space-y-16">
-            {/* Blogs */}
-            {blogs.length > 0 && (
-              <section>
-                <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-3xl font-bold text-white">Blogs Recientes</h2>
-                  <Link to="/ver-blogs" className="text-blue-200 hover:text-white transition">
-                    Ver todos →
+      <main className="container mx-auto px-4 py-8">
+        {/* Banner principal */}
+        <section className="mb-12">
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-lg overflow-hidden">
+            <div className="md:flex">
+              <div className="p-8 md:w-1/2">
+                <h2 className="text-3xl font-bold text-white mb-4">Encuentra tu propiedad ideal</h2>
+                <p className="text-blue-100 mb-6">Explora nuestra selección de propiedades y blogs sobre bienes raíces para encontrar tu hogar perfecto.</p>
+                <div className="space-x-4">
+                  <Link to="/blogs" className="inline-block py-2 px-6 bg-white text-blue-600 font-medium rounded-md hover:bg-blue-50 transition duration-300">
+                    Ver Blogs
+                  </Link>
+                  <Link to="/properties" className="inline-block py-2 px-6 bg-transparent border border-white text-white font-medium rounded-md hover:bg-blue-700 transition duration-300">
+                    Ver Propiedades
                   </Link>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  {blogs.map((blog, index) => {
-                    const imageUrl = getImageUrl(blog);
-                    
-                    return (
-                      <div 
-                        key={blog._id} 
-                        className="bg-white/10 backdrop-blur-md rounded-xl overflow-hidden shadow-lg border border-white/20 transform transition hover:scale-105"
-                        style={{ animationDelay: `${index * 0.1}s` }}
-                      >
-                        <div className="h-48 overflow-hidden">
-                          {imageUrl ? (
-                            <img 
-                              src={imageUrl}
-                              alt={blog.title} 
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                console.log(`Error cargando imagen para blog ${blog.title}`);
-                                e.target.style.display = 'none';
-                                e.target.parentNode.innerHTML = '<div class="flex items-center justify-center w-full h-full bg-gray-100"><span class="text-gray-400">Imagen no disponible</span></div>';
-                              }}
-                            />
-                          ) : (
-                            <div className="flex items-center justify-center w-full h-full bg-gray-100">
-                              <span className="text-gray-400">Imagen no disponible</span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-6">
-                          <h3 className="font-bold text-xl mb-2 text-white">{blog.title}</h3>
-                          <p className="text-blue-100 mb-4 line-clamp-2">{blog.description}</p>
-                          <div className="flex justify-between items-center">
-                            <span className="text-xs text-blue-200">
-                              {new Date(blog.createdAt).toLocaleDateString('es-ES')}
-                            </span>
-                            <Link to={`/blog/${blog._id}`} className="text-amber-400 hover:text-amber-300 font-medium">
-                              Leer más →
-                            </Link>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
+              </div>
+              <div className="md:w-1/2 hidden md:block">
+                <img 
+                  src="https://images.unsplash.com/photo-1564013799919-ab600027ffc6?q=80&w=1000" 
+                  alt="Propiedad destacada" 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
 
-            {/* Propiedades */}
-            {properties.length > 0 && (
-              <section>
-                <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-3xl font-bold text-white">Propiedades Destacadas</h2>
-                  <Link to="/propiedades" className="text-blue-200 hover:text-white transition">
-                    Ver todas →
-                  </Link>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  {properties.map((property, index) => {
-                    const imageUrl = getPropertyImageUrl(property);
-                    
-                    return (
-                      <div 
-                        key={property._id} 
-                        className="bg-white/10 backdrop-blur-md rounded-xl overflow-hidden shadow-lg border border-white/20 transform transition hover:scale-105"
-                        style={{ animationDelay: `${index * 0.1}s` }}
-                      >
-                        <div className="h-48 overflow-hidden">
-                          {imageUrl ? (
-                            <img 
-                              src={imageUrl}
-                              alt={property.title} 
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                console.log(`Error cargando imagen para propiedad ${property.title}`);
-                                e.target.style.display = 'none';
-                                e.target.parentNode.innerHTML = '<div class="flex items-center justify-center w-full h-full bg-gray-100"><span class="text-gray-400">Imagen no disponible</span></div>';
-                              }}
-                            />
-                          ) : (
-                            <div className="flex items-center justify-center w-full h-full bg-gray-100">
-                              <span className="text-gray-400">Imagen no disponible</span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-6">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="bg-amber-500 text-white text-xs font-semibold px-2.5 py-0.5 rounded-full">
-                              {property.propertyType || 'Venta'}
-                            </span>
-                            <span className="text-lg font-bold text-white">
-                              {property.price ? `${property.price.toLocaleString('es-ES')} €` : 'Consultar'}
-                            </span>
-                          </div>
-                          <h3 className="font-bold text-xl mb-2 text-white">{property.title}</h3>
-                          <p className="text-blue-100 mb-4 line-clamp-2">{property.description}</p>
-                          <div className="flex justify-between items-center text-sm text-blue-200">
-                            <div className="flex items-center">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                              </svg>
-                              {property.bedrooms || '3'} hab.
-                            </div>
-                            <Link to={`/property/${property._id}`} className="text-amber-400 hover:text-amber-300 font-medium">
-                              Ver detalles →
-                            </Link>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
+        {/* Sección de blogs destacados */}
+        <section className="mb-12">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-800">Blogs Destacados</h2>
+            <Link to="/blogs" className="text-blue-600 hover:text-blue-800 font-medium">
+              Ver todos →
+            </Link>
           </div>
-        )}
+
+          {loading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : topBlogs.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {topBlogs.map((blog) => (
+                <motion.div
+                  key={blog._id || blog.id || `blog-${Math.random()}`}
+                  className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition duration-300"
+                  whileHover={{ y: -5 }}
+                >
+                  <div className="relative h-48 bg-blue-100">
+                    <img
+                      src={getImageUrl(blog) || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1000'}
+                      alt={blog.title}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.src = 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1000';
+                      }}
+                    />
+                    <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                      {blog.category || 'Blog'}
+                    </div>
+                  </div>
+                  <div className="p-5">
+                    <h3 className="text-xl font-bold text-gray-800 mb-2 truncate">{blog.title}</h3>
+                    <p className="text-gray-600 mb-4 line-clamp-2">{blog.description}</p>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-500">
+                        {blog.author || 'Anónimo'} • {blog.readTime || '5'} min lectura
+                      </span>
+                      <Link
+                        to={`/blog/${blog._id || blog.id}`}
+                        className="text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        Leer más
+                      </Link>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl shadow-md p-8 text-center">
+              <h3 className="text-xl font-medium text-gray-700 mb-2">No hay blogs disponibles</h3>
+              <p className="text-gray-500 mb-4">Aún no se han publicado blogs en esta plataforma.</p>
+              {isAuthenticated && (
+                <Link
+                  to="/blogs/new"
+                  className="inline-block py-2 px-6 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition duration-300"
+                >
+                  Crear nuevo blog
+                </Link>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* Sección de propiedades destacadas */}
+        <section className="mb-12">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-800">Propiedades Destacadas</h2>
+            <Link to="/properties" className="text-blue-600 hover:text-blue-800 font-medium">
+              Ver todas →
+            </Link>
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : topProperties.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {topProperties.map((property) => (
+                <motion.div
+                  key={property._id || property.id || `property-${Math.random()}`}
+                  className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition duration-300"
+                  whileHover={{ y: -5 }}
+                >
+                  <div className="relative h-48 bg-blue-100">
+                    <img
+                      src={getPropertyImageUrl(property) || 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=1000'}
+                      alt={property.title}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.src = 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=1000';
+                      }}
+                    />
+                    <div className="absolute top-0 left-0 bg-blue-600 text-white py-1 px-3 rounded-br">
+                      {property.status || 'En venta'}
+                    </div>
+                    <div className="absolute bottom-0 right-0 bg-gradient-to-l from-blue-900 to-transparent text-white p-2 w-full text-right">
+                      <span className="font-bold">${property.price?.toLocaleString() || '0'}</span>
+                    </div>
+                  </div>
+                  <div className="p-5">
+                    <h3 className="text-xl font-bold text-gray-800 mb-2 truncate">{property.title}</h3>
+                    <p className="text-gray-500 mb-2 truncate">
+                      <i className="fas fa-map-marker-alt mr-1"></i> {property.location || 'Madrid, España'}
+                    </p>
+                    <div className="flex justify-between text-gray-600 mb-4">
+                      <span><i className="fas fa-bed mr-1"></i> {property.bedrooms || '0'} hab</span>
+                      <span><i className="fas fa-bath mr-1"></i> {property.bathrooms || '0'} baños</span>
+                      <span><i className="fas fa-vector-square mr-1"></i> {property.area || '0'} m²</span>
+                    </div>
+                    <Link
+                      to={`/property/${property._id || property.id}`}
+                      className="block text-center py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition duration-300"
+                    >
+                      Ver detalles
+                    </Link>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl shadow-md p-8 text-center">
+              <h3 className="text-xl font-medium text-gray-700 mb-2">No hay propiedades disponibles</h3>
+              <p className="text-gray-500 mb-4">Aún no se han publicado propiedades en esta plataforma.</p>
+              {isAuthenticated && (
+                <Link
+                  to="/properties/new"
+                  className="inline-block py-2 px-6 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition duration-300"
+                >
+                  Publicar propiedad
+                </Link>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* Sección de llamada a la acción */}
+        <section className="bg-gray-50 p-8 rounded-xl shadow-sm">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">¿Buscas tu propiedad ideal?</h2>
+            <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
+              Explora todas nuestras propiedades disponibles y encuentra tu hogar perfecto. También puedes leer nuestros blogs para consejos y tendencias del mercado inmobiliario.
+            </p>
+            <div className="space-x-4">
+              <Link to="/properties" className="inline-block py-3 px-6 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition duration-300">
+                Ver propiedades
+              </Link>
+              <Link to="/blogs" className="inline-block py-3 px-6 bg-white border border-blue-600 text-blue-600 font-medium rounded-md hover:bg-blue-50 transition duration-300">
+                Explorar blogs
+              </Link>
+            </div>
+          </div>
+        </section>
       </main>
 
-      {/* Footer con efecto de vidrio */}
-      <footer className="mt-16 py-12 px-4 backdrop-blur-lg bg-white/5 border-t border-white/10">
-        <div className="max-w-6xl mx-auto text-center">
-          <h2 className="text-2xl font-bold text-white mb-6">¿Listo para encontrar tu propiedad ideal?</h2>
-          <div className="flex flex-wrap justify-center gap-4">
-            <Link to="/propiedades" className="bg-white text-blue-700 px-6 py-3 rounded-full font-bold transform transition hover:scale-105 hover:shadow-lg">
-              Explorar Propiedades
-            </Link>
-            <Link to="/ver-blogs" className="bg-gradient-to-r from-amber-500 to-blue-600 text-white px-6 py-3 rounded-full font-bold transform transition hover:scale-105 hover:shadow-lg">
-              Leer Blogs
-            </Link>
+      <footer className="bg-gray-800 text-white py-8">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col md:flex-row justify-between">
+            <div className="mb-6 md:mb-0">
+              <h3 className="text-xl font-bold mb-2">Blog de Propiedades</h3>
+              <p className="text-gray-400">Tu fuente de información inmobiliaria</p>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
+              <div>
+                <h4 className="font-bold mb-4">Enlaces</h4>
+                <ul className="space-y-2">
+                  <li><Link to="/" className="text-gray-400 hover:text-white">Inicio</Link></li>
+                  <li><Link to="/blogs" className="text-gray-400 hover:text-white">Blogs</Link></li>
+                  <li><Link to="/properties" className="text-gray-400 hover:text-white">Propiedades</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-bold mb-4">Legal</h4>
+                <ul className="space-y-2">
+                  <li><Link to="/privacy" className="text-gray-400 hover:text-white">Privacidad</Link></li>
+                  <li><Link to="/terms" className="text-gray-400 hover:text-white">Términos</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-bold mb-4">Contacto</h4>
+                <ul className="space-y-2">
+                  <li className="text-gray-400">info@blogpropiedades.com</li>
+                  <li className="text-gray-400">+34 91 123 45 67</li>
+                </ul>
+              </div>
+            </div>
           </div>
-          <p className="mt-8 text-blue-200">© 2023 InmoBlog. Todos los derechos reservados.</p>
+          <div className="border-t border-gray-700 mt-8 pt-6 text-center text-gray-400">
+            <p>&copy; {new Date().getFullYear()} Blog de Propiedades. Todos los derechos reservados.</p>
+          </div>
         </div>
       </footer>
-
-      {/* Estilos adicionales para animaciones */}
-      <style>
-        {`
-        @keyframes spin-slow {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        .animate-spin-slow {
-          animation: spin-slow 20s linear infinite;
-        }
-        .animate-pulse-slow {
-          animation: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        @keyframes pulse-slow {
-          0%, 100% { opacity: 0.1; }
-          50% { opacity: 0.3; }
-        }
-        .animate-pulse {
-          animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 0.2; }
-          50% { opacity: 0.3; }
-        }
-        `}
-      </style>
-    </div>
+    </motion.div>
   );
 }
 
