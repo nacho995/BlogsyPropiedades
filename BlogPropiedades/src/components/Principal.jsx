@@ -60,6 +60,42 @@ function Principal() {
   // Usar el hook de imagen de perfil para la sincronización
   const { profileImage, handleImageError } = useProfileImage();
   
+  // Estado local adicional como respaldo
+  const [localProfileImage, setLocalProfileImage] = useState(defaultProfilePic);
+  
+  // Efecto adicional para asegurar la sincronización
+  useEffect(() => {
+    // Cargar imagen inicial
+    const storedImage = localStorage.getItem('profilePic');
+    if (storedImage) {
+      setLocalProfileImage(storedImage);
+    }
+    
+    // Listener directo para cambios en la imagen
+    const handleImageUpdate = (event) => {
+      if (event.detail && event.detail.profileImage) {
+        setLocalProfileImage(event.detail.profileImage);
+      }
+    };
+    
+    // Registrar listener
+    window.addEventListener('profileImageUpdated', handleImageUpdate);
+    
+    // Limpiar al desmontar
+    return () => {
+      window.removeEventListener('profileImageUpdated', handleImageUpdate);
+    };
+  }, []);
+  
+  // Función para obtener la imagen correcta (con fallbacks)
+  const getProfileImage = () => {
+    if (profileImage && profileImage !== defaultProfilePic) return profileImage;
+    if (localProfileImage && localProfileImage !== defaultProfilePic) return localProfileImage;
+    const storedImage = localStorage.getItem('profilePic');
+    if (storedImage) return storedImage;
+    return defaultProfilePic;
+  };
+  
   // Obtener datos del usuario
   const { user, isAuthenticated: userAuthenticated, logout } = useUser();
   const navigate = useNavigate(); // Replace useHistory with useNavigate
@@ -485,7 +521,7 @@ function Principal() {
               <div className="flex items-center space-x-3">
                 <div className="relative" ref={profileMenuRef}>
                   <img 
-                    src={profileImage || defaultProfilePic} 
+                    src={getProfileImage()} 
                     alt="Perfil" 
                     className="h-14 w-14 rounded-full border-3 border-yellow-300 object-cover shadow-lg cursor-pointer" 
                     onError={handleImageError}
@@ -540,7 +576,7 @@ function Principal() {
           <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-4 sm:p-6 md:p-8 flex flex-col md:flex-row items-center gap-6">
             <div className="relative">
               <img 
-                src={profileImage || defaultProfilePic} 
+                src={getProfileImage()} 
                 alt="Perfil" 
                 className="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 rounded-full border-4 border-blue-500 object-cover shadow-lg" 
                 onError={handleImageError}

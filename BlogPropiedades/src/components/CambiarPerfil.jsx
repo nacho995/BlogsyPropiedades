@@ -53,7 +53,8 @@ export default function CambiarPerfil() {
     isLoading: profileLoading, 
     error: profileError, 
     handleImageError, 
-    updateProfileImage
+    updateProfileImage,
+    notifyImageUpdate
   } = useProfileImage();
 
   // Limpiar recursos al desmontar
@@ -64,6 +65,20 @@ export default function CambiarPerfil() {
       }
     };
   }, [profilePic]);
+
+  // Forzar actualización inmediata de imagen cuando se accede a este componente
+  useEffect(() => {
+    // Verificar si hay imagen en localStorage
+    try {
+      const storedImage = localStorage.getItem('profilePic');
+      if (storedImage) {
+        // Notificar a otros componentes en caso de que no estén sincronizados
+        notifyImageUpdate(storedImage);
+      }
+    } catch (err) {
+      console.error("Error al sincronizar imagen al iniciar:", err);
+    }
+  }, [notifyImageUpdate]);
 
   // Determinar si estamos usando HTTPS
   const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
@@ -106,6 +121,14 @@ export default function CambiarPerfil() {
           // Actualizar imagen usando el hook simplificado que maneja la sincronización
           updateProfileImage(imageData)
             .then(() => {
+              // Forzar la notificación de actualización para otros componentes
+              window.dispatchEvent(new CustomEvent('profileImageUpdated', { 
+                detail: { profileImage: imageData } 
+              }));
+              
+              // También actualizar en localStorage para asegurar persistencia
+              localStorage.setItem('profilePic', imageData);
+              
               setSuccess("Imagen actualizada correctamente");
               setLoading(false);
             })
@@ -206,6 +229,15 @@ export default function CambiarPerfil() {
       if (data.profilePic && typeof data.profilePic === 'string') {
         // Actualizar la imagen local
         await updateProfileImage(data.profilePic);
+        
+        // Forzar la notificación de actualización para otros componentes
+        window.dispatchEvent(new CustomEvent('profileImageUpdated', { 
+          detail: { profileImage: data.profilePic } 
+        }));
+        
+        // También actualizar en localStorage para asegurar persistencia
+        localStorage.setItem('profilePic', data.profilePic);
+        localStorage.setItem('profilePic_backup', data.profilePic);
         
         // Actualizar userData para mantener todo coherente
         try {
