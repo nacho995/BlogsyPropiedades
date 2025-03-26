@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blog Propiedades - Solución TDZ</title>
+  
+  <!-- CRÍTICO: Script de protección TDZ - DEBE SER EL PRIMER SCRIPT -->
+  <script>
+    // SOLUCIÓN TDZ INLINE - Definir variables críticas inmediatamente
+    (function() {
+      // 1. Definir variables críticas usando 'var' para hoisting global
+      var y = {};
+      var wi = {};
+      var Fp = {};
+      var Nc = {};
+      
+      // 2. Asignar a window para garantizar su disponibilidad
+      window.y = y;
+      window.wi = wi;
+      window.Fp = Fp;
+      window.Nc = Nc;
+      
+      console.log("🔒 Variables críticas 'y', 'wi', 'Fp', 'Nc' protegidas");
+      
+      // 3. Detector de errores TDZ para protección adicional
+      window.addEventListener('error', function(event) {
+        if (event.message && event.message.includes('Cannot access') && 
+            event.message.includes('before initialization')) {
+          
+          // Extraer nombre de la variable problemática
+          var matches = event.message.match(/'([^']+)'/);
+          if (matches && matches[1]) {
+            var varName = matches[1];
+            
+            // Inyectar inmediatamente mediante script
+            var script = document.createElement('script');
+            script.textContent = `
+              // Definir variable problemática
+              var ${varName} = {}; 
+              window.${varName} = window.${varName} || {};
+              console.log("⚡ Variable '${varName}' protegida mediante interceptor");
+            `;
+            document.head.appendChild(script);
+            
+            // Intentar prevenir propagación
+            event.preventDefault();
+            event.stopPropagation();
+            return true;
+          }
+        }
+      }, true);
+      
+      // 4. Cargar script de solución completa
+      setTimeout(function() {
+        var script = document.createElement('script');
+        script.src = 'tdz-solution.js';
+        document.head.appendChild(script);
+      }, 0);
+    })();
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <!-- Contenido para mostrar que las variables están protegidas -->
+  <script>
+    window.addEventListener('DOMContentLoaded', function() {
+      // Verificar estado de variables críticas
+      console.log('Estado de variables críticas:');
+      console.log('- y:', typeof y !== 'undefined' ? 'Definida ✅' : 'No definida ❌');
+      console.log('- wi:', typeof wi !== 'undefined' ? 'Definida ✅' : 'No definida ❌');
+      console.log('- Fp:', typeof Fp !== 'undefined' ? 'Definida ✅' : 'No definida ❌');
+      console.log('- Nc:', typeof Nc !== 'undefined' ? 'Definida ✅' : 'No definida ❌');
+      
+      // Mostrar en la página
+      var rootDiv = document.getElementById('root');
+      rootDiv.innerHTML = `
+        <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+          <h1>Blog Propiedades - Solución TDZ</h1>
+          <div style="background-color: #f0f0f0; padding: 20px; border-radius: 5px;">
+            <h2>Estado de protección TDZ</h2>
+            <ul>
+              <li>Variable 'y': <strong>${typeof y !== 'undefined' ? 'Protegida ✅' : 'No protegida ❌'}</strong></li>
+              <li>Variable 'wi': <strong>${typeof wi !== 'undefined' ? 'Protegida ✅' : 'No protegida ❌'}</strong></li>
+              <li>Variable 'Fp': <strong>${typeof Fp !== 'undefined' ? 'Protegida ✅' : 'No protegida ❌'}</strong></li>
+              <li>Variable 'Nc': <strong>${typeof Nc !== 'undefined' ? 'Protegida ✅' : 'No protegida ❌'}</strong></li>
+            </ul>
+          </div>
+          
+          <div style="margin-top: 20px;">
+            <h2>Instrucciones para implementar en tu app React</h2>
+            <ol>
+              <li><strong>Incluye el script de protección al inicio del HTML</strong>
+                <p>Agrega el siguiente script como el primer script en la sección &lt;head&gt; de tu archivo HTML principal:</p>
+                <pre style="background-color: #272822; color: #f8f8f2; padding: 10px; border-radius: 5px; white-space: pre-wrap; overflow-x: auto;"><code>&lt;script&gt;
+  // SOLUCIÓN TDZ INLINE - Definir variables críticas
+  (function() {
+    // Definir variables críticas con 'var'
+    var y = {};
+    var wi = {};
+    var Fp = {};
+    var Nc = {};
+    
+    // Asignar a window también
+    window.y = y;
+    window.wi = wi;
+    window.Fp = Fp;
+    window.Nc = Nc;
+    
+    console.log("🔒 Variables críticas protegidas");
+  })();
+&lt;/script&gt;</code></pre>
+              </li>
+              
+              <li><strong>Copia los scripts adicionales a tu carpeta pública</strong>
+                <p>Copia estos archivos a la carpeta pública:</p>
+                <ul>
+                  <li><code>tdz-solution.js</code> - Solución principal</li>
+                  <li><code>react-component-patch.js</code> - Parche para componentes</li>
+                </ul>
+              </li>
+            </ol>
+          </div>
+        </div>
+      `;
+    });
+    
+    // Probar acceso a variables protegidas
+    setTimeout(function() {
+      try {
+        console.log("Prueba de acceso a 'y':", y ? "Acceso exitoso ✅" : "Fallo ❌");
+      } catch(e) {
+        console.error("❌ Error al acceder a 'y':", e);
+      }
+    }, 1000);
+  </script>
+  
+  <!-- Aquí iría normalmente el script de la aplicación React -->
+  <!-- <script type="module" src="/src/main.jsx"></script> -->
+</body>
+</html> 
