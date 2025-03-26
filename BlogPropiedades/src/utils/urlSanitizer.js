@@ -5,9 +5,9 @@
  */
 
 /**
- * Sanitiza una URL asegurando que las APIs siempre usen HTTP
+ * Sanitiza una URL asegurando que las APIs siempre usen HTTPS
  * @param {string} url - URL a sanitizar
- * @returns {string} - URL sanitizada (HTTP para APIs, HTTPS para recursos externos)
+ * @returns {string} - URL sanitizada (HTTPS para APIs y recursos externos)
  */
 export const sanitizeUrl = (url) => {
   if (!url) return '';
@@ -19,29 +19,25 @@ export const sanitizeUrl = (url) => {
   sanitized = sanitized.replace(/^["']|["']$/g, '');
   
   // Determinar si es una URL de API
-  const isApiUrl = sanitized.includes('gozamadrid-api') || 
-                  sanitized.includes('api.realestategozamadrid.com') ||
-                  sanitized.includes('goza-madrid.onrender.com') ||
-                  sanitized.includes('elasticbeanstalk.com');
+  const isApiUrl = sanitized.includes('api.realestategozamadrid.com');
   
   // Si ya tiene protocolo, ajustar según tipo de URL
   if (sanitized.includes('://')) {
     if (isApiUrl) {
-      // Para APIs, SIEMPRE usar HTTP
-      sanitized = sanitized.replace(/^https:\/\//, 'http://');
-      if (!sanitized.startsWith('http://')) {
-        sanitized = sanitized.replace(/^.*:\/\//, 'http://');
+      // Para APIs, SIEMPRE usar HTTPS
+      sanitized = sanitized.replace(/^http:\/\//, 'https://');
+      if (!sanitized.startsWith('https://')) {
+        sanitized = sanitized.replace(/^.*:\/\//, 'https://');
       }
     } else {
       // Para recursos externos, preferir HTTPS
       if (!sanitized.startsWith('https://') && !sanitized.startsWith('http://')) {
-        // Si tiene otro protocolo que no sea HTTP o HTTPS, corregirlo
         sanitized = sanitized.replace(/^.*:\/\//, 'https://');
       }
     }
   } else {
-    // Si no tiene protocolo, añadir HTTP para APIs y HTTPS para lo demás
-    sanitized = `${isApiUrl ? 'http' : 'https'}://${sanitized}`;
+    // Si no tiene protocolo, añadir HTTPS
+    sanitized = `https://${sanitized}`;
   }
   
   return sanitized;
@@ -130,11 +126,10 @@ export const combineUrls = (baseUrl, endpoint = '') => {
 
 /**
  * Devuelve una URL predeterminada segura para casos de error
- * @returns {string} - URL predeterminada con HTTP
+ * @returns {string} - URL predeterminada con HTTPS
  */
 export const getDefaultApiUrl = () => {
-  // Usar HTTP para la API de Elastic Beanstalk
-  return 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+  return 'https://api.realestategozamadrid.com';
 };
 
 // Exportar todas las funciones

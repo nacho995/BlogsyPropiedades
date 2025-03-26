@@ -7,9 +7,9 @@
 import { getSafeEnvValue } from './validateEnv';
 import { sanitizeUrl, combineUrls, getDefaultApiUrl } from './urlSanitizer';
 
-// URL correcta para la API - usando HTTP ya que HTTPS no funciona
-const API_DOMAIN = 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
-const PRODUCTION_API_URL = `http://${API_DOMAIN}`;
+// URL correcta para la API - usando HTTPS
+const API_DOMAIN = 'api.realestategozamadrid.com';
+const PRODUCTION_API_URL = `https://${API_DOMAIN}`;
 
 // Variables de backend con sanitización de URLs
 export const API_URL = PRODUCTION_API_URL;
@@ -31,7 +31,7 @@ export const DEBUG_LEVEL = getSafeEnvValue('VITE_DEBUG_LEVEL') || 'error';
 export const APP_MODE = getSafeEnvValue('VITE_APP_MODE') || 'production';
 
 // Dominio principal para cookies
-export const MAIN_DOMAIN = getSafeEnvValue('VITE_MAIN_DOMAIN') || 'realestategozamadrid.com';
+export const MAIN_DOMAIN = 'realestategozamadrid.com';
 
 // Función para determinar si estamos en producción
 export const isProduction = () => {

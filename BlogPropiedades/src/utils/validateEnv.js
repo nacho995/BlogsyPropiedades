@@ -7,10 +7,10 @@ import { sanitizeUrl, extractDomain } from './urlSanitizer';
 
 // Definir valores por defecto para las variables de entorno críticas
 const DEFAULTS = {
-  VITE_BACKEND_URL: 'https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com',
-  VITE_API_URL: 'https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com',
-  VITE_API_PUBLIC_API_URL: 'https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com',
-  VITE_FALLBACK_API: 'https://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com',
+  VITE_BACKEND_URL: 'https://api.realestategozamadrid.com',
+  VITE_API_URL: 'https://api.realestategozamadrid.com',
+  VITE_API_PUBLIC_API_URL: 'https://api.realestategozamadrid.com',
+  VITE_FALLBACK_API: 'https://api.realestategozamadrid.com',
   VITE_APP_MODE: 'production',
   VITE_MAIN_DOMAIN: 'realestategozamadrid.com',
   VITE_DEBUG_LEVEL: 'error'
