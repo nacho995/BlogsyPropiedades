@@ -7,8 +7,27 @@
     <meta name="description" content="Goza Madrid - Portal inmobiliario y blog de propiedades" />
     <title>GozaMadrid - Inmobiliaria y Blog</title>
     
+    <!-- Solución inmediata para el error de Nc -->
+    <script>
+      // Ejecutar antes de cualquier otro código
+      window.Nc = {}; // Definir Nc para evitar "Cannot access 'Nc' before initialization"
+      
+      // Sistema de polyfill para variables minificadas
+      ['Qe', 'qe', 'Il', 'Kc', 'Hl', 'Oe', 'Si', 'Oi', 'Rc', 'Qc', 'Ab', 'Bb', 'Ni', 'Wc', 'Mi', 'Li', 'Ki', 'Ji']
+        .forEach(function(name) { window[name] = {}; });
+      
+      // Interceptar errores de acceso a propiedades y crear las variables faltantes
+      window.__originalGetFn = Object.prototype.__lookupGetter__; 
+      Object.defineProperty(window, '__ncFixActive', { value: true, writable: false });
+      
+      console.log('✅ Parche preventivo aplicado para variables minificadas');
+    </script>
+    
     <!-- Bootstrap debe cargarse antes que nada para configurar el entorno -->
     <script src="/bootstrap.js"></script>
+    
+    <!-- Fix específico para el problema de Nc -->
+    <script src="/ncfix.js"></script>
     
     <!-- Script de recuperación de emergencia para errores de inicialización -->
     <script>

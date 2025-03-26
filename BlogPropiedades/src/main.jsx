@@ -284,6 +284,34 @@ try {
   
   console.log(`🔄 Inicializando aplicación con retraso de ${delayTime}ms (recargas: ${reloadCount})`);
   
+  // VERIFICACIÓN ADICIONAL DE NC
+  // Este código se ejecuta justo antes de inicializar React
+  try {
+    // Verificar si Nc existe
+    if (typeof window.Nc === 'undefined') {
+      console.log('⚠️ Creando Nc antes de inicializar React');
+      window.Nc = {};
+    } else {
+      console.log('✅ Nc ya está definido antes de inicializar React');
+    }
+    
+    // Añadir verificación justo antes de la inicialización
+    const NcCheckInterval = setInterval(() => {
+      if (typeof window.Nc === 'undefined') {
+        console.warn('⚠️ Nc ha desaparecido, reinicializando...');
+        window.Nc = {};
+      }
+    }, 100);
+    
+    // Limpiar el intervalo después de 5 segundos
+    setTimeout(() => {
+      clearInterval(NcCheckInterval);
+      console.log('Verificación de Nc finalizada');
+    }, 5000);
+  } catch (e) {
+    console.error('Error al verificar Nc:', e);
+  }
+
   if (lastError && lastError.includes('Nc')) {
     console.log('⚠️ Previamente se detectó error de inicialización de Nc, aplicando modo seguro');
     // Establecer una bandera global que será usada por el código minificado para evitar el error
