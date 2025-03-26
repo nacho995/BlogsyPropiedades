@@ -35,6 +35,63 @@ const useProfileImage = ({
   const retryTimeoutRef = useRef(null);
   const isMounted = useRef(true);
 
+  // Escuchar eventos de actualización de imagen de perfil
+  useEffect(() => {
+    const handleProfileImageUpdate = (event) => {
+      if (!isMounted.current) return;
+      
+      console.log("🔄 Evento de actualización de imagen de perfil detectado");
+      const newImageUrl = event.detail?.imageUrl;
+      
+      if (newImageUrl && typeof newImageUrl === 'string') {
+        console.log("✅ Nueva URL de imagen recibida:", newImageUrl);
+        setProfileImage(newImageUrl);
+        
+        // Guardar en localStorage para persistencia
+        try {
+          localStorage.setItem('profilePic', newImageUrl);
+        } catch (err) {
+          console.error("Error al guardar imagen en localStorage:", err);
+        }
+      } else {
+        // Si no hay imagen específica, forzar sincronización
+        syncImage(true).catch(e => {
+          console.warn("Error al sincronizar después de evento:", e);
+        });
+      }
+    };
+    
+    // Manejar evento de logout
+    const handleLogout = () => {
+      console.log("🔄 Evento de logout detectado en useProfileImage");
+      
+      // Guardar copia de la imagen actual antes del logout
+      try {
+        const currentImage = localStorage.getItem('profilePic');
+        if (currentImage) {
+          localStorage.setItem('profilePic_backup', currentImage);
+          localStorage.setItem('profilePic_temp', currentImage);
+          console.log("✅ Imagen guardada para persistencia entre sesiones");
+        }
+      } catch (e) {
+        console.warn("Error al guardar copia de seguridad de imagen en logout:", e);
+      }
+    };
+    
+    // Añadir detector de eventos personalizado para actualizaciones
+    window.addEventListener('profileImageUpdated', handleProfileImageUpdate);
+    window.addEventListener('userLoggedOut', handleLogout);
+    
+    // Añadir detector para evento de sesión iniciada
+    window.addEventListener('userLoggedIn', () => syncImage(true));
+    
+    return () => {
+      window.removeEventListener('profileImageUpdated', handleProfileImageUpdate);
+      window.removeEventListener('userLoggedIn', () => syncImage(true));
+      window.removeEventListener('userLoggedOut', handleLogout);
+    };
+  }, []);
+
   // Función para manejar errores de carga de imagen
   const handleImageError = useCallback((e) => {
     console.warn('Error al cargar imagen de perfil:', e);
@@ -142,7 +199,7 @@ const useProfileImage = ({
 
       // Usar imagen del localStorage temporalmente mientras procesamos
       const cachedImage = localStorage.getItem('profilePic');
-      if (cachedImage && cachedImage.startsWith('http')) {
+      if (cachedImage && (cachedImage.startsWith('http') || cachedImage.startsWith('data:'))) {
         if (isMounted.current) {
           setProfileImage(cachedImage);
           console.log('Usando imagen en caché mientras se sincroniza');
@@ -187,7 +244,7 @@ const useProfileImage = ({
           
           // Si no hay imagen en userData, verificar si hay algo en localStorage
           const storedImage = localStorage.getItem('profilePic');
-          if (storedImage && storedImage.startsWith('http')) {
+          if (storedImage && (storedImage.startsWith('http') || storedImage.startsWith('data:'))) {
             setProfileImage(storedImage);
             return;
           }
@@ -214,6 +271,16 @@ const useProfileImage = ({
       if (isMounted.current) {
         if (image) {
           setProfileImage(image);
+          
+          // Notificar a otros componentes sobre el cambio
+          try {
+            window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+              detail: { imageUrl: image }
+            }));
+          } catch (e) {
+            console.warn('Error al notificar actualización de imagen:', e);
+          }
+          
           setRetryCount(0);
         } else {
           // Si no hay imagen, intentar usar profileImage del usuario
@@ -373,19 +440,40 @@ const useProfileImage = ({
         throw new Error('No se proporcionó imagen para actualizar');
       }
       
+      let imageUrl = newImage;
+      
+      // Procesar objeto de imagen si es necesario
+      if (typeof newImage === 'object' && (newImage.src || newImage.url)) {
+        imageUrl = newImage.src || newImage.url;
+      }
+      
       // Guardar en localStorage para acceso inmediato
-      if (typeof newImage === 'string') {
-        localStorage.setItem('profilePic', newImage);
-      } else if (newImage.src || newImage.url) {
-        localStorage.setItem('profilePic', newImage.src || newImage.url);
+      if (typeof imageUrl === 'string') {
+        localStorage.setItem('profilePic', imageUrl);
+        
+        // También almacenar en localStorage alternativo para mayor persistencia
+        try {
+          localStorage.setItem('profilePic_backup', imageUrl);
+        } catch (e) {
+          console.warn('Error al guardar copia de seguridad de imagen:', e);
+        }
       } else {
         throw new Error('Formato de imagen no válido');
       }
       
       // Actualizar estado local
       if (isMounted.current) {
-        setProfileImage(newImage);
+        setProfileImage(imageUrl);
         setError(null);
+      }
+      
+      // Notificar a otros componentes sobre el cambio
+      try {
+        window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+          detail: { imageUrl }
+        }));
+      } catch (e) {
+        console.warn('Error al notificar actualización de imagen:', e);
       }
       
       // Sincronizar con el servidor si está habilitado

@@ -1125,9 +1125,50 @@ export const syncProfileImage = async (newImage = null) => {
         }
       }
       
-      // Si se encontró una URL válida, guardarla y devolverla
+      // Si se encontró una URL válida, guardarla en múltiples ubicaciones para redundancia
       if (imageUrl && typeof imageUrl === 'string') {
-        localStorage.setItem('profilePic', imageUrl);
+        try {
+          // Guardar en localStorage principal
+          localStorage.setItem('profilePic', imageUrl);
+          
+          // Guardar en respaldo
+          localStorage.setItem('profilePic_backup', imageUrl);
+          
+          // Asegurar que userData tenga la imagen actualizada
+          const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+          userData.profilePic = imageUrl;
+          userData.profileImage = imageUrl;
+          localStorage.setItem('userData', JSON.stringify(userData));
+          
+          // Intentar guardar en userResponse si existe
+          try {
+            const userResponse = JSON.parse(localStorage.getItem('userResponse') || '{}');
+            if (userResponse && Object.keys(userResponse).length > 0) {
+              userResponse.profilePic = imageUrl;
+              userResponse.profileImage = imageUrl;
+              localStorage.setItem('userResponse', JSON.stringify(userResponse));
+            }
+          } catch (e) {
+            console.warn('Error al actualizar userResponse:', e);
+          }
+          
+          // Guardar timestamp de última actualización
+          localStorage.setItem('profilePic_lastUpdated', Date.now().toString());
+          
+          // Disparar evento para notificar a otros componentes
+          try {
+            window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+              detail: { imageUrl }
+            }));
+          } catch (e) {
+            console.warn('Error al disparar evento de actualización:', e);
+          }
+          
+          console.log('✅ Imagen de perfil sincronizada y guardada en múltiples ubicaciones');
+        } catch (storageError) {
+          console.error('Error al guardar imagen en localStorage:', storageError);
+        }
+        
         return imageUrl;
       }
       
@@ -1136,66 +1177,84 @@ export const syncProfileImage = async (newImage = null) => {
       return null;
     }
 
-    // Si no se proporcionó imagen, intentar usar la actual del localStorage
-    const currentImage = localStorage.getItem('profilePic');
+    // Si no se proporcionó imagen, intentar usar la actual del localStorage con estrategia de redundancia
+    const sources = [
+      localStorage.getItem('profilePic'),
+      localStorage.getItem('profilePic_backup'),
+      localStorage.getItem('profilePic_local')
+    ];
     
-    // Si no hay imagen en localStorage, buscar en userData
-    if (!currentImage) {
+    // Buscar primera fuente válida
+    const currentImage = sources.find(src => src && typeof src === 'string' && 
+                                       (src.startsWith('http') || src.startsWith('data:')));
+    
+    // Si encontramos imagen en alguna fuente, asegurar que esté en todas las ubicaciones
+    if (currentImage) {
       try {
-        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-        let profileUrl = null;
+        localStorage.setItem('profilePic', currentImage);
+        localStorage.setItem('profilePic_backup', currentImage);
         
-        // Buscar primero en profileImage
-        if (userData.profileImage) {
-          if (typeof userData.profileImage === 'string') {
-            profileUrl = userData.profileImage;
-          } else if (userData.profileImage && typeof userData.profileImage === 'object') {
-            profileUrl = userData.profileImage.src || userData.profileImage.url || null;
-          }
+        // Actualizar userData para mantener todo coherente
+        try {
+          const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+          userData.profilePic = currentImage;
+          userData.profileImage = currentImage;
+          localStorage.setItem('userData', JSON.stringify(userData));
+        } catch (e) {
+          console.warn('Error al actualizar userData con imagen:', e);
         }
-        
-        // Si no se encontró en profileImage, buscar en profilePic
-        if (!profileUrl && userData.profilePic) {
-          if (typeof userData.profilePic === 'string') {
-            profileUrl = userData.profilePic;
-          } else if (userData.profilePic && typeof userData.profilePic === 'object') {
-            profileUrl = userData.profilePic.src || userData.profilePic.url || null;
-          }
-        }
-        
-        // Si se encontró una URL, guardarla y devolverla
-        if (profileUrl) {
-          localStorage.setItem('profilePic', profileUrl);
-          return profileUrl;
-        }
-      } catch (parseError) {
-        console.warn('Error al procesar datos de usuario del localStorage:', parseError);
+      } catch (e) {
+        console.warn('Error al sincronizar fuentes de imagen:', e);
       }
       
-      return null;
-    }
-
-    // Verificar si la imagen actual es una URL válida
-    if (typeof currentImage !== 'string') {
-      console.warn('URL de imagen de perfil no válida (no es string)');
-      localStorage.removeItem('profilePic');
-      return null;
-    }
-
-    // Si es base64 o URL válida, devolverla directamente
-    if (currentImage.startsWith('data:') || currentImage.startsWith('http')) {
       return currentImage;
     }
     
-    // Si llegamos aquí, la URL no parece válida
-    console.warn('URL de imagen de perfil no válida (formato desconocido)');
-    localStorage.removeItem('profilePic');
+    // Si no encontramos imagen en localStorage, buscar en userData
+    try {
+      const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+      let profileUrl = null;
+      
+      // Buscar primero en profileImage
+      if (userData.profileImage) {
+        if (typeof userData.profileImage === 'string') {
+          profileUrl = userData.profileImage;
+        } else if (userData.profileImage && typeof userData.profileImage === 'object') {
+          profileUrl = userData.profileImage.src || userData.profileImage.url || null;
+        }
+      }
+      
+      // Si no se encontró en profileImage, buscar en profilePic
+      if (!profileUrl && userData.profilePic) {
+        if (typeof userData.profilePic === 'string') {
+          profileUrl = userData.profilePic;
+        } else if (userData.profilePic && typeof userData.profilePic === 'object') {
+          profileUrl = userData.profilePic.src || userData.profilePic.url || null;
+        }
+      }
+      
+      // Si se encontró una URL, guardarla y devolverla
+      if (profileUrl && (profileUrl.startsWith('http') || profileUrl.startsWith('data:'))) {
+        localStorage.setItem('profilePic', profileUrl);
+        localStorage.setItem('profilePic_backup', profileUrl);
+        return profileUrl;
+      }
+    } catch (parseError) {
+      console.warn('Error al procesar datos de usuario del localStorage:', parseError);
+    }
+    
     return null;
   } catch (error) {
     console.error('Error en syncProfileImage:', error);
     // Intentar recuperar la imagen del localStorage como último recurso
     try {
-      return localStorage.getItem('profilePic');
+      const sources = [
+        localStorage.getItem('profilePic'),
+        localStorage.getItem('profilePic_backup'),
+        localStorage.getItem('profilePic_local')
+      ];
+      
+      return sources.find(src => src && typeof src === 'string');
     } catch (e) {
       return null;
     }

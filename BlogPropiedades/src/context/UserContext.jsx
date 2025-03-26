@@ -331,6 +331,201 @@ export function UserProvider({ children }) {
     }
   };
 
+  // Función para escuchar actualizaciones de imagen de perfil
+  useEffect(() => {
+    const handleProfileImageUpdate = (event) => {
+      const newImageUrl = event.detail?.imageUrl;
+      
+      if (newImageUrl && typeof newImageUrl === 'string') {
+        console.log("🖼️ UserContext: Actualizando imagen de perfil desde evento global");
+        
+        // Actualizar la imagen en el estado del usuario
+        setUser(prevUser => {
+          if (!prevUser) return prevUser;
+          
+          return {
+            ...prevUser,
+            profileImage: newImageUrl,
+            profilePic: newImageUrl
+          };
+        });
+      }
+    };
+    
+    // Escuchar evento de actualización de imagen
+    window.addEventListener('profileImageUpdated', handleProfileImageUpdate);
+    
+    return () => {
+      window.removeEventListener('profileImageUpdated', handleProfileImageUpdate);
+    };
+  }, []);
+
+  // Sincronizar imagen al iniciar sesión o recargar
+  const safeProfileSync = async () => {
+    try {
+      console.log("🔄 Sincronizando imagen de perfil en contexto de usuario...");
+      await syncProfileImage();
+      
+      // Después de sincronizar, asegurar que el usuario tenga la imagen más reciente
+      const latestImage = localStorage.getItem('profilePic');
+      if (latestImage && user) {
+        setUser(prevUser => ({
+          ...prevUser,
+          profileImage: latestImage,
+          profilePic: latestImage
+        }));
+      }
+    } catch (error) {
+      console.error("❌ Error al sincronizar imagen de perfil:", error);
+    }
+  };
+
+  // Función de logout
+  const logout = (shouldRedirect = true) => {
+    // Guardar una copia de la imagen de perfil temporalmente si existe
+    try {
+      const profileImage = localStorage.getItem('profilePic');
+      if (profileImage) {
+        localStorage.setItem('profilePic_temp', profileImage);
+      }
+    } catch (e) {
+      console.error("Error al guardar imagen temporal:", e);
+    }
+    
+    // Limpiar y reestablecer después del cierre de sesión
+    setUser(null);
+    setIsAuthenticated(false);
+    
+    try {
+      localStorage.removeItem("token");
+      localStorage.removeItem("userData");
+      localStorage.removeItem("userResponse");
+      
+      // No borrar la imagen de perfil para que se mantenga entre sesiones
+      // localStorage.removeItem("profilePic");
+      
+      // Despachar evento de cierre de sesión
+      window.dispatchEvent(new Event('userLoggedOut'));
+    } catch (e) {
+      console.error("❌ Error al eliminar token:", e);
+    }
+    
+    // Redireccionar si es necesario
+    if (shouldRedirect) {
+      window.location.href = "/login";
+    }
+  };
+  
+  // Función para iniciar sesión
+  const login = async (token, userData) => {
+    console.log("Iniciando sesión con datos:", userData);
+    logAuthEvent('login_attempt', { hasToken: !!token, hasUserData: !!userData });
+    
+    try {
+      // Validar el token proporcionado
+      if (!token || !isValidToken(token)) {
+        console.error("Token inválido proporcionado para inicio de sesión");
+        logAuthEvent('login_failed_invalid_token');
+        return false;
+      }
+      
+      // Guardar token en localStorage
+      localStorage.setItem("token", token);
+      
+      // Almacenar datos del usuario si están disponibles
+      if (userData) {
+        localStorage.setItem("email", userData.email || "");
+        localStorage.setItem("name", userData.name || "");
+        localStorage.setItem("role", userData.role || "user");
+        
+        // También guardar todo el objeto para facilitar la recuperación
+        localStorage.setItem("userData", JSON.stringify(userData));
+        
+        // Manejar imagen de perfil
+        if (userData.profileImage || userData.profilePic) {
+          let profileImageUrl = null;
+          
+          // Extraer URL de la imagen según el formato disponible
+          if (userData.profileImage) {
+            if (typeof userData.profileImage === 'string') {
+              profileImageUrl = userData.profileImage;
+            } else if (userData.profileImage && typeof userData.profileImage === 'object') {
+              profileImageUrl = userData.profileImage.src || userData.profileImage.url;
+            }
+          } else if (userData.profilePic) {
+            if (typeof userData.profilePic === 'string') {
+              profileImageUrl = userData.profilePic;
+            } else if (userData.profilePic && typeof userData.profilePic === 'object') {
+              profileImageUrl = userData.profilePic.src || userData.profilePic.url;
+            }
+          }
+          
+          // Si se encontró URL de imagen, sincronizarla
+          if (profileImageUrl) {
+            console.log("🖼️ Imagen de perfil encontrada, sincronizando:", profileImageUrl);
+            localStorage.setItem('profilePic', profileImageUrl);
+            localStorage.setItem('profilePic_backup', profileImageUrl);
+            syncProfileImage(profileImageUrl);
+          }
+        } else {
+          // Si no hay imagen en los datos del usuario, verificar si hay una guardada
+          const profilePicTemp = localStorage.getItem('profilePic_temp');
+          if (profilePicTemp) {
+            console.log("🖼️ Usando imagen de perfil temporal guardada:", profilePicTemp);
+            localStorage.setItem('profilePic', profilePicTemp);
+            syncProfileImage(profilePicTemp);
+          }
+        }
+      }
+      
+      // Intentar obtener perfil de usuario actualizado
+      try {
+        const userProfile = await getUserProfile(token);
+        console.log("Perfil de usuario obtenido:", userProfile);
+        
+        // Si tiene imagen, sincronizarla
+        if (userProfile && (userProfile.profileImage || userProfile.profilePic)) {
+          let profilePicUrl = null;
+          
+          if (userProfile.profileImage) {
+            profilePicUrl = typeof userProfile.profileImage === 'string' ? 
+                          userProfile.profileImage : 
+                          userProfile.profileImage.src || userProfile.profileImage.url;
+          } else if (userProfile.profilePic) {
+            profilePicUrl = typeof userProfile.profilePic === 'string' ? 
+                          userProfile.profilePic : 
+                          userProfile.profilePic.src || userProfile.profilePic.url;
+          }
+          
+          console.log("🖼️ Imagen recibida del perfil del usuario:", profilePicUrl);
+          if (profilePicUrl) {
+            localStorage.setItem('profilePic', profilePicUrl);
+            localStorage.setItem('profilePic_backup', profilePicUrl);
+            syncProfileImage(profilePicUrl);
+          }
+        }
+      } catch (profileError) {
+        console.warn("Error al obtener perfil tras login (no crítico):", profileError);
+      }
+      
+      // Configurar estados
+      setIsAuthenticated(true);
+      setUser(userData);
+      
+      // Disparar evento para que otros componentes se enteren
+      window.dispatchEvent(new CustomEvent('userLoggedIn', {
+        detail: { userData }
+      }));
+      
+      logAuthEvent('login_successful');
+      return true;
+    } catch (error) {
+      console.error("Error crítico durante el login:", error);
+      logAuthEvent('login_critical_error', { error: error.message });
+      return false;
+    }
+  };
+  
   // Inicializar datos de usuario al cargar la aplicación
   useEffect(() => {
     const initializeUser = async () => {
@@ -497,204 +692,12 @@ export function UserProvider({ children }) {
       }
     };
     
-    // Escuchar el evento personalizado para actualización de imagen
-    const handleProfileImageUpdate = (e) => {
-      if (e.detail && e.detail.imageUrl) {
-        setUser(prevUser => {
-          if (!prevUser) return null;
-          return {
-            ...prevUser,
-            profileImage: e.detail.imageUrl
-          };
-        });
-      }
-    };
-    
     window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('profileImageUpdated', handleProfileImageUpdate);
     
     return () => {
       window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('profileImageUpdated', handleProfileImageUpdate);
     };
   }, []);
-  
-  // Función para iniciar sesión
-  const login = async (token, userData) => {
-    console.log("🔐 Iniciando sesión con token y datos de usuario", { token: !!token, userData: !!userData });
-    logAuthEvent('login_attempt');
-    
-    try {
-      // MEJORA 1: Validación robusta de token
-      if (!token) {
-        console.error("❌ Error de login: No se proporcionó token");
-        logAuthEvent('login_failed_no_token');
-        return false;
-      }
-      
-      // Validación de datos de usuario
-      if (!userData || typeof userData !== 'object') {
-        console.error("❌ Error de login: Datos de usuario inválidos");
-        logAuthEvent('login_failed_invalid_user_data');
-        return false;
-      }
-      
-      // MEJORA 2: Detección de bucles más agresiva
-      const now = Date.now();
-      const lastLogin = localStorage.getItem('lastLogin');
-      const lastLoginTime = lastLogin ? parseInt(lastLogin, 10) : 0;
-      
-      if (now - lastLoginTime < 2000) {
-        console.warn("⚠️ Múltiples intentos de login en intervalos cortos, posible bucle");
-        
-        try {
-          // Registrar evento de bucle
-          localStorage.setItem('loginLoopDetected', JSON.stringify({
-            timestamp: new Date().toISOString(),
-            timeSinceLastLogin: now - lastLoginTime
-          }));
-          
-          // Si hay más de 2 intentos en 5 segundos, es definitivamente un bucle
-          const loginAttempts = JSON.parse(localStorage.getItem('loginAttempts') || '[]');
-          loginAttempts.push(now);
-          localStorage.setItem('loginAttempts', JSON.stringify(loginAttempts.slice(-5)));
-          
-          const recentAttempts = loginAttempts.filter(time => (now - time) < 5000);
-          
-          if (recentAttempts.length > 3) {
-            console.error("🛑 BUCLE DE LOGIN DETECTADO - Deteniendo");
-            window.dispatchEvent(new CustomEvent('loginLoopDetected'));
-            logAuthEvent('login_loop_detected');
-            return false;
-          }
-        } catch (loopError) {
-          console.error("Error al detectar bucle de login:", loopError);
-        }
-      }
-      
-      // Actualizar tiempo de último login
-      localStorage.setItem('lastLogin', now.toString());
-      
-      try {
-        // MEJORA 4: Asegurar datos mínimos de usuario
-        const email = userData.email || '';
-        const name = userData.name || (email ? email.split('@')[0] : 'Usuario') || 'Usuario';
-        
-        console.log("Datos de usuario para sesión:", { 
-          email: email || 'No disponible', 
-          name, 
-          role: userData.role || 'user'
-        });
-        
-        // Guardar token
-        localStorage.setItem('token', token);
-        localStorage.setItem('tokenType', token.startsWith('temp_') ? 'temporary' : 'normal');
-        
-        // Guardar datos básicos del usuario
-        if (email) localStorage.setItem('email', email);
-        if (name) localStorage.setItem('name', name);
-        
-        // Solo guardar rol si existe
-        if (userData.role) localStorage.setItem('role', userData.role);
-        
-        // Si hay imagen de perfil, guardarla
-        if (userData.profilePic) {
-          localStorage.setItem('profilePic', userData.profilePic);
-        }
-        
-        console.log("✅ Datos de sesión guardados correctamente");
-      } catch (storageError) {
-        console.error("❌ Error al guardar datos de sesión:", storageError);
-        // Continuar de todos modos
-      }
-      
-      // MEJORA 6: Actualización del estado simplificada
-      setUser({...userData});
-      setIsAuthenticated(true);
-      logAuthEvent('login_successful');
-      
-      return true;
-    } catch (error) {
-      console.error("❌ Error crítico durante login:", error);
-      logAuthEvent('login_error', {error: error.message});
-      return false;
-    }
-  };
-  
-  // Sincronización segura de imagen de perfil
-  const safeProfileSync = async () => {
-    try {
-      // Solo intentar sincronizar si hay un token
-      if (localStorage.getItem('token')) {
-        await syncProfileImage();
-      } else {
-        console.log("No se intentó sincronizar la imagen de perfil: no hay token");
-      }
-    } catch (error) {
-      console.warn("Error al sincronizar imagen de perfil (ignorado):", error);
-      // Ignorar errores de sincronización de imagen para evitar bloquear la app
-    }
-  };
-  
-  // Función de logout
-  const logout = (shouldRedirect = true) => {
-    try {
-      console.log("Cerrando sesión...");
-      
-      // Guardar las imágenes actuales antes de limpiar localStorage
-      const currentProfilePic = localStorage.getItem('profilePic');
-      const localProfilePic = localStorage.getItem('profilePic_local');
-      const base64ProfilePic = localStorage.getItem('profilePic_base64');
-      
-      // Crear un objeto con las imágenes a preservar
-      const imagesToPreserve = {
-        profilePic: currentProfilePic || localProfilePic || base64ProfilePic || fallbackImageBase64,
-        profilePic_local: localProfilePic || currentProfilePic || base64ProfilePic || fallbackImageBase64,
-        profilePic_base64: base64ProfilePic || localProfilePic || currentProfilePic || fallbackImageBase64
-      };
-      
-      console.log("Imágenes guardadas antes de logout:", {
-        profilePic: imagesToPreserve.profilePic.substring(0, 30) + "...",
-        profilePic_local: imagesToPreserve.profilePic_local.substring(0, 30) + "...",
-        profilePic_base64: imagesToPreserve.profilePic_base64.substring(0, 30) + "..."
-      });
-      
-      // Limpiar localStorage
-      localStorage.clear();
-      
-      // Restaurar las imágenes
-      localStorage.setItem('profilePic', imagesToPreserve.profilePic);
-      localStorage.setItem('profilePic_local', imagesToPreserve.profilePic_local);
-      localStorage.setItem('profilePic_base64', imagesToPreserve.profilePic_base64);
-      
-      console.log("Imágenes restauradas después de logout");
-      
-      // Actualizar estado
-      setUser(null);
-      setIsAuthenticated(false);
-      
-      // Redirigir a la página de login utilizando window.location
-      if (shouldRedirect) {
-        // Usar window.location.href en lugar de navigate para evitar problemas con hooks
-        window.location.href = "/login";
-      }
-      
-      return true;
-    } catch (error) {
-      console.error("Error en logout:", error);
-      
-      // Asegurar que el usuario se desconecte incluso si hay un error
-      localStorage.removeItem('token');
-      setUser(null);
-      setIsAuthenticated(false);
-      
-      if (shouldRedirect) {
-        window.location.href = "/login";
-      }
-      
-      return false;
-    }
-  };
   
   // Valor del contexto
   const contextValue = {
@@ -708,7 +711,17 @@ export function UserProvider({ children }) {
   };
   
   return (
-    <UserContext.Provider value={contextValue}>
+    <UserContext.Provider
+      value={{
+        user,
+        isAuthenticated,
+        loading,
+        login,
+        logout,
+        refreshUserData,
+        safeProfileSync
+      }}
+    >
       {children}
     </UserContext.Provider>
   );

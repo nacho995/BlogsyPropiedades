@@ -81,6 +81,16 @@ export default function CambiarPerfil() {
             .then(() => {
               setSuccess("Imagen actualizada y sincronizada correctamente");
               setLoading(false);
+              
+              // Notificar a otros componentes sobre el cambio
+              try {
+                window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+                  detail: { imageUrl: imageData }
+                }));
+                console.log("Notificación de cambio de imagen enviada a todos los componentes");
+              } catch (e) {
+                console.warn('Error al notificar actualización de imagen:', e);
+              }
             })
             .catch(err => {
               console.error("Error al sincronizar imagen:", err);
@@ -147,6 +157,31 @@ export default function CambiarPerfil() {
       // Forzar sincronización de imagen
       if (data.profilePic) {
         await syncImage(true);
+        
+        // Guardar la imagen en múltiples lugares para asegurar persistencia
+        if (typeof data.profilePic === 'string') {
+          localStorage.setItem('profilePic', data.profilePic);
+          localStorage.setItem('profilePic_backup', data.profilePic);
+          
+          // Actualizar userData para mantener todo coherente
+          try {
+            const storedUserData = JSON.parse(localStorage.getItem('userData') || '{}');
+            storedUserData.profilePic = data.profilePic;
+            localStorage.setItem('userData', JSON.stringify(storedUserData));
+          } catch (e) {
+            console.warn('Error al actualizar datos de usuario en localStorage:', e);
+          }
+          
+          // Notificar a otros componentes
+          try {
+            window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+              detail: { imageUrl: data.profilePic }
+            }));
+            console.log("Notificación de cambio de imagen enviada a todos los componentes");
+          } catch (e) {
+            console.warn('Error al notificar actualización de imagen:', e);
+          }
+        }
       }
 
       // Actualizar datos de usuario
