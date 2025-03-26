@@ -108,6 +108,7 @@ export default function CambiarPerfil() {
 
       setLoading(true);
       setError(null);
+      setSuccess(null); // Limpiar mensaje de éxito anterior
 
       // Crear URL temporal para vista previa
       const localUrl = URL.createObjectURL(file);
@@ -127,12 +128,21 @@ export default function CambiarPerfil() {
           
           console.log("CambiarPerfil: Imagen cargada desde el ordenador, actualizando...");
           
+          // Guardar la imagen en localStorage para asegurar persistencia
+          localStorage.setItem('profilePic', imageData);
+          localStorage.setItem('profilePic_backup', imageData);
+          
           // Actualizar la imagen usando el hook con la función actualizada
           updateProfileImage(imageData)
             .then((success) => {
               if (success) {
                 console.log("CambiarPerfil: Imagen actualizada correctamente en toda la aplicación");
                 setSuccess("Imagen actualizada correctamente");
+                
+                // Notificar a toda la aplicación sobre el cambio
+                window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+                  detail: { profileImage: imageData, timestamp: Date.now() }
+                }));
                 
                 // También actualizar el perfil del usuario si está disponible
                 if (user && refreshUserData) {
@@ -348,6 +358,19 @@ export default function CambiarPerfil() {
             className="hidden" 
             disabled={loading || profileLoading}
           />
+
+          {profilePic?.file && (
+            <div className="text-center">
+              <button
+                type="button"
+                className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg text-sm transition"
+                onClick={() => navigate("/")}
+                disabled={loading || profileLoading}
+              >
+                Guardar y volver
+              </button>
+            </div>
+          )}
           
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-blue-100">

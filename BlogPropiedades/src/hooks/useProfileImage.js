@@ -25,10 +25,16 @@ const useProfileImage = () => {
             typeof storedImage === 'string') {
           console.log("🖼️ Cargando imagen de perfil desde localStorage");
           setProfileImage(storedImage);
+          
+          // Asegurar backup
+          if (!localStorage.getItem('profilePic_backup')) {
+            localStorage.setItem('profilePic_backup', storedImage);
+          }
         } else {
           // Si no hay imagen válida, establecer la de respaldo y guardarla
           console.log("⚠️ No hay imagen válida en localStorage, usando fallback");
           localStorage.setItem('profilePic', fallbackImageBase64);
+          localStorage.setItem('profilePic_backup', fallbackImageBase64);
           setProfileImage(fallbackImageBase64);
         }
       } catch (err) {
@@ -76,6 +82,7 @@ const useProfileImage = () => {
     // También actualizar en localStorage
     try {
       localStorage.setItem('profilePic', fallbackImageBase64);
+      localStorage.setItem('profilePic_backup', fallbackImageBase64);
     } catch (err) {
       console.error("Error al guardar imagen fallback:", err);
     }
@@ -104,10 +111,29 @@ const useProfileImage = () => {
     }
   }, []);
   
+  // Función para verificar si la imagen es válida antes de procesarla
+  const validateImage = useCallback((imageData) => {
+    // Debe ser una cadena de texto
+    if (typeof imageData !== 'string') return false;
+    
+    // Verificaciones básicas
+    if (!imageData || imageData === 'undefined' || imageData === 'null') return false;
+    
+    // Si es base64, debe comenzar con el formato adecuado
+    if (imageData.startsWith('data:')) {
+      // Verificar que tenga un formato válido (data:image/...)
+      return imageData.includes('data:image/');
+    }
+    
+    // Si es una URL, debe tener un protocolo válido
+    return imageData.startsWith('http://') || imageData.startsWith('https://');
+  }, []);
+  
   // Actualizar imagen de perfil (función principal)
   const updateProfileImage = useCallback(async (newImage) => {
-    if (!newImage || typeof newImage !== 'string') {
+    if (!validateImage(newImage)) {
       console.error("🚫 Imagen inválida proporcionada");
+      setError("La imagen proporcionada no es válida");
       return false;
     }
     
@@ -123,6 +149,15 @@ const useProfileImage = () => {
       // 2. Notificar a toda la aplicación
       notifyImageUpdate(newImage);
       
+      // 3. Verificar que se haya almacenado correctamente
+      const storedImage = localStorage.getItem('profilePic');
+      
+      if (storedImage !== newImage) {
+        console.warn("⚠️ Posible problema al almacenar la imagen. Reintentando...");
+        localStorage.setItem('profilePic', newImage);
+        localStorage.setItem('profilePic_backup', newImage);
+      }
+      
       setIsLoading(false);
       console.log("✅ Imagen actualizada correctamente");
       return true;
@@ -132,7 +167,7 @@ const useProfileImage = () => {
       setIsLoading(false);
       return false;
     }
-  }, [notifyImageUpdate]);
+  }, [notifyImageUpdate, validateImage]);
   
   return {
     profileImage: profileImage || fallbackImageBase64,

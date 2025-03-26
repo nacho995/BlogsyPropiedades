@@ -1154,6 +1154,7 @@ export const syncProfileImage = (imageUrl) => {
   try {
     localStorage.setItem('profilePic', imageUrl);
     localStorage.setItem('profilePic_backup', imageUrl);
+    localStorage.setItem('profilePic_lastUpdate', Date.now().toString());
     
     // Actualizar userData si existe
     try {
@@ -1167,7 +1168,17 @@ export const syncProfileImage = (imageUrl) => {
       console.warn('Error al actualizar userData:', e);
     }
     
-    console.log('Imagen de perfil almacenada en localStorage');
+    // Emitir evento de actualización para componentes que escuchan
+    try {
+      window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+        detail: { profileImage: imageUrl, timestamp: Date.now() }
+      }));
+      console.log('Evento de actualización de imagen emitido');
+    } catch (eventError) {
+      console.warn('Error al emitir evento de actualización:', eventError);
+    }
+    
+    console.log('Imagen de perfil almacenada en localStorage y notificada');
     return imageUrl;
   } catch (error) {
     console.error('Error al guardar imagen en localStorage:', error);
