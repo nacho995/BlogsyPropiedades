@@ -3,8 +3,8 @@ import { Disclosure, Menu, Transition } from '@headlessui/react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import { fallbackImageBase64 } from '../utils/profileUtils';
 import useProfileImage from '../hooks/useProfileImage';
+import { fallbackImageBase64 } from '../utils';
 
 // Función de utilidad para combinar clases CSS
 function classNames(...classes) {

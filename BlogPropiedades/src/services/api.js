@@ -6,27 +6,20 @@
  */
 
 // Importar utilidades
-import { 
-  sanitizeUrl, 
-  combineUrls 
-} from '../utils/urlSanitizer';
+import { combineUrls, ensureHttps, detectAndPreventLoopError } from '../utils';
 
-import { 
-  API_URL, 
-  FALLBACK_API
-} from '../utils/envConfig';
-
-import ErrorHandler from '../utils/errorHandler';
+// URL base de la API
+const API_DOMAIN = 'api.realestategozamadrid.com';
+const BASE_URL = `https://${API_DOMAIN}`;
 
 // Determinar si estamos usando HTTPS
 const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
 // Usar la API con HTTPS
-const BASE_URL = API_URL;
-const API_BASE_URL = API_URL;
+const API_BASE_URL = BASE_URL;
 
 // Registrar la URL de la API usada
-console.log(`🌐 Usando API en: ${API_URL} - Acceso directo sin proxies`);
+console.log(`🌐 Usando API en: ${BASE_URL} - Acceso directo sin proxies`);
 console.log(`🔒 Frontend en: ${isHttps ? 'HTTPS' : 'HTTP'} - ${window.location.origin}`);
 
 // Desactivar explícitamente cualquier proxy CORS
@@ -55,7 +48,7 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     console.log(`🔄 Enviando solicitud directa a: ${url}`);
     
     // Verificar si estamos en un bucle de solicitudes repetidas
-    if (ErrorHandler.detectAndPreventLoopError('api_fetch_' + endpoint, 8000, 4)) {
+    if (detectAndPreventLoopError('api_fetch_' + endpoint, 8000, 4)) {
       console.error(`🛑 Bucle de solicitudes detectado para ${endpoint}. Cancelando operación.`);
       clearTimeout(timeoutId);
       
@@ -104,20 +97,55 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     // Intentar realizar la solicitud directa
     const response = await fetch(url, fetchOptions);
     
-    // Si hay un error HTTP, usar el manejador de errores
+    // Si hay un error HTTP, manejar según el tipo
     if (!response.ok) {
-      // Obtener el resultado del manejador de errores
-      const handlerResult = ErrorHandler.handleHttpError(response.status, url, endpoint);
+      // Si el error fue manejado específicamente
+      if (response.status === 401) {
+        // Si entramos en bucle de 401, limpiar token
+        if (detectAndPreventLoopError('auth_401', 10000, 3)) {
+          console.warn("⚠️ Bucle de errores 401 detectado, limpiando credenciales");
+          // Solo limpiar token de localStorage si no estamos en login/registro
+          if (!endpoint.includes('/login') && !endpoint.includes('/register')) {
+            localStorage.removeItem('token');
+          }
+        }
+        
+        return { 
+          error: true, 
+          status: 401,
+          message: endpoint.includes('/login') ? 
+            'Credenciales incorrectas. Por favor, verifica tu email y contraseña.' : 
+            'Sesión expirada. Por favor, inicie sesión nuevamente.'
+        };
+      }
       
-      // Si el error fue manejado, devolver el resultado
-      if (handlerResult.isHandled) {
-        // Para endpoints que deberían devolver arrays, devolver array vacío
-        if (handlerResult.isEmpty) {
+      // Para código 500 - Error de servidor
+      if (response.status >= 500) {
+        // Detectar bucle de errores 500
+        detectAndPreventLoopError('server_500', 10000, 3);
+        
+        // Para endpoints de datos, devolver array vacío
+        if (endpoint.includes('/blog') || endpoint.includes('/property')) {
           return [];
         }
         
-        // Devolver el resultado manejado
-        return handlerResult;
+        return {
+          error: true,
+          status: 500,
+          message: 'Error interno del servidor. Por favor, intente más tarde.'
+        };
+      }
+      
+      // Para código 400 - Error de cliente
+      if (response.status === 400) {
+        // Si es login, devolver error específico
+        return {
+          error: true,
+          status: 400,
+          message: endpoint.includes('/login') ? 
+            'Credenciales incorrectas. Por favor, verifica tu email y contraseña.' :
+            'Error en la solicitud. Por favor, verifica los datos ingresados.'
+        };
       }
       
       // Si el error no fue manejado, intentar analizar la respuesta como JSON
@@ -156,7 +184,7 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     // No reintentar si es un error 401 o 500
     if (error.message && (error.message.includes('401') || error.message.includes('500'))) {
       // Verificar si estamos en un bucle de error 401
-      if (error.message.includes('401') && ErrorHandler.detectAndPreventLoopError('api_401_error', 10000, 3)) {
+      if (error.message.includes('401') && detectAndPreventLoopError('api_401_error', 10000, 3)) {
         console.warn("⚠️ Bucle de errores 401 detectado, limpiando credenciales");
         localStorage.removeItem('token');
         localStorage.removeItem('name');
@@ -172,31 +200,24 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
         };
       }
       
-      // Para endpoints de listas, devolver array vacío
+      // Para otros endpoints, devolver objeto vacío o error según corresponda
       if (endpoint.includes('/blog') || endpoint.includes('/property')) {
         return [];
       }
       
-      // Para otros endpoints, devolver objeto de error genérico
-      return {
-        error: true,
-        message: 'Error en la solicitud. Por favor, intente más tarde.'
-      };
+      return { error: true, message: error.message };
     }
     
-    // Reintentar solo en caso de error de red, con tiempo máximo
-    if ((error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) && retryCount < 1) {
-      console.log(`🔄 Reintentando solicitud directa (${retryCount + 1}/1)...`);
-      
+    // Si es un error de conexión y no hemos reintentado demasiadas veces, reintentar
+    if (retryCount < 2 && (
+      error.name === 'AbortError' || 
+      error.message.includes('network') || 
+      error.message.includes('connection')
+    )) {
+      console.log(`🔄 Reintentando solicitud (${retryCount + 1}/2)...`);
       // Esperar un poco antes de reintentar
-      await sleep(1000);
+      await sleep(1000 * (retryCount + 1));
       return fetchAPI(endpoint, options, retryCount + 1);
-    }
-    
-    // Para endpoints de propiedades y blogs, devolver array vacío para evitar romper la UI
-    if (endpoint.includes('/blog') || endpoint.includes('/property')) {
-      console.warn(`⚠️ Error al cargar datos de ${endpoint}, devolviendo array vacío`);
-      return [];
     }
     
     // Propagar el error para otros endpoints
@@ -695,14 +716,14 @@ export const uploadFile = async (file, token) => {
     }
     
     // Intentar primero con la ruta de subida específica
-    console.log("Intentando subir archivo a:", `${API_URL}/property/upload`);
+    console.log("Intentando subir archivo a:", `${BASE_URL}/property/upload`);
     
     let response;
     let usePropertyRoute = false;
     
     try {
       // Intentar con la ruta de subida específica
-      response = await fetch(`${API_URL}/property/upload`, {
+      response = await fetch(`${BASE_URL}/property/upload`, {
         method: 'POST',
         headers,
         body: formData
@@ -726,9 +747,9 @@ export const uploadFile = async (file, token) => {
     
     // Si falla, intentar con la ruta de blog
     if (usePropertyRoute || !response || !response.ok) {
-      console.log("Intentando con ruta alternativa:", `${API_URL}/blog/upload`);
+      console.log("Intentando con ruta alternativa:", `${BASE_URL}/blog/upload`);
       
-      response = await fetch(`${API_URL}/blog/upload`, {
+      response = await fetch(`${BASE_URL}/blog/upload`, {
         method: 'POST',
         headers,
         body: formData
@@ -749,9 +770,9 @@ export const uploadFile = async (file, token) => {
     
     // Si ambas rutas fallan, intentar con la ruta principal
     if (!response || !response.ok) {
-      console.log("Intentando con ruta principal:", `${API_URL}/property`);
+      console.log("Intentando con ruta principal:", `${BASE_URL}/property`);
       
-      response = await fetch(`${API_URL}/property`, {
+      response = await fetch(`${BASE_URL}/property`, {
         method: 'POST',
         headers,
         body: formData
@@ -1046,7 +1067,7 @@ const handleResponse = async (response) => {
 // GET request
 export const fetchData = async (endpoint) => {
   try {
-    const response = await fetch(`${API_URL}${endpoint}`);
+    const response = await fetch(`${BASE_URL}${endpoint}`);
     return handleResponse(response);
   } catch (error) {
     console.error('Error fetching data:', error);
@@ -1057,7 +1078,7 @@ export const fetchData = async (endpoint) => {
 // POST request
 export const postData = async (endpoint, data) => {
   try {
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const response = await fetch(`${BASE_URL}${endpoint}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1074,7 +1095,7 @@ export const postData = async (endpoint, data) => {
 // PUT request
 export const updateData = async (endpoint, data) => {
   try {
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const response = await fetch(`${BASE_URL}${endpoint}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -1091,7 +1112,7 @@ export const updateData = async (endpoint, data) => {
 // DELETE request
 export const deleteData = async (endpoint) => {
   try {
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const response = await fetch(`${BASE_URL}${endpoint}`, {
       method: 'DELETE',
     });
     return handleResponse(response);
@@ -1283,10 +1304,10 @@ export const uploadImageProperty = async (formData) => {
     };
     
     console.log("Token de autorización:", token);
-    console.log("Subiendo imagen de propiedad a:", `${API_URL}/property/upload-image`);
+    console.log("Subiendo imagen de propiedad a:", `${BASE_URL}/property/upload-image`);
     console.log("FormData contenido:", Array.from(formData.entries()));
     
-    const response = await fetch(`${API_URL}/property/upload-image`, {
+    const response = await fetch(`${BASE_URL}/property/upload-image`, {
       method: 'POST',
       headers: headers,
       body: formData,

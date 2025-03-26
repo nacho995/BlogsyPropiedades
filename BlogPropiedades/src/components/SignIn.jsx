@@ -5,7 +5,7 @@ import { useUser } from "../context/UserContext";
 import toast from "react-hot-toast";
 import { UserContext } from '../context/UserContext';
 import PropTypes from 'prop-types';
-import ErrorHandler from '../utils/errorHandler';
+import { detectAndPreventLoopError } from '../utils';
 
 const SignIn = ({ isRegistering = false }) => {
     const [email, setEmail] = useState("");
@@ -58,7 +58,7 @@ const SignIn = ({ isRegistering = false }) => {
             console.log("Usuario ya autenticado, preparando redirección...");
             
             // Verificar si ya estamos en un bucle de redirección
-            if (ErrorHandler.detectAndPreventLoopError('auth_redirect', 5000, 3)) {
+            if (detectAndPreventLoopError('auth_redirect', 5000, 3)) {
                 console.warn("⚠️ Posible bucle de redirección detectado, omitiendo redirección automática");
                 return;
             }
@@ -94,7 +94,7 @@ const SignIn = ({ isRegistering = false }) => {
                 setShowRecover(true);
                 
                 // Limpiar local storage si está atascado
-                if (ErrorHandler.detectAndPreventLoopError('signin_timeout', 30000, 2)) {
+                if (detectAndPreventLoopError('signin_timeout', 30000, 2)) {
                     console.log("🧹 Limpiando datos de sesión por timeout repetido");
                     localStorage.removeItem('token');
                 }
@@ -122,7 +122,7 @@ const SignIn = ({ isRegistering = false }) => {
         // MEJORA 2: Verificar si estamos en un bucle y romperlo definitivamente
         try {
             // Usar el detector de bucles
-            if (ErrorHandler.detectAndPreventLoopError('login_attempts', 3000, 2)) {
+            if (detectAndPreventLoopError('login_attempts', 3000, 2)) {
                 console.error("🛑 BUCLE DE LOGIN DETECTADO - Limpiando token");
                 // Limpiar token para romper bucle
                 localStorage.removeItem('token');

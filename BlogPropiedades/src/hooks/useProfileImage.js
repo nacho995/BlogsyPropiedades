@@ -1,185 +1,138 @@
 import { useState, useEffect, useCallback } from 'react';
+import { fallbackImageBase64, validateAndProcessImage } from '../utils';
 import { syncProfileImage } from '../services/api';
-import { fallbackImageBase64, validateAndProcessImage } from '../utils/profileUtils';
 
 /**
  * Hook personalizado para manejar la imagen de perfil
- * @param {Object} options - Opciones de configuración
- * @param {boolean} options.autoSync - Si debe sincronizar automáticamente con el servidor al montar
- * @param {boolean} options.listenForUpdates - Si debe escuchar eventos de actualización de imagen
- * @returns {Object} - Estado y funciones para manejar la imagen de perfil
+ * 
+ * Características:
+ * - Carga automática desde localStorage
+ * - Sincronización con el servidor
+ * - Manejo automático de errores
+ * - Capacidad de escuchar actualizaciones externas
+ * 
+ * @param {Object} options Configuración del hook
+ * @param {boolean} options.autoSync Si debe sincronizar automáticamente con el servidor
+ * @param {boolean} options.listenForUpdates Si debe escuchar actualizaciones de otras partes de la app
+ * @returns {Object} Estado y funciones de manejo de la imagen de perfil
  */
-const useProfileImage = (options = {}) => {
-  const { autoSync = true, listenForUpdates = true } = options;
-  
+const useProfileImage = ({ 
+  autoSync = false,
+  listenForUpdates = false
+} = {}) => {
   const [profileImage, setProfileImage] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  // Función para sincronizar la imagen con el servidor
-  const syncImage = useCallback(async (force = false) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // Verificar si hay token antes de intentar sincronizar
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.log("No se puede sincronizar imagen: no hay token de autenticación");
-        // Usar imagen en caché o fallback
-        const cachedImage = localStorage.getItem('profilePic') || 
-                          localStorage.getItem('profilePic_local') || 
-                          localStorage.getItem('profilePic_base64');
-        
-        if (cachedImage) {
-          setProfileImage(cachedImage);
-        } else {
-          setProfileImage(fallbackImageBase64);
-        }
-        
-        setIsLoading(false);
-        return;
-      }
-      
-      const response = await syncProfileImage();
-      
-      if (response && response.imageUrl) {
-        const imageUrl = response.imageUrl;
-        setProfileImage(imageUrl);
-        // Actualizar localStorage solo como caché
-        localStorage.setItem('profilePic', imageUrl);
-        
-        // Notificar a otros componentes
-        window.dispatchEvent(new CustomEvent('profileImageUpdated', {
-          detail: { imageUrl }
-        }));
-      } else {
-        // Si no hay imagen en el servidor, usar la imagen por defecto
-        setProfileImage(fallbackImageBase64);
-      }
-    } catch (err) {
-      console.error('Error al sincronizar imagen:', err);
-      setError(err);
-      // En caso de error, intentar usar la imagen en caché
-      const cachedImage = localStorage.getItem('profilePic');
-      if (cachedImage) {
-        setProfileImage(cachedImage);
-      } else {
-        setProfileImage(fallbackImageBase64);
-      }
-    } finally {
-      setIsLoading(false);
+  // Función para manejar errores de imagen
+  const handleImageError = useCallback((e) => {
+    console.error('Error al cargar imagen de perfil');
+    if (e?.target) {
+      e.target.src = fallbackImageBase64;
     }
-  }, []);
-  
-  // Función para actualizar la imagen
-  const updateProfileImage = useCallback(async (newImage) => {
-    try {
-      // Verificar si hay token antes de intentar actualizar
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No se puede actualizar la imagen: no hay token de autenticación');
-      }
-      
-      setIsLoading(true);
-      setError(null);
-
-      // Procesar la imagen antes de enviarla
-      const processedImage = await validateAndProcessImage(newImage);
-      
-      // Crear un Blob desde la imagen base64
-      const base64Data = processedImage.split(',')[1];
-      const blob = await fetch(`data:image/jpeg;base64,${base64Data}`).then(res => res.blob());
-      
-      // Crear un archivo desde el Blob
-      const file = new File([blob], 'profile.jpg', { type: 'image/jpeg' });
-      
-      // Actualizar en el servidor
-      const response = await syncProfileImage(file);
-      
-      if (response && response.imageUrl) {
-        const imageUrl = response.imageUrl;
-        setProfileImage(imageUrl);
-        localStorage.setItem('profilePic', imageUrl);
-        
-        window.dispatchEvent(new CustomEvent('profileImageUpdated', {
-          detail: { imageUrl }
-        }));
-        
-        return imageUrl;
-      } else {
-        throw new Error('No se recibió una URL de imagen válida del servidor');
-      }
-    } catch (err) {
-      console.error('Error al actualizar imagen:', err);
-      setError(err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-  
-  // Manejar errores de carga de imagen
-  const handleImageError = useCallback(() => {
-    console.error('Error al cargar imagen');
     setProfileImage(fallbackImageBase64);
   }, []);
   
-  // Efecto para sincronización inicial y periódica
-  useEffect(() => {
-    if (!autoSync) return;
-    
-    // Intentar sincronizar solo si hay token
-    if (localStorage.getItem('token')) {
-      syncImage();
-      
-      // Sincronizar cada 5 minutos solo si hay token
-      const interval = setInterval(() => {
-        if (localStorage.getItem('token')) {
-          syncImage();
+  // Cargar imagen desde localStorage
+  const loadLocalImage = useCallback(() => {
+    try {
+      const storedImage = localStorage.getItem('profilePic');
+      if (storedImage) {
+        if (storedImage !== profileImage) {
+          // Verificar y validar la imagen antes de establecerla
+          validateAndProcessImage(storedImage)
+            .then(validatedImage => {
+              setProfileImage(validatedImage);
+            })
+            .catch(() => {
+              console.warn('Imagen de perfil en localStorage no válida');
+              setProfileImage(fallbackImageBase64);
+            });
         }
-      }, 300000);
-      
-      // Limpiar intervalo al desmontar
-      return () => clearInterval(interval);
-    } else {
-      // Si no hay token, cargar imagen de caché o fallback
-      const cachedImage = localStorage.getItem('profilePic') || 
-                        localStorage.getItem('profilePic_local') || 
-                        localStorage.getItem('profilePic_base64');
-      
-      if (cachedImage) {
-        setProfileImage(cachedImage);
       } else {
         setProfileImage(fallbackImageBase64);
       }
-      
-      setIsLoading(false);
+    } catch (error) {
+      console.error('Error al cargar imagen de localStorage:', error);
+      setProfileImage(fallbackImageBase64);
     }
-  }, [autoSync, syncImage]);
+  }, [profileImage]);
   
-  // Efecto para escuchar actualizaciones de otros componentes
+  // Sincronizar imagen con el servidor
+  const syncImage = useCallback(async () => {
+    // Solo sincronizar si hay un token
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.log('No hay token, no se puede sincronizar imagen');
+      return null;
+    }
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const result = await syncProfileImage();
+      
+      if (result && result.imageUrl) {
+        // Verificar y procesar la URL antes de guardarla
+        const processedImage = await validateAndProcessImage(result.imageUrl);
+        
+        // Guardar en localStorage
+        localStorage.setItem('profilePic', processedImage);
+        setProfileImage(processedImage);
+        
+        setIsLoading(false);
+        return processedImage;
+      } else {
+        setIsLoading(false);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error al sincronizar imagen de perfil:', error);
+      setError(error);
+      setIsLoading(false);
+      return null;
+    }
+  }, []);
+  
+  // Efecto para cargar la imagen al montar el componente
+  useEffect(() => {
+    loadLocalImage();
+    
+    // Si autoSync está habilitado, sincronizar con el servidor
+    if (autoSync) {
+      syncImage().catch(err => {
+        console.error('Error en sincronización automática de imagen:', err);
+      });
+    }
+  }, [loadLocalImage, autoSync, syncImage]);
+  
+  // Efecto para escuchar actualizaciones desde otras partes de la app
   useEffect(() => {
     if (!listenForUpdates) return;
     
-    const handleImageUpdate = (event) => {
-      const newImage = event.detail.imageUrl;
-      if (newImage && newImage !== profileImage) {
-        setProfileImage(newImage);
+    const handleStorageChange = (e) => {
+      if (e.key === 'profilePic') {
+        loadLocalImage();
       }
     };
     
-    window.addEventListener('profileImageUpdated', handleImageUpdate);
-    return () => window.removeEventListener('profileImageUpdated', handleImageUpdate);
-  }, [listenForUpdates, profileImage]);
+    window.addEventListener('storage', handleStorageChange);
+    document.addEventListener('profile-image-updated', loadLocalImage);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      document.removeEventListener('profile-image-updated', loadLocalImage);
+    };
+  }, [loadLocalImage, listenForUpdates]);
   
   return {
-    profileImage: profileImage || fallbackImageBase64,
+    profileImage,
     isLoading,
     error,
     syncImage,
     handleImageError,
-    updateProfileImage
+    setProfileImage
   };
 };
 

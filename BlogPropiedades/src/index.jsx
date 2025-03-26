@@ -2,14 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
-import { initializeErrorHandlers } from './utils/errorHandler';
 
 // Envolver la renderización en un try-catch para evitar errores
 const renderApp = () => {
   try {
-    // Inicializar manejadores de errores globales
-    initializeErrorHandlers();
-    
     // Renderizar la aplicación con un pequeño retraso para evitar problemas de inicialización
     setTimeout(() => {
       try {

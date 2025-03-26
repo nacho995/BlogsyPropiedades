@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from "../context/UserContext";
-import { fallbackImageBase64, validateAndProcessImage } from "../utils/profileUtils";
+import { fallbackImageBase64, validateAndProcessImage } from "../utils";
 import useProfileImage from "../hooks/useProfileImage";
 
 export default function CambiarPerfil() {

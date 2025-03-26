@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom"; // Replace useHistory with
 import { useUser } from "../context/UserContext";
 import { getBlogPosts, getPropertyPosts } from "../services/api"; // Removed syncProfileImage import
 import { motion } from "framer-motion";
-import { fallbackImageBase64 } from "../utils/profileUtils";
+import { fallbackImageBase64 } from "../utils";
 import useProfileImage from "../hooks/useProfileImage"; // Import the new hook
 
 // Definir la imagen de perfil por defecto

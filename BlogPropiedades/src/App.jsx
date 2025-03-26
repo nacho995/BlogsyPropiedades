@@ -7,7 +7,6 @@ import toast from 'react-hot-toast';
 // Primero cargar componentes básicos y utilidades
 import Navbar from './components/NavBar';
 import ImageLoader from './components/ImageLoader';
-import ErrorHandler from './utils/errorHandler';
 
 // Luego cargar componentes de páginas
 import Principal from './components/Principal';

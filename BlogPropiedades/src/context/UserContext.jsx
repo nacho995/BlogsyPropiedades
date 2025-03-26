@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
 import { getUserProfile, syncProfileImage } from '../services/api';
-import { fallbackImageBase64, validateAndProcessImage, ensureHttps } from "../utils/profileUtils";
+import { fallbackImageBase64, validateAndProcessImage, ensureHttps } from "../utils";
 
 // Crear contexto
 export const UserContext = createContext();
