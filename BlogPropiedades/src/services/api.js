@@ -9,6 +9,7 @@
 import { combineUrls, ensureHttps, detectAndPreventLoopError } from '../utils';
 
 // URL base de la API
+// Modificar la URL base para asegurar que sea correcta
 const API_DOMAIN = 'api.realestategozamadrid.com';
 const BASE_URL = `https://${API_DOMAIN}`;
 
@@ -1333,5 +1334,54 @@ export const uploadImageProperty = async (formData) => {
   } catch (error) {
     console.error('Error al subir imagen de propiedad:', error);
     throw error;
+  }
+};
+
+// Añadir función de prueba para verificar la conexión con la API
+export const testApiConnection = async () => {
+  try {
+    console.log(`🔍 Probando conexión a la API en: ${BASE_URL}`);
+    
+    // Intentar una conexión simple a la raíz de la API
+    const response = await fetch(`${BASE_URL}/`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    
+    console.log(`📊 Respuesta de conexión a API: Status ${response.status}`);
+    
+    // Probar la ruta de blogs específicamente
+    const blogTestResponse = await fetch(`${BASE_URL}/api/blogs`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    
+    console.log(`📚 Prueba de ruta de blogs: Status ${blogTestResponse.status}`);
+    
+    // Probar la ruta de propiedades específicamente
+    const propertyTestResponse = await fetch(`${BASE_URL}/api/properties`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    
+    console.log(`🏠 Prueba de ruta de propiedades: Status ${propertyTestResponse.status}`);
+    
+    return {
+      baseApi: response.status,
+      blogs: blogTestResponse.status,
+      properties: propertyTestResponse.status
+    };
+  } catch (error) {
+    console.error('❌ Error en prueba de conexión a API:', error);
+    return {
+      error: true,
+      message: error.message
+    };
   }
 };
