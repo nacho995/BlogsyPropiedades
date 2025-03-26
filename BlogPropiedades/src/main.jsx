@@ -275,9 +275,25 @@ try {
     document.body.appendChild(newRoot);
   }
 
+  // Verificar recargas y problemas anteriores
+  const reloadCount = parseInt(localStorage.getItem('app_reload_count') || '0');
+  const lastError = localStorage.getItem('app_last_error');
+  
+  // Si ha habido recargas previas por errores, aumentar el tiempo de espera
+  const delayTime = reloadCount > 0 ? 300 + (reloadCount * 150) : 150;
+  
+  console.log(`🔄 Inicializando aplicación con retraso de ${delayTime}ms (recargas: ${reloadCount})`);
+  
+  if (lastError && lastError.includes('Nc')) {
+    console.log('⚠️ Previamente se detectó error de inicialización de Nc, aplicando modo seguro');
+    // Establecer una bandera global que será usada por el código minificado para evitar el error
+    window.__SAFE_INIT = true;
+  }
+
   // Añadir un retraso para asegurarse de que todos los módulos estén inicializados
   setTimeout(() => {
     try {
+      // Envolver en try-catch para capturar errores durante la renderización
       createRoot(document.getElementById("root")).render(
         getSafeEnvValue('MODE') === 'production' ? (
           <ErrorBoundary>
@@ -291,10 +307,34 @@ try {
           </StrictMode>
         )
       );
+      
+      // Si llegamos aquí, todo salió bien, reiniciamos el contador
+      if (reloadCount > 0) {
+        localStorage.setItem('app_reload_count', '0');
+        console.log('✅ Aplicación inicializada correctamente después de reintento');
+      }
     } catch(error) {
       console.error("Error al renderizar la aplicación:", error);
+      
+      // Si hay un error específico, mostrar un mensaje directo
+      if (error.message && error.message.includes('Nc')) {
+        document.body.innerHTML = `
+          <div style="padding: 20px; text-align: center; font-family: sans-serif;">
+            <h2 style="color: #e53e3e;">Error al inicializar la aplicación</h2>
+            <p>Estamos experimentando un problema técnico específico (Error Nc).</p>
+            <p>Intentando recuperación automática...</p>
+          </div>
+        `;
+        
+        // Forzar recarga después de un momento
+        setTimeout(() => {
+          localStorage.setItem('app_reload_count', (reloadCount + 1).toString());
+          localStorage.setItem('app_last_error', error.message);
+          window.location.reload();
+        }, 2000);
+      }
     }
-  }, 150);
+  }, delayTime);
 } catch (error) {
   console.error("Error crítico en la inicialización:", error);
 }
