@@ -1,5 +1,5 @@
 import React from 'react';
-import Header from "../components/header";
+import Navbar from "../components/NavBar";
 import TestProfileImage from '../components/TestProfileImage';
 
 /**
@@ -8,7 +8,7 @@ import TestProfileImage from '../components/TestProfileImage';
 export default function TestImagePage() {
   return (
     <>
-      <Header />
+      <Navbar />
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold text-center mb-8 text-blue-900">
           Diagnóstico de Imágenes de Perfil

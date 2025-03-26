@@ -1,5 +1,5 @@
-import CambiarPerfil from "../components/cambiarPerfil";
-import Header from "../components/header";
+import CambiarPerfil from "../components/CambiarPerfil";
+import Navbar from "../components/NavBar";
 import { useUser } from '../context/UserContext';
 
 export default function ChangeProfilePage() {
@@ -20,7 +20,7 @@ export default function ChangeProfilePage() {
 
     return (
         <>
-            <Header />
+            <Navbar />
             <CambiarPerfil />
         </>
     );
