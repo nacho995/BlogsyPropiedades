@@ -116,7 +116,7 @@ export default function SeeProperties() {
         try {
             setDeleteLoading(prevState => ({ ...prevState, [property_id]: true }));
             const deleted = await deletePropertyPost(property_id);
-            if (deleted.success) {
+            if (deleted) {
                 try {
                     toast('Propiedad eliminada correctamente', {
                         icon: '✅',

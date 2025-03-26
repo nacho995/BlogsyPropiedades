@@ -916,14 +916,23 @@ export const getPropertyPosts = async () => {
 };
 
 /**
- * Elimina un property post por su id.
+ * Elimina una propiedad por su id.
  * @param {string} id - Identificador del property post.
  * @returns {Promise<Object>}
  */
 export const deletePropertyPost = async (id) => {
   try {
+    // Obtener el token del localStorage
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No hay token de autenticación disponible');
+    }
+    
     return await fetchAPI(`/api/properties/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
   } catch (error) {
     console.error('Error al eliminar propiedad:', error);

@@ -54,7 +54,7 @@ export default function CambiarPerfil() {
     error: profileError, 
     handleImageError, 
     updateProfileImage,
-    broadcastUpdate
+    fallbackImageBase64
   } = useProfileImage();
 
   // Limpiar recursos al desmontar
@@ -66,21 +66,21 @@ export default function CambiarPerfil() {
     };
   }, [profilePic]);
 
-  // Forzar actualización inmediata de imagen al iniciar el componente
+  // Inicializar la imagen al montar el componente
   useEffect(() => {
-    console.log("🔄 CambiarPerfil: Verificando imagen al iniciar");
     try {
-      // Intentar cargar desde localStorage
       const storedImage = localStorage.getItem('profilePic');
-      if (storedImage && storedImage !== 'undefined' && storedImage !== 'null') {
-        console.log("🖼️ CambiarPerfil: Forzando actualización de imagen");
-        // Forzar una actualización global
-        broadcastUpdate(storedImage);
+      // Solo actualizar si hay una imagen válida
+      if (storedImage && storedImage !== 'undefined' && storedImage !== 'null' && typeof storedImage === 'string') {
+        console.log("CambiarPerfil: Inicializando con imagen guardada");
+        updateProfileImage(storedImage).catch(err => 
+          console.error("Error al inicializar imagen en CambiarPerfil:", err)
+        );
       }
     } catch (err) {
-      console.error("Error al sincronizar imagen al iniciar:", err);
+      console.error("Error al cargar imagen inicial en CambiarPerfil:", err);
     }
-  }, [broadcastUpdate]);
+  }, [updateProfileImage]);
 
   // Determinar si estamos usando HTTPS
   const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
@@ -120,18 +120,22 @@ export default function CambiarPerfil() {
         try {
           const imageData = event.target.result;
           
-          // Actualizar imagen de manera directa y clara
-          console.log("📤 CambiarPerfil: Imagen transformada a base64, actualizando...");
+          // Verificar que la imagen es válida
+          if (!imageData || typeof imageData !== 'string') {
+            throw new Error("La imagen procesada no es válida");
+          }
           
-          // Establecer en localStorage para garantizar disponibilidad inmediata
+          // Guardar primero en localStorage
           localStorage.setItem('profilePic', imageData);
           
-          // Actualizar imagen usando el hook (que también notificará a otros componentes)
+          // Actualizar la imagen usando el hook
           updateProfileImage(imageData)
-            .then(() => {
-              // Forzar una propagación adicional para mayor seguridad
-              broadcastUpdate(imageData);
-              setSuccess("Imagen actualizada correctamente");
+            .then((success) => {
+              if (success) {
+                setSuccess("Imagen actualizada correctamente");
+              } else {
+                setError("No se pudo actualizar la imagen correctamente");
+              }
               setLoading(false);
             })
             .catch(err => {
@@ -236,9 +240,6 @@ export default function CambiarPerfil() {
         
         // Usar updateProfileImage que manejará todo el proceso de notificación
         await updateProfileImage(data.profilePic);
-        
-        // Por seguridad, forzar una segunda actualización
-        broadcastUpdate(data.profilePic);
       }
 
       // Actualizar datos de usuario

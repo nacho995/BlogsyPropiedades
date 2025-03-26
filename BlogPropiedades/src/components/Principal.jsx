@@ -57,57 +57,8 @@ function Principal() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef(null);
   
-  // Estado local para la imagen de perfil
-  const [profilePicture, setProfilePicture] = useState(defaultProfilePic);
-  
-  // Obtener la imagen del localStorage directamente cada vez que se renderiza el componente
-  useEffect(() => {
-    // Función para obtener la imagen más reciente
-    const updateProfilePicture = () => {
-      try {
-        const storedImage = localStorage.getItem('profilePic');
-        if (storedImage && storedImage !== 'undefined' && storedImage !== 'null') {
-          console.log("🖼️ Principal: Imagen cargada desde localStorage");
-          setProfilePicture(storedImage);
-        } else {
-          // Intentar con el respaldo
-          const backupImage = localStorage.getItem('profilePic_backup');
-          if (backupImage && backupImage !== 'undefined' && backupImage !== 'null') {
-            console.log("🖼️ Principal: Imagen cargada desde backup");
-            setProfilePicture(backupImage);
-            // Restaurar la imagen principal
-            localStorage.setItem('profilePic', backupImage);
-          }
-        }
-      } catch (error) {
-        console.error("Error al cargar imagen en Principal:", error);
-      }
-    };
-    
-    // Actualizar al montar
-    updateProfilePicture();
-    
-    // Configurar un intervalo para verificar la imagen periódicamente
-    const checkInterval = setInterval(updateProfilePicture, 1000);
-    
-    // También escuchar el evento de actualización
-    const handleProfileUpdate = () => {
-      updateProfilePicture();
-    };
-    
-    window.addEventListener('profileImageUpdated', handleProfileUpdate);
-    
-    return () => {
-      clearInterval(checkInterval);
-      window.removeEventListener('profileImageUpdated', handleProfileUpdate);
-    };
-  }, []);
-  
-  // Función para manejar error de imagen
-  const handleImageError = () => {
-    console.log("❌ Error al cargar imagen en Principal, usando fallback");
-    setProfilePicture(defaultProfilePic);
-  };
+  // Usar el hook de imagen directamente - esto asegura que siempre tengamos una imagen válida
+  const { profileImage, handleImageError } = useProfileImage();
   
   // Obtener datos del usuario
   const { user, isAuthenticated: userAuthenticated, logout } = useUser();
@@ -534,7 +485,7 @@ function Principal() {
               <div className="flex items-center space-x-3">
                 <div className="relative" ref={profileMenuRef}>
                   <img 
-                    src={profilePicture} 
+                    src={profileImage} 
                     alt="Perfil" 
                     className="h-14 w-14 rounded-full border-3 border-yellow-300 object-cover shadow-lg cursor-pointer" 
                     onError={handleImageError}
@@ -589,7 +540,7 @@ function Principal() {
           <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-4 sm:p-6 md:p-8 flex flex-col md:flex-row items-center gap-6">
             <div className="relative">
               <img 
-                src={profilePicture} 
+                src={profileImage} 
                 alt="Perfil" 
                 className="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 rounded-full border-4 border-blue-500 object-cover shadow-lg" 
                 onError={handleImageError}
