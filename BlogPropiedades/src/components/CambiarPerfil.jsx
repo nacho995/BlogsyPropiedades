@@ -70,20 +70,31 @@ export default function CambiarPerfil() {
 
       // Convertir a base64 para almacenamiento y sincronización
       const reader = new FileReader();
-      reader.onload = async (event) => {
+      
+      reader.onload = function(event) {
         try {
+          // Envolver en un bloque try-catch adicional
+          const imageData = event.target.result;
+          
           // Actualizar imagen en el sistema de sincronización
-          await updateProfileImage(event.target.result);
-          setSuccess("Imagen actualizada y sincronizada correctamente");
+          updateProfileImage(imageData)
+            .then(() => {
+              setSuccess("Imagen actualizada y sincronizada correctamente");
+              setLoading(false);
+            })
+            .catch(err => {
+              console.error("Error al sincronizar imagen:", err);
+              setError("Error al sincronizar la imagen. Inténtalo de nuevo.");
+              setLoading(false);
+            });
         } catch (err) {
           console.error("Error al procesar imagen:", err);
           setError("Error al procesar la imagen. Inténtalo de nuevo.");
-        } finally {
           setLoading(false);
         }
       };
       
-      reader.onerror = () => {
+      reader.onerror = function() {
         setError("Error al leer el archivo. Inténtalo de nuevo.");
         setLoading(false);
       };

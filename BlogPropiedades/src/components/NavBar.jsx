@@ -82,13 +82,13 @@ export default function Navbar({ showOnlyAuth = false }) {
       <Disclosure as="nav" className="bg-black text-white shadow-md">
         {({ open }) => (
           <>
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-7xl px-2 sm:px-4 lg:px-8">
               <div className="flex justify-between h-16">
                 {/* Logo */}
                 <div className="flex">
                   <Link to="/" className="flex-shrink-0 flex items-center">
-                    <img className="h-8 w-auto" src="/logo.jpg" alt="Logo" />
-                    <span className="ml-2 font-bold text-xl text-white">GozaMadrid - Subir Imágenes</span>
+                    <img className="h-6 w-auto sm:h-8" src="/logo.jpg" alt="Logo" />
+                    <span className="ml-2 text-sm sm:text-xl font-bold text-white">GozaMadrid - Subir Imágenes</span>
                   </Link>
                 </div>
                 
@@ -182,20 +182,20 @@ export default function Navbar({ showOnlyAuth = false }) {
   }
 
   return (
-    <Disclosure as="nav" className="bg-black text-white shadow-md">
+    <Disclosure as="nav" className="bg-black text-white shadow-md sticky top-0 z-50">
       {({ open }) => (
         <>
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-2 sm:px-4 lg:px-8">
             <div className="flex justify-between h-16">
               {/* Logo y navegación principal */}
-              <div className="flex">
+              <div className="flex items-center">
                 <Link to="/" className="flex-shrink-0 flex items-center">
-                  <img className="h-8 w-auto" src="/logo.jpg" alt="Logo" />
-                  <span className="ml-2 font-bold text-xl text-white">GozaMadrid</span>
+                  <img className="h-6 w-auto sm:h-8" src="/logo.jpg" alt="Logo" />
+                  <span className="ml-2 text-base sm:text-xl font-bold text-white">GozaMadrid</span>
                 </Link>
                 
                 {/* Enlaces de navegación en escritorio */}
-                <div className="hidden sm:ml-6 sm:flex sm:space-x-4">
+                <div className="hidden md:ml-6 md:flex md:space-x-3 lg:space-x-4">
                   {updatedNavigation.map((item) => (
                     <Link
                       key={item.name}
@@ -204,7 +204,7 @@ export default function Navbar({ showOnlyAuth = false }) {
                         item.current
                           ? 'border-blue-400 text-blue-400'
                           : 'border-transparent text-gray-300 hover:text-white hover:border-gray-300',
-                        'inline-flex items-center px-3 py-2 border-b-2 text-sm font-medium transition-colors duration-200'
+                        'inline-flex items-center px-2 lg:px-3 py-2 border-b-2 text-sm font-medium transition-colors duration-200'
                       )}
                       aria-current={item.current ? 'page' : undefined}
                     >
@@ -215,7 +215,7 @@ export default function Navbar({ showOnlyAuth = false }) {
               </div>
               
               {/* Botón de menú en móvil */}
-              <div className="flex items-center sm:hidden">
+              <div className="flex items-center md:hidden">
                 <Disclosure.Button className="inline-flex items-center justify-center p-2 rounded-md text-gray-300 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-400">
                   <span className="sr-only">Abrir menú principal</span>
                   {open ? (
@@ -227,15 +227,15 @@ export default function Navbar({ showOnlyAuth = false }) {
               </div>
               
               {/* Menú de usuario */}
-              <div className="hidden sm:flex sm:items-center">
+              <div className="hidden md:flex md:items-center">
                 {isAuthenticated ? (
                   <div className="flex items-center space-x-3">
-                    <span className="hidden md:block text-gray-300">{user?.name || "Usuario"}</span>
+                    <span className="hidden lg:block text-gray-300">{user?.name || "Usuario"}</span>
                     <Menu as="div" className="relative">
                       <Menu.Button className="flex rounded-full bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 ring-offset-2 ring-offset-black">
                         <span className="sr-only">Abrir menú de usuario</span>
                         <img
-                          className="h-10 w-10 rounded-full object-cover border-2 border-gray-700"
+                          className="h-8 w-8 lg:h-10 lg:w-10 rounded-full object-cover border-2 border-gray-700"
                           src={profileImage || fallbackImageBase64}
                           alt="Perfil"
                           onError={handleImageError}
@@ -255,54 +255,16 @@ export default function Navbar({ showOnlyAuth = false }) {
                           <Menu.Item>
                             {({ active }) => (
                               <Link
-                                to="/cambiar-perfil"
+                                to="/perfil"
                                 className={classNames(
                                   active ? 'bg-gray-100' : '',
                                   'block px-4 py-2 text-sm text-gray-700'
                                 )}
                               >
-                                Cambiar Perfil
+                                Mi Perfil
                               </Link>
                             )}
                           </Menu.Item>
-                          
-                          {/* Opciones rápidas de navegación */}
-                          {isAuthenticated && (
-                            <>
-                              <Menu.Item>
-                                {({ active }) => (
-                                  <Link
-                                    to="/crear-blog"
-                                    className={classNames(
-                                      active ? 'bg-gray-100' : '',
-                                      'block px-4 py-2 text-sm text-gray-700'
-                                    )}
-                                  >
-                                    Añadir Blog
-                                  </Link>
-                                )}
-                              </Menu.Item>
-                              
-                              {(user?.role === 'admin' || user?.role === 'ADMIN' || user?.isAdmin === true) && (
-                                <Menu.Item>
-                                  {({ active }) => (
-                                    <Link
-                                      to="/add-property"
-                                      className={classNames(
-                                        active ? 'bg-gray-100' : '',
-                                        'block px-4 py-2 text-sm text-gray-700'
-                                      )}
-                                    >
-                                      Añadir Propiedad
-                                    </Link>
-                                  )}
-                                </Menu.Item>
-                              )}
-                              
-                              <div className="border-t border-gray-200 my-1"></div>
-                            </>
-                          )}
-                          
                           <Menu.Item>
                             {({ active }) => (
                               <button
@@ -321,27 +283,19 @@ export default function Navbar({ showOnlyAuth = false }) {
                     </Menu>
                   </div>
                 ) : (
-                  <div className="flex items-center space-x-4">
-                    <Link
-                      to="/login"
-                      className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
-                    >
-                      Iniciar Sesión
-                    </Link>
-                    <Link
-                      to="/register"
-                      className="bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700"
-                    >
-                      Registrarse
-                    </Link>
-                  </div>
+                  <Link
+                    to="/login"
+                    className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                  >
+                    Iniciar Sesión
+                  </Link>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Menú móvil */}
-          <Disclosure.Panel className="sm:hidden">
+          {/* Panel de navegación móvil */}
+          <Disclosure.Panel className="md:hidden bg-gray-900">
             <div className="space-y-1 px-2 pb-3 pt-2">
               {updatedNavigation.map((item) => (
                 <Disclosure.Button
@@ -350,72 +304,43 @@ export default function Navbar({ showOnlyAuth = false }) {
                   to={item.href}
                   className={classNames(
                     item.current
-                      ? 'bg-gray-900 text-white'
+                      ? 'bg-gray-800 text-white'
                       : 'text-gray-300 hover:bg-gray-700 hover:text-white',
-                    'block px-3 py-2 rounded-md text-base font-medium'
+                    'block rounded-md px-3 py-2 text-base font-medium'
                   )}
                   aria-current={item.current ? 'page' : undefined}
                 >
                   {item.name}
                 </Disclosure.Button>
               ))}
-              
-              {isAuthenticated ? (
-                <>
-                  <div className="border-t border-gray-700 my-2"></div>
-                  <Disclosure.Button
-                    as={Link}
-                    to="/cambiar-perfil"
-                    className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-white"
-                  >
-                    Cambiar Perfil
-                  </Disclosure.Button>
-                  <Disclosure.Button
-                    as="button"
-                    onClick={() => logout(true)}
-                    className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-white"
-                  >
-                    Cerrar Sesión
-                  </Disclosure.Button>
-                </>
-              ) : (
-                <>
-                  <Disclosure.Button
-                    as={Link}
-                    to="/login"
-                    className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-white"
-                  >
-                    Iniciar Sesión
-                  </Disclosure.Button>
-                  <Disclosure.Button
-                    as={Link}
-                    to="/register"
-                    className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-white"
-                  >
-                    Registrarse
-                  </Disclosure.Button>
-                </>
-              )}
-            </div>
-            
-            {/* Perfil en móvil */}
-            {isAuthenticated && (
-              <div className="pt-4 pb-3 border-t border-gray-700">
-                <div className="flex items-center px-5">
-                  <div className="flex-shrink-0">
+              {isAuthenticated && (
+                <div className="border-t border-gray-700 pt-2 mt-2">
+                  <div className="flex items-center px-3 py-2">
                     <img
-                      className="h-10 w-10 rounded-full object-cover"
+                      className="h-8 w-8 rounded-full mr-2 object-cover"
                       src={profileImage || fallbackImageBase64}
                       alt="Perfil"
                       onError={handleImageError}
                     />
+                    <span className="text-gray-300 text-sm">{user?.name || "Usuario"}</span>
                   </div>
-                  <div className="ml-3">
-                    <div className="text-base font-medium text-white">{user?.name || "Usuario"}</div>
+                  <div className="mt-1">
+                    <Link
+                      to="/perfil"
+                      className="block text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-base font-medium"
+                    >
+                      Mi Perfil
+                    </Link>
+                    <button
+                      onClick={() => logout(true)}
+                      className="w-full text-left text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-base font-medium"
+                    >
+                      Cerrar Sesión
+                    </button>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </Disclosure.Panel>
         </>
       )}

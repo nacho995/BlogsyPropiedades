@@ -365,12 +365,53 @@ const useProfileImage = ({
     };
   }, []);
   
+  // Función para actualizar la imagen de perfil
+  const updateProfileImage = useCallback(async (newImage) => {
+    try {
+      // Validar la imagen antes de continuar
+      if (!newImage) {
+        throw new Error('No se proporcionó imagen para actualizar');
+      }
+      
+      // Guardar en localStorage para acceso inmediato
+      if (typeof newImage === 'string') {
+        localStorage.setItem('profilePic', newImage);
+      } else if (newImage.src || newImage.url) {
+        localStorage.setItem('profilePic', newImage.src || newImage.url);
+      } else {
+        throw new Error('Formato de imagen no válido');
+      }
+      
+      // Actualizar estado local
+      if (isMounted.current) {
+        setProfileImage(newImage);
+        setError(null);
+      }
+      
+      // Sincronizar con el servidor si está habilitado
+      if (autoSync) {
+        await syncImage(true);
+      }
+      
+      return true;
+    } catch (err) {
+      console.error('Error al actualizar imagen de perfil:', err);
+      
+      if (isMounted.current) {
+        setError(err);
+      }
+      
+      return false;
+    }
+  }, [autoSync, syncImage]);
+
   return {
     profileImage,
     isLoading,
     error,
     handleImageError,
-    syncImage
+    syncImage,
+    updateProfileImage
   };
 };
 

@@ -272,138 +272,144 @@ const SignIn = ({ isRegistering = false }) => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-700 to-amber-500 py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-md w-full space-y-8 backdrop-blur-lg bg-white/10 p-8 rounded-xl shadow-2xl border border-white/20">
-                <div>
-                    <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                        Iniciar Sesión
-                    </h2>
-                    <p className="mt-2 text-center text-sm text-gray-600">
-                        ¿No tienes una cuenta?{" "}
-                        <Link
-                            to="/register"
-                            className="font-medium text-indigo-600 hover:text-indigo-500"
-                        >
-                            Regístrate aquí
-                        </Link>
-                    </p>
-                </div>
-                
-                {/* ⚠️ Mensaje de Recuperación de Emergencia ⚠️ */}
-                {showRecover && (
-                    <div className="p-4 mb-4 bg-red-50 border-l-4 border-red-500 rounded-md">
-                        <div className="flex">
-                            <div className="flex-shrink-0">
-                                <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                                </svg>
-                            </div>
-                            <div className="ml-3">
-                                <h3 className="text-sm font-medium text-red-800">¿Problemas de carga?</h3>
-                                <div className="mt-2 text-sm text-red-700">
-                                    <p>Parece que la aplicación está teniendo problemas. Intente:</p>
-                                    <ul className="list-disc pl-5 mt-1 space-y-1">
-                                        <li>Refrescar la página</li>
-                                        <li>Revisar su conexión a internet</li>
-                                        <li>
-                                            <button 
-                                                onClick={() => {
-                                                    localStorage.clear();
-                                                    window.location.href = '/login';
-                                                }}
-                                                className="text-red-800 font-medium hover:text-red-900"
+        <div className="flex min-h-screen flex-col justify-center bg-gray-100 py-6 sm:py-12">
+            <div className="relative py-3 sm:mx-auto sm:max-w-xl">
+                <div className="absolute inset-0 -skew-y-6 transform bg-gradient-to-r from-black to-gray-800 shadow-lg sm:-rotate-6 sm:skew-y-0 sm:rounded-3xl"></div>
+                <div className="relative bg-white px-4 py-10 shadow-lg sm:rounded-3xl sm:p-14 sm:p-20">
+                    <div className="mx-auto max-w-md">
+                        <div className="flex justify-center">
+                            <img src="/logo.jpg" alt="Logo" className="h-12 sm:h-16 rounded-full" />
+                        </div>
+                        <div className="divide-y divide-gray-200">
+                            <div className="space-y-4 py-4 text-base leading-6 text-gray-700 sm:text-lg sm:leading-7">
+                                <h1 className="text-center text-xl font-semibold sm:text-2xl md:text-3xl">
+                                    {isRegistering ? "Crear una cuenta" : "Iniciar sesión"}
+                                </h1>
+                                
+                                {error && (
+                                    <div className="rounded-md bg-red-50 p-4">
+                                        <div className="flex">
+                                            <div className="ml-3">
+                                                <p className="text-sm text-red-700">{error}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                <form onSubmit={handleSubmit} className="space-y-4">
+                                    <div>
+                                        <label htmlFor="email" className="block text-gray-700 text-sm font-medium sm:text-base">
+                                            Correo electrónico
+                                        </label>
+                                        <input
+                                            id="email"
+                                            name="email"
+                                            type="email"
+                                            autoComplete="email"
+                                            required
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                                            placeholder="tu@email.com"
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label htmlFor="password" className="block text-gray-700 text-sm font-medium sm:text-base">
+                                            Contraseña
+                                        </label>
+                                        <input
+                                            id="password"
+                                            name="password"
+                                            type="password"
+                                            autoComplete={isRegistering ? "new-password" : "current-password"}
+                                            required
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                                            placeholder="Contraseña"
+                                        />
+                                    </div>
+                                    
+                                    {isRegistering && (
+                                        <div>
+                                            <label htmlFor="confirmPassword" className="block text-gray-700 text-sm font-medium sm:text-base">
+                                                Confirmar Contraseña
+                                            </label>
+                                            <input
+                                                id="confirmPassword"
+                                                name="confirmPassword"
+                                                type="password"
+                                                autoComplete="new-password"
+                                                required
+                                                value={confirmPassword}
+                                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                                                placeholder="Repite la contraseña"
+                                            />
+                                        </div>
+                                    )}
+                                    
+                                    <div className="flex items-center justify-between pt-2">
+                                        {!isRegistering && (
+                                            <div className="text-sm">
+                                                <Link to="/recuperar" className="font-medium text-blue-600 hover:text-blue-500">
+                                                    ¿Olvidaste tu contraseña?
+                                                </Link>
+                                            </div>
+                                        )}
+                                        <div className={`text-sm ${!isRegistering ? "ml-auto" : ""}`}>
+                                            <Link
+                                                to={isRegistering ? "/login" : "/register"}
+                                                className="font-medium text-blue-600 hover:text-blue-500"
                                             >
-                                                Reiniciar sesión (borrar datos)
-                                            </button>
-                                        </li>
-                                    </ul>
-                                </div>
+                                                {isRegistering
+                                                    ? "¿Ya tienes una cuenta? Inicia sesión"
+                                                    : "¿No tienes cuenta? Regístrate"}
+                                            </Link>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <button
+                                            type="submit"
+                                            disabled={loading}
+                                            className={`flex w-full justify-center rounded-md py-2 px-4 text-sm font-medium text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:text-base
+                                                ${loading
+                                                    ? "bg-blue-400 cursor-not-allowed"
+                                                    : "bg-blue-600 hover:bg-blue-700"
+                                                }`}
+                                        >
+                                            {loading ? (
+                                                <span className="flex items-center">
+                                                    <svg className="h-5 w-5 animate-spin mr-2" viewBox="0 0 24 24">
+                                                        <circle
+                                                            className="opacity-25"
+                                                            cx="12"
+                                                            cy="12"
+                                                            r="10"
+                                                            stroke="currentColor"
+                                                            strokeWidth="4"
+                                                            fill="none"
+                                                        ></circle>
+                                                        <path
+                                                            className="opacity-75"
+                                                            fill="currentColor"
+                                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                                        ></path>
+                                                    </svg>
+                                                    {isRegistering ? "Creando cuenta..." : "Iniciando sesión..."}
+                                                </span>
+                                            ) : (
+                                                <span>{isRegistering ? "Crear cuenta" : "Iniciar sesión"}</span>
+                                            )}
+                                        </button>
+                                    </div>
+                                </form>
                             </div>
                         </div>
                     </div>
-                )}
-                
-                {error && (
-                    <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4">
-                        <p>{error}</p>
-                    </div>
-                )}
-                
-                <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-                    <div className="rounded-md shadow-sm -space-y-px">
-                        <div>
-                            <label htmlFor="email-address" className="sr-only">
-                                Correo electrónico
-                            </label>
-                            <input
-                                id="email-address"
-                                name="email"
-                                type="email"
-                                autoComplete="email"
-                                required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                                placeholder="Correo electrónico"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="password" className="sr-only">
-                                Contraseña
-                            </label>
-                            <input
-                                id="password"
-                                name="password"
-                                type="password"
-                                autoComplete="current-password"
-                                required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                                placeholder="Contraseña"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                            />
-                        </div>
-                        {isRegistering && (
-                            <div>
-                                <label htmlFor="confirm-password" className="sr-only">
-                                    Confirmar Contraseña
-                                </label>
-                                <input
-                                    id="confirm-password"
-                                    name="confirm-password"
-                                    type="password"
-                                    autoComplete="new-password"
-                                    required
-                                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                                    placeholder="Confirmar Contraseña"
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                />
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                        <div className="text-sm">
-                            <Link
-                                to="/recover-password"
-                                className="font-medium text-indigo-600 hover:text-indigo-500"
-                            >
-                                ¿Olvidaste tu contraseña?
-                            </Link>
-                        </div>
-                    </div>
-
-                    <div>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                        >
-                            {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
-                        </button>
-                    </div>
-                </form>
+                </div>
             </div>
         </div>
     );

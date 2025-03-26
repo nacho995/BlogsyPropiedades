@@ -12,17 +12,45 @@ export const ensureHttps = (url) => {
 };
 
 // Función para verificar si una imagen es válida
-export const validateAndProcessImage = async (imageUrl) => {
-  // Si no hay URL, usar la imagen por defecto
-  if (!imageUrl) return fallbackImageBase64;
-  
-  // Si ya es un base64, devolverlo directamente
-  if (imageUrl.startsWith('data:')) return imageUrl;
-  
-  // Asegurar que sea HTTPS
-  const secureUrl = ensureHttps(imageUrl);
-  
-  return secureUrl;
+export const validateAndProcessImage = async (imageSource) => {
+  try {
+    // Si no hay fuente de imagen, usar la imagen por defecto
+    if (!imageSource) return fallbackImageBase64;
+    
+    // Si ya es un base64, devolverlo directamente
+    if (typeof imageSource === 'string' && imageSource.startsWith('data:')) {
+      return imageSource;
+    }
+    
+    // Si es un string (URL), asegurar que sea HTTPS
+    if (typeof imageSource === 'string') {
+      return ensureHttps(imageSource);
+    }
+    
+    // Si es un objeto con src o url
+    if (typeof imageSource === 'object') {
+      if (imageSource.src) {
+        return ensureHttps(imageSource.src);
+      }
+      if (imageSource.url) {
+        return ensureHttps(imageSource.url);
+      }
+      
+      // Si es un objeto File (para subida de archivos)
+      if (imageSource instanceof File || 
+         (imageSource.type && imageSource.type.startsWith('image/'))) {
+        // Devolver la URL para uso temporal
+        return URL.createObjectURL(imageSource);
+      }
+    }
+    
+    // Si no pudimos procesar la imagen, usar fallback
+    console.warn('Imagen no procesable, usando imagen predeterminada');
+    return fallbackImageBase64;
+  } catch (error) {
+    console.error('Error al validar imagen:', error);
+    return fallbackImageBase64;
+  }
 };
 
 // Función para detectar errores repetitivos

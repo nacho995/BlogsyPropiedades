@@ -1,11 +1,13 @@
-import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { createPropertyPost, uploadImageProperty } from '../services/api';
+import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { createPropertyPost, uploadImageProperty, getPropertyById, updatePropertyPost } from '../services/api';
 import { useUser } from '../context/UserContext';
 import { motion } from 'framer-motion';
-import { FiUpload, FiHome, FiDollarSign, FiMapPin, FiUser, FiDroplet, FiSquare, FiTag, FiList, FiX, FiPlus } from 'react-icons/fi';
+import { FiUpload, FiHome, FiDollarSign, FiMapPin, FiUser, FiDroplet, FiSquare, FiTag, FiList, FiX, FiPlus, FiEdit } from 'react-icons/fi';
 import { BiBed, BiBath } from 'react-icons/bi';
 import { toast } from 'react-hot-toast';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
 // Inyecta global CSS para la animación de shake (puedes moverlo a tu archivo global si lo prefieres)
 const globalStyles = `
@@ -17,7 +19,114 @@ const globalStyles = `
 .animate-shake {
   animation: shake 0.5s;
 }
+
+/* Estilos para el editor de descripción */
+.property-description .ql-editor {
+  font-family: 'Inter', system-ui, sans-serif;
+  color: #374151;
+  line-height: 1.8;
+  font-size: 16px;
+  min-height: 200px;
+  padding: 16px;
+}
+
+.property-description .ql-editor p {
+  margin-bottom: 1rem;
+}
+
+.property-description .ql-editor h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+  color: #1F2937;
+}
+
+.property-description .ql-editor h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 1.25rem;
+  margin-bottom: 0.75rem;
+  color: #374151;
+}
+
+.property-description .ql-editor ul, 
+.property-description .ql-editor ol {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.property-description .ql-editor li {
+  margin-bottom: 0.5rem;
+}
+
+.property-feature-block,
+.feature-block {
+  background-color: #f0f9ff;
+  border-left: 3px solid #3b82f6;
+  padding: 10px 15px;
+  margin: 10px 0;
+  border-radius: 4px;
+}
+
+.property-highlight-block,
+.highlight-block {
+  background-color: #fffbeb;
+  border-left: 3px solid #f59e0b;
+  padding: 10px 15px;
+  margin: 10px 0;
+  border-radius: 4px;
+}
 `;
+
+// Configuración del editor
+const quillModules = {
+  toolbar: {
+    container: [
+      [{ 'header': [2, 3, false] }],
+      ['bold', 'italic', 'underline'],
+      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+      ['link'],
+      ['clean']
+    ]
+  }
+};
+
+const quillFormats = [
+  'header',
+  'bold', 'italic', 'underline',
+  'list', 'bullet',
+  'link'
+];
+
+// Plantillas para bloques especiales
+const propertyBlockTemplates = {
+  feature: `
+    <div class="property-feature-block">
+      <p><strong>Características destacadas:</strong></p>
+      <ul>
+        <li>Característica 1</li>
+        <li>Característica 2</li>
+        <li>Característica 3</li>
+      </ul>
+    </div>
+  `,
+  highlight: `
+    <div class="property-highlight-block">
+      <p><strong>Beneficios de la propiedad:</strong></p>
+      <p>Descripción de los beneficios y ventajas que ofrece esta propiedad, como la ubicación privilegiada, las vistas espectaculares o las amenidades cercanas.</p>
+    </div>
+  `,
+  location: `
+    <h3>Información de la zona</h3>
+    <p>Esta propiedad se encuentra en una zona privilegiada con fácil acceso a:</p>
+    <ul>
+      <li>Centros comerciales a 5 minutos</li>
+      <li>Transporte público a 2 minutos andando</li>
+      <li>Parques y zonas verdes en los alrededores</li>
+    </ul>
+  `,
+};
 
 // Animaciones
 const fadeIn = {
@@ -36,16 +145,15 @@ const staggerContainer = {
 };
 
 export default function PropertyCreation() {
-  // Inyectar el CSS de la animación en el head (sólo en navegador)
-  if (typeof window !== "undefined") {
-    const style = document.createElement("style");
-    style.innerHTML = globalStyles;
-    document.head.appendChild(style);
-  }
-
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useUser();
   const fileInputRef = useRef(null);
+  const quillRef = useRef(null);
+  
+  // Estado para controlar si estamos en modo edición
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [propertyId, setPropertyId] = useState(null);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -79,12 +187,124 @@ export default function PropertyCreation() {
   const [currentStep, setCurrentStep] = useState(1);
   const [featureInput, setFeatureInput] = useState('');
   
+  useEffect(() => {
+    // Inyectar estilos
+    if (typeof window !== "undefined") {
+      const style = document.createElement("style");
+      style.innerHTML = globalStyles;
+      document.head.appendChild(style);
+      
+      return () => {
+        document.head.removeChild(style);
+      };
+    }
+  }, []);
+  
+  // Detectar si estamos en modo edición y cargar los datos de la propiedad
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const editPropertyId = queryParams.get('edit');
+    
+    if (editPropertyId) {
+      setIsEditMode(true);
+      setPropertyId(editPropertyId);
+      loadPropertyData(editPropertyId);
+    }
+  }, [location]);
+  
+  // Función para cargar los datos de la propiedad a editar
+  const loadPropertyData = async (id) => {
+    try {
+      const propertyData = await getPropertyById(id);
+      
+      if (!propertyData) {
+        throw new Error('No se pudo obtener la información de la propiedad');
+      }
+      
+      // Procesar las imágenes para que tengan el formato correcto
+      let propertyImages = [];
+      
+      // Procesar la imagen principal
+      if (propertyData.image && typeof propertyData.image === 'object' && propertyData.image.src) {
+        propertyImages.push(propertyData.image);
+      } else if (propertyData.image && typeof propertyData.image === 'string') {
+        propertyImages.push({ src: propertyData.image, alt: "Imagen principal" });
+      }
+      
+      // Procesar las imágenes adicionales
+      if (propertyData.images && Array.isArray(propertyData.images)) {
+        const additionalImages = propertyData.images.map(img => {
+          if (typeof img === 'string') {
+            return { src: img, alt: "Imagen de la propiedad" };
+          } else if (typeof img === 'object' && img.src) {
+            return img;
+          }
+          return null;
+        }).filter(img => img !== null);
+        
+        propertyImages = [...propertyImages, ...additionalImages];
+      }
+      
+      // Actualizar el estado del formulario con los datos de la propiedad
+      setFormData({
+        title: propertyData.title || '',
+        description: propertyData.description || '',
+        address: propertyData.address || propertyData.location || '',
+        price: propertyData.price || '',
+        images: propertyImages || [],
+        bedrooms: propertyData.bedrooms || propertyData.rooms || '',
+        bathrooms: propertyData.bathrooms || propertyData.wc || '',
+        area: propertyData.area || propertyData.m2 || '',
+        typeProperty: propertyData.typeProperty || 'Propiedad',
+        m2: propertyData.m2 || propertyData.area || '',
+        priceM2: propertyData.priceM2 || '',
+        rooms: propertyData.rooms || propertyData.bedrooms || '',
+        wc: propertyData.wc || propertyData.bathrooms || '',
+        piso: propertyData.piso || '',
+        tags: propertyData.tags || [],
+        location: propertyData.location || propertyData.address || '',
+        propertyType: propertyData.propertyType || 'Venta',
+        features: propertyData.features || [],
+        status: propertyData.status || 'Disponible',
+        featured: propertyData.featured || false
+      });
+      
+      // Actualizar previewImages
+      setPreviewImages(propertyImages);
+      setUploadedImages(propertyImages);
+      
+      toast.success('Datos de la propiedad cargados correctamente');
+    } catch (error) {
+      console.error('Error al cargar los datos de la propiedad:', error);
+      toast.error('Error al cargar los datos de la propiedad');
+    }
+  };
+  
   // Manejar cambios en los campos del formulario
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({
       ...formData,
       [name]: value
+    });
+  };
+  
+  // Manejar cambios en el editor de descripción
+  const handleDescriptionChange = (content) => {
+    setFormData({
+      ...formData,
+      description: content
+    });
+  };
+  
+  // Insertar bloque especial en la descripción
+  const insertPropertyBlock = (blockType) => {
+    const content = propertyBlockTemplates[blockType] || '';
+    
+    // Añadir el bloque al contenido existente
+    setFormData({
+      ...formData,
+      description: (formData.description || '') + content
     });
   };
   
@@ -289,17 +509,27 @@ export default function PropertyCreation() {
             images: validImages
         };
         
-        console.log('Enviando datos de la propiedad:', propertyData);
+        console.log(`${isEditMode ? 'Actualizando' : 'Creando'} propiedad:`, propertyData);
         
-        const response = await createPropertyPost(propertyData);
+        let response;
+        
+        if (isEditMode && propertyId) {
+            // Editar propiedad existente
+            response = await updatePropertyPost(propertyId, propertyData);
+            toast.success('¡Propiedad actualizada exitosamente!');
+        } else {
+            // Crear nueva propiedad
+            response = await createPropertyPost(propertyData);
+            toast.success('¡Propiedad creada exitosamente!');
+        }
+        
         console.log('Respuesta del servidor:', response);
         
-        toast.success('¡Propiedad creada exitosamente!');
         navigate('/propiedades');
     } catch (err) {
-        console.error('Error detallado al crear la propiedad:', err);
-        setError(`Error al crear la propiedad: ${err.message}`);
-        toast.error(`Error al crear la propiedad: ${err.message}`);
+        console.error(`Error al ${isEditMode ? 'actualizar' : 'crear'} la propiedad:`, err);
+        setError(`Error al ${isEditMode ? 'actualizar' : 'crear'} la propiedad: ${err.message}`);
+        toast.error(`Error al ${isEditMode ? 'actualizar' : 'crear'} la propiedad: ${err.message}`);
     } finally {
         setLoading(false);
     }
@@ -341,15 +571,70 @@ export default function PropertyCreation() {
                 <FiList className="inline mr-2" />
                 Descripción
               </label>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                className="w-full border-2 border-blue-200 p-3 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 transition"
-                rows="4"
-                placeholder="Describe la propiedad con detalle..."
-                required
-              ></textarea>
+              <div className="border border-gray-300 rounded-lg overflow-hidden property-description">
+                <ReactQuill
+                  ref={quillRef}
+                  value={formData.description || ''}
+                  onChange={handleDescriptionChange}
+                  modules={quillModules}
+                  formats={quillFormats}
+                  className="min-h-[250px]"
+                  theme="snow"
+                  placeholder="Describe la propiedad con detalle..."
+                />
+                
+                {/* Bloques especiales */}
+                <div className="p-3 bg-gray-50 border-t border-gray-200">
+                  <div className="flex flex-wrap gap-2">
+                    <h3 className="w-full text-sm text-gray-600 font-medium mb-1">Añadir bloques especiales:</h3>
+                    <button
+                      type="button"
+                      onClick={() => insertPropertyBlock('feature')}
+                      className="text-sm px-3 py-2 rounded hover:bg-blue-50 border border-blue-100 flex items-center gap-1 text-left"
+                    >
+                      <div className="flex-1">
+                        <span className="font-bold text-blue-800 block">Lista de características</span>
+                        <span className="text-xs text-gray-500 block" style={{backgroundColor: '#f0f9ff', padding: '2px 6px', borderLeft: '2px solid #3b82f6'}}>Estructura con viñetas</span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertPropertyBlock('highlight')}
+                      className="text-sm px-3 py-2 rounded hover:bg-yellow-50 border border-yellow-100 flex items-center gap-1 text-left"
+                    >
+                      <div className="flex-1">
+                        <span className="font-bold text-yellow-800 block">Bloque destacado</span>
+                        <span className="text-xs text-gray-500 block" style={{backgroundColor: '#fffbeb', padding: '2px 6px', borderLeft: '2px solid #f59e0b'}}>Información importante</span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertPropertyBlock('location')}
+                      className="text-sm px-3 py-2 rounded hover:bg-green-50 border border-green-100 flex items-center gap-1 text-left"
+                    >
+                      <div className="flex-1">
+                        <span className="font-bold text-green-800 block">Información de zona</span>
+                        <span className="text-xs text-gray-500 block" style={{backgroundColor: '#ecfdf5', padding: '2px 6px', borderLeft: '2px solid #10b981'}}>Detalles de la ubicación</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Vista previa */}
+              <div className="mt-4 border rounded-lg p-4 bg-white shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-700 mb-3 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                  </svg>
+                  Vista previa
+                </h3>
+                <div 
+                  className="property-description p-4 border rounded bg-gray-50"
+                  dangerouslySetInnerHTML={{ __html: formData.description }}
+                ></div>
+              </div>
             </motion.div>
             
             <motion.div variants={fadeIn} className="mb-6">
@@ -408,7 +693,7 @@ export default function PropertyCreation() {
               Características
             </motion.h2>
             
-            <motion.div variants={fadeIn} className="grid grid-cols-3 gap-4">
+            <motion.div variants={fadeIn} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-gray-700 font-semibold mb-2">
                   <FiUser className="inline mr-2" />
@@ -475,7 +760,7 @@ export default function PropertyCreation() {
             <motion.div variants={fadeIn} className="mb-6">
               <label className="block text-gray-700 font-semibold mb-2">
                 <FiList className="inline mr-2" />
-                Características
+                Características Adicionales
               </label>
               
               <div className="flex items-center mb-3">
@@ -515,6 +800,35 @@ export default function PropertyCreation() {
                   ))}
                 </div>
               )}
+              
+              {/* Añadir sugerencias de características comunes */}
+              <div className="mt-4">
+                <p className="text-sm text-gray-600 mb-2">Características comunes:</p>
+                <div className="flex flex-wrap gap-2">
+                  {['Piscina', 'Garaje', 'Terraza', 'Aire acondicionado', 'Calefacción', 'Ascensor', 'Amueblado', 'Jardín'].map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      onClick={() => {
+                        if (!formData.features.includes(suggestion)) {
+                          setFormData({
+                            ...formData,
+                            features: [...formData.features, suggestion]
+                          });
+                        }
+                      }}
+                      disabled={formData.features.includes(suggestion)}
+                      className={`text-xs px-3 py-1 rounded-full ${
+                        formData.features.includes(suggestion)
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                      }`}
+                    >
+                      + {suggestion}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </motion.div>
             
             <motion.div variants={fadeIn} className="flex justify-between">
@@ -651,8 +965,14 @@ export default function PropertyCreation() {
       >
         {/* Encabezado */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 py-6 px-8">
-          <h1 className="text-3xl font-bold text-white">Añadir Nueva Propiedad</h1>
-          <p className="text-blue-100 mt-2">Completa el formulario para publicar tu propiedad</p>
+          <h1 className="text-3xl font-bold text-white">
+            {isEditMode ? 'Editar Propiedad' : 'Añadir Nueva Propiedad'}
+          </h1>
+          <p className="text-blue-100 mt-2">
+            {isEditMode 
+              ? 'Actualiza los detalles de tu propiedad' 
+              : 'Completa el formulario para publicar tu propiedad'}
+          </p>
         </div>
         
         {/* Indicador de progreso */}

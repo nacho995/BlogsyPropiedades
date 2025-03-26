@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { Dialog } from "@headlessui/react";
 import { getPropertyById, updatePropertyPost, uploadFile } from "../services/api";
 import { useUser } from "../context/UserContext";
@@ -21,6 +21,7 @@ export default function PropertyDetail() {
   const [messageLoading, setMessageLoading] = useState(false);
   
   const { user } = useUser();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchProperty = async () => {
@@ -74,7 +75,8 @@ export default function PropertyDetail() {
   }, [id]);
 
   const handleEdit = () => {
-    setIsEditing(true);
+    // Redirigir a la página de añadir propiedades con el ID como parámetro para edición
+    navigate(`/add-property?edit=${id}`);
   };
 
   const openModifiedModal = () => {
@@ -420,7 +422,10 @@ export default function PropertyDetail() {
 
               <div>
                 <h2 className="text-xl font-semibold mb-2">Descripción</h2>
-                <p className="text-gray-600">{property.description}</p>
+                <div 
+                  className="property-description mt-4 text-gray-600 leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: property.description }}
+                ></div>
               </div>
 
               {user && (user.role === 'admin' || user.role === 'ADMIN') && (

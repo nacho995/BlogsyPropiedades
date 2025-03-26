@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { Dialog } from "@headlessui/react";
 import { getBlogById, updateBlogPost, deleteBlogPost, uploadImageBlog } from "../services/api";
 import { useUser } from "../context/UserContext";
@@ -24,6 +24,7 @@ export default function BlogDetail() {
   
   // Obtener el usuario actual
   const { user } = useUser();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchBlog = async () => {
@@ -75,7 +76,8 @@ export default function BlogDetail() {
   }, [id]);
 
   const handleEdit = () => {
-    setIsEditing(true);
+    // Redirigir a la página de creación de blog con el ID como parámetro para edición
+    navigate(`/crear-blog?edit=${id}`);
   };
 
   const openModifiedModal = () => {

@@ -2,7 +2,7 @@ import React, { Fragment, useEffect, useState, useContext } from 'react';
 import { Dialog, Transition } from "@headlessui/react";
 import { Link } from 'react-router-dom';
 import { deletePropertyPost, getPropertyPosts } from '../services/api';
-import { FiHome, FiMapPin, FiDollarSign, FiMaximize } from 'react-icons/fi';
+import { FiHome, FiMapPin, FiDollarSign, FiMaximize, FiEye, FiEdit, FiTrash2 } from 'react-icons/fi';
 import { UserContext } from '../context/UserContext';
 import toast from 'react-hot-toast';
 
@@ -11,7 +11,7 @@ export default function SeeProperties() {
     const [isOpen, setIsOpen] = useState(false);
     const [propertyToDelete, setPropertyToDelete] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [deleteLoading, setDeleteLoading] = useState({});
     
     // Usar useContext directamente con manejo de errores
     const userContext = useContext(UserContext);
@@ -231,29 +231,38 @@ export default function SeeProperties() {
                                     </div>
 
                                     <div className="mt-4 flex justify-between gap-4">
-                                        {user && (user.role === 'admin' || user.role === 'ADMIN' || user.isAdmin) && (
-                                            <div className="flex gap-2">
-                                                <Link
-                                                    to={`/add-property?id=${prop._id}`}
-                                                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-                                                >
-                                                    Editar
-                                                </Link>
-                                                <button
-                                                    onClick={() => openDeleteModal(prop)}
-                                                    className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700 transition"
-                                                    disabled={deleteLoading}
-                                                >
-                                                    {deleteLoading && propertyToDelete?._id === prop._id ? 'Eliminando...' : 'Eliminar'}
-                                                </button>
-                                            </div>
-                                        )}
-                                        <Link
-                                            to={`/property/${prop._id}`}
-                                            className="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-700 transition ml-auto"
-                                        >
-                                            Ver detalles
-                                        </Link>
+                                        <div className="flex gap-2">
+                                            <Link
+                                                to={`/property/${prop._id}`}
+                                                className="flex items-center gap-1 px-3 py-1.5 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors"
+                                                title="Ver detalles de la propiedad"
+                                            >
+                                                <FiEye className="w-4 h-4" />
+                                                <span>Ver detalles</span>
+                                            </Link>
+
+                                            {user && (user.role === 'admin' || user.role === 'ADMIN' || user.isAdmin) && (
+                                                <>
+                                                    <Link
+                                                        to={`/add-property?edit=${prop._id}`}
+                                                        className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                                                        title="Editar propiedad"
+                                                    >
+                                                        <FiEdit className="w-4 h-4" />
+                                                        <span>Editar</span>
+                                                    </Link>
+                                                    <button
+                                                        onClick={() => handleDeleteClick(prop._id)}
+                                                        className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                                                        title="Eliminar propiedad"
+                                                        disabled={deleteLoading[prop._id]}
+                                                    >
+                                                        <FiTrash2 className="w-4 h-4" />
+                                                        <span>{deleteLoading[prop._id] ? 'Eliminando...' : 'Eliminar'}</span>
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -305,7 +314,7 @@ export default function SeeProperties() {
                                             type="button"
                                             className="inline-flex justify-center rounded-md border border-transparent bg-gray-100 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
                                             onClick={() => setIsOpen(false)}
-                                            disabled={deleteLoading}
+                                            disabled={propertyToDelete && deleteLoading[propertyToDelete._id]}
                                         >
                                             Cancelar
                                         </button>
@@ -313,9 +322,9 @@ export default function SeeProperties() {
                                             type="button"
                                             className="inline-flex justify-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
                                             onClick={() => confirmDelete(propertyToDelete._id)}
-                                            disabled={deleteLoading}
+                                            disabled={propertyToDelete && deleteLoading[propertyToDelete._id]}
                                         >
-                                            {deleteLoading ? 'Eliminando...' : 'Eliminar'}
+                                            {propertyToDelete && deleteLoading[propertyToDelete._id] ? 'Eliminando...' : 'Eliminar'}
                                         </button>
                                     </div>
                                 </Dialog.Panel>

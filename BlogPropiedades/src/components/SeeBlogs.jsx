@@ -278,31 +278,41 @@ export default function SeeBlogs() {
                   )}
 
                   <div className="flex justify-between items-center mt-4">
-                    <Link
-                      to={`/blog/${blog._id}`}
-                      className="text-blue-600 hover:text-blue-800 font-medium"
-                    >
-                      Leer más
-                    </Link>
+                    <div className="flex gap-2">
+                      <Link
+                        to={`/blog/${blog._id}`}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors"
+                        title="Ver blog completo"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                          <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                        </svg>
+                        <span>Ver blog</span>
+                      </Link>
 
-                    {user && (user.role === 'admin' || user.role === 'ADMIN' || user.isAdmin) && (
-                      <div className="flex gap-2">
-                        <Link
-                          to={`/crear-blog?id=${blog._id}`}
-                          className="p-2 text-blue-600 hover:text-blue-800 transition-colors"
-                          title="Editar"
-                        >
-                          <FiEdit className="w-5 h-5" />
-                        </Link>
-                        <button
-                          onClick={() => handleDeleteClick(blog._id)}
-                          className="p-2 text-red-600 hover:text-red-800 transition-colors"
-                          title="Eliminar"
-                        >
-                          <FiTrash2 className="w-5 h-5" />
-                        </button>
-                      </div>
-                    )}
+                      {user && (user.role === 'admin' || user.role === 'ADMIN' || user.isAdmin) && (
+                        <>
+                          <Link
+                            to={`/crear-blog?edit=${blog._id}`}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                            title="Editar blog"
+                          >
+                            <FiEdit className="w-4 h-4" />
+                            <span>Editar</span>
+                          </Link>
+                          <button
+                            onClick={() => handleDeleteClick(blog._id)}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                            title="Eliminar blog"
+                            disabled={deleteLoading[blog._id]}
+                          >
+                            <FiTrash2 className="w-4 h-4" />
+                            <span>{deleteLoading[blog._id] ? 'Eliminando...' : 'Eliminar'}</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               </article>

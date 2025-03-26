@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { createBlogPost, uploadImageBlog } from '../services/api';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { createBlogPost, uploadImageBlog, getBlogById, updateBlogPost } from '../services/api';
 import { useUser } from '../context/UserContext';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
@@ -37,6 +37,9 @@ const modules = {
       ['link', 'image'],
       ['clean']
     ],
+    handlers: {
+      // Aquí se podrían añadir manejadores personalizados
+    }
   },
   clipboard: {
     matchVisual: false
@@ -218,6 +221,18 @@ const customStyles = `
     color: #4a6fa5 !important;
     display: flex !important;
     align-items: center !important;
+  }
+  
+  /* Separator personalizado explícito */
+  .separator-decorative {
+    border: 0; 
+    height: 6px; 
+    margin: 4rem auto; 
+    width: 50%; 
+    background-image: radial-gradient(circle, #f59e0b 0%, transparent 60%), radial-gradient(circle, #f59e0b 0%, transparent 60%); 
+    background-size: 15px 15px; 
+    background-position: top center; 
+    opacity: 0.5;
   }
 `;
 
@@ -437,8 +452,14 @@ function getFromLocalStorage(key, defaultValue) {
 
 export default function BlogCreation() {
   const navigate = useNavigate();
-  const { user } = useUser();
+  const location = useLocation();
+  const { isAuthenticated, user } = useUser();
+  const quillRef = useRef(null);
   const fileInputRef = useRef(null);
+  
+  // Estado para controlar si estamos en modo edición
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [blogId, setBlogId] = useState(null);
   
   // Cargar estado desde localStorage o usar valores por defecto
   const [currentStep, setCurrentStep] = useState(() => 
@@ -447,7 +468,7 @@ export default function BlogCreation() {
   
   const [formData, setFormData] = useState({
     title: '',
-    description: '',
+    subtitle: '',
     content: '',
     category: 'Inmobiliaria',
     tags: [],
@@ -456,7 +477,7 @@ export default function BlogCreation() {
       src: '',
       alt: ''
     },
-    images: [], // Asegurarnos de que images siempre sea un array
+    images: [],
     readTime: '5',
     button: {
       title: '',
@@ -476,6 +497,83 @@ export default function BlogCreation() {
     getFromLocalStorage('blog_previewImages', [])
   );
   const [tagInput, setTagInput] = useState('');
+  
+  // Detectar si estamos en modo edición y cargar los datos del blog
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const editBlogId = queryParams.get('edit');
+    
+    if (editBlogId) {
+      setIsEditMode(true);
+      setBlogId(editBlogId);
+      loadBlogData(editBlogId);
+    }
+  }, [location]);
+  
+  // Función para cargar los datos del blog a editar
+  const loadBlogData = async (id) => {
+    try {
+      const blogData = await getBlogById(id);
+      
+      if (!blogData) {
+        throw new Error('No se pudo obtener la información del blog');
+      }
+      
+      // Procesar las imágenes para que tengan el formato correcto
+      let blogImages = [];
+      
+      // Procesar la imagen principal
+      if (blogData.image && typeof blogData.image === 'object' && blogData.image.src) {
+        blogImages.push(blogData.image);
+      } else if (blogData.image && typeof blogData.image === 'string') {
+        blogImages.push({ src: blogData.image, alt: "Imagen principal" });
+      }
+      
+      // Procesar las imágenes adicionales
+      if (blogData.images && Array.isArray(blogData.images)) {
+        const additionalImages = blogData.images.map(img => {
+          if (typeof img === 'string') {
+            return { src: img, alt: "Imagen del blog" };
+          } else if (typeof img === 'object' && img.src) {
+            return img;
+          }
+          return null;
+        }).filter(img => img !== null);
+        
+        blogImages = [...blogImages, ...additionalImages];
+      }
+      
+      // Actualizar el estado del formulario con los datos del blog
+      setFormData({
+        title: blogData.title || '',
+        subtitle: blogData.subtitle || '',
+        content: blogData.content || '',
+        description: blogData.description || '',
+        category: blogData.category || 'Inmobiliaria',
+        tags: blogData.tags || [],
+        url: blogData.url || '',
+        image: blogData.image && typeof blogData.image === 'object' ? blogData.image : { src: '', alt: '' },
+        images: blogImages || [],
+        readTime: blogData.readTime || '5',
+        button: blogData.button || {
+          title: '',
+          variant: 'primary',
+          size: 'medium',
+          iconRight: ''
+        }
+      });
+      
+      // Actualizar previewImage si hay una imagen principal
+      if (blogImages.length > 0) {
+        setPreviewImage(blogImages[0].src);
+      }
+      
+      toast.success('Datos del blog cargados correctamente');
+    } catch (error) {
+      console.error('Error al cargar los datos del blog:', error);
+      toast.error('Error al cargar los datos del blog');
+    }
+  };
   
   // Guardar cambios en localStorage cuando cambie el estado
   useEffect(() => {
@@ -713,66 +811,53 @@ export default function BlogCreation() {
   // Enviar formulario
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Iniciando envío del formulario:', formData);
+    setLoading(true);
+    setError(null);
     
     try {
-        setLoading(true);
-        setError(null);
-
-        // Validar campos requeridos
-        if (!formData.title?.trim()) {
-            throw new Error('El título es obligatorio');
-        }
-        if (!formData.description?.trim()) {
-            throw new Error('La descripción es obligatoria');
-        }
-        if (!formData.content?.trim()) {
-            throw new Error('El contenido es obligatorio');
-        }
-
-        // Validar que haya al menos una imagen
-        if (!formData.images || formData.images.length === 0) {
-            throw new Error('Debes subir al menos una imagen');
-        }
-
-        // Asegurarse de que hay una imagen principal
-        if (!formData.image || !formData.image.src) {
-            // Si no hay imagen principal, usar la primera imagen
-            formData.image = formData.images[0];
-        }
-
-        // Preparar los datos para enviar
-        const blogData = {
-            ...formData,
-            // Asegurarse de que la imagen principal esté definida
-            image: formData.image,
-            // Asegurarse de que las imágenes estén en el formato correcto
-            images: formData.images.map(img => ({
-                src: img.src,
-                alt: img.alt || formData.title
-            }))
+      // Validar campos requeridos
+      if (!formData.title || !formData.content) {
+        throw new Error('Por favor, completa todos los campos requeridos');
+      }
+      
+      // Si no hay imagen, usar una imagen por defecto
+      if (!formData.image.src && (!formData.images || formData.images.length === 0)) {
+        formData.image = {
+          src: 'https://via.placeholder.com/800x400?text=Blog+GozaMadrid',
+          alt: formData.title
         };
-
-        console.log('Enviando datos del blog:', blogData);
-        const result = await createBlogPost(blogData);
-        console.log('Blog creado exitosamente:', result);
-        
-        toast.success('¡Blog publicado exitosamente!');
-        // Limpiar el formulario y localStorage
-        resetForm();
-        // Redirigir a la página de blogs
-        navigate('/blogs');
+      }
+      
+      console.log(`${isEditMode ? 'Actualizando' : 'Creando'} blog:`, formData);
+      
+      let response;
+      
+      if (isEditMode && blogId) {
+        // Editar blog existente
+        response = await updateBlogPost(blogId, formData);
+        toast.success('¡Blog actualizado exitosamente!');
+      } else {
+        // Crear nuevo blog
+        response = await createBlogPost(formData);
+        toast.success('¡Blog creado exitosamente!');
+      }
+      
+      console.log('Respuesta del servidor:', response);
+      
+      // Limpiar localStorage
+      localStorage.removeItem('blog_currentStep');
+      localStorage.removeItem('blog_formData');
+      localStorage.removeItem('blog_previewImage');
+      
+      navigate('/ver-blogs');
     } catch (error) {
-        console.error('Error al crear el blog:', error);
-        setError(error.message || 'Error al crear el blog');
-        toast.error(error.message || 'Error al crear el blog');
+      console.error(`Error al ${isEditMode ? 'actualizar' : 'crear'} el blog:`, error);
+      setError(`Error al ${isEditMode ? 'actualizar' : 'crear'} el blog: ${error.message}`);
+      toast.error(`Error al ${isEditMode ? 'actualizar' : 'crear'} el blog: ${error.message}`);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-};
-  
-  // Movemos el ref al nivel superior del componente
-  const quillRef = useRef(null);
+  };
   
   // Añadir el manejador para el contenido del editor
   const handleEditorChange = (content) => {
@@ -889,12 +974,12 @@ export default function BlogCreation() {
                         </div>
                     </div>
                     
-                    {/* Editor mejorado con referencia moderna */}
+                    {/* Editor mejorado con vista previa */}
                     <div className="mb-6">
                         <label className="block text-gray-700 font-semibold mb-2">
                             Contenido
                         </label>
-                        <div className="border border-gray-300 rounded-lg overflow-hidden quill-container">
+                        <div className="border border-gray-300 rounded-lg overflow-hidden quill-container bg-white">
                             <ReactQuill
                                 ref={quillRef}
                                 value={formData.content || ''}
@@ -908,146 +993,173 @@ export default function BlogCreation() {
                                 bounds=".quill-container"
                             />
                             
-                            {/* Botones para insertar elementos */}
-                            <div className="mt-4">
-                                <div className="flex flex-wrap gap-2 mb-2">
-                                    <h3 className="w-full text-sm text-gray-600 font-medium mb-1">Añadir títulos:</h3>
-                                    <button
-                                        type="button"
-                                        onClick={() => insertSpecialBlock('title-main')}
-                                        className="text-sm bg-indigo-100 text-indigo-800 px-3 py-1 rounded hover:bg-indigo-200 flex items-center gap-1"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-                                        </svg>
-                                        Título Principal
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => insertSpecialBlock('title-section')}
-                                        className="text-sm bg-indigo-100 text-indigo-800 px-3 py-1 rounded hover:bg-indigo-200 flex items-center gap-1"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-                                        </svg>
-                                        Título de Sección
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => insertSpecialBlock('title-subsection')}
-                                        className="text-sm bg-indigo-100 text-indigo-800 px-3 py-1 rounded hover:bg-indigo-200 flex items-center gap-1"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M3 5a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-                                        </svg>
-                                        Subtítulo
-                                    </button>
-                                </div>
-                                
-                                <div className="flex flex-wrap gap-2 mb-2">
-                                    <h3 className="w-full text-sm text-gray-600 font-medium mb-1">Añadir bloques especiales:</h3>
-                                    <button
-                                        type="button"
-                                        onClick={() => insertSpecialBlock('formula')}
-                                        className="text-sm bg-blue-100 text-blue-800 px-3 py-1 rounded hover:bg-blue-200 flex items-center gap-1"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M4.649 3.084A1 1 0 015.163 4.4 13.95 13.95 0 004 10c0 1.993.416 3.886 1.164 5.6a1 1 0 01-1.832.8A15.95 15.95 0 012 10c0-2.274.475-4.44 1.332-6.4a1 1 0 011.317-.516zM12.96 7a3 3 0 00-2.342 1.126l-.328.41-.111-.279A2 2 0 008.323 7H8a1 1 0 000 2h.323l.532 1.33-1.035 1.295a1 1 0 01-.781.375H7a1 1 0 100 2h.039a3 3 0 002.342-1.126l.328-.41.111.279A2 2 0 0011.677 14H12a1 1 0 100-2h-.323l-.532-1.33 1.035-1.295A1 1 0 0112.961 9H13a1 1 0 100-2h-.039z" clipRule="evenodd" />
-                                        </svg>
-                                        Bloque de cálculo
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => insertSpecialBlock('highlight')}
-                                        className="text-sm bg-yellow-100 text-yellow-800 px-3 py-1 rounded hover:bg-yellow-200 flex items-center gap-1"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                        </svg>
-                                        Bloque destacado
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => insertSpecialBlock('note')}
-                                        className="text-sm bg-green-100 text-green-800 px-3 py-1 rounded hover:bg-green-200 flex items-center gap-1"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                        </svg>
-                                        Bloque de nota
-                                    </button>
-                                </div>
-                                
-                                <div className="flex flex-wrap gap-2">
-                                    <h3 className="w-full text-sm text-gray-600 font-medium mb-1">Elementos adicionales:</h3>
-                                    <button
-                                        type="button"
-                                        onClick={() => insertSpecialBlock('quote')}
-                                        className="text-sm bg-purple-100 text-purple-800 px-3 py-1 rounded hover:bg-purple-200 flex items-center gap-1"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H6zM9 8H4v2h5V8z" clipRule="evenodd" />
-                                        </svg>
-                                        Cita o testimonio
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => insertSpecialBlock('pro-table')}
-                                        className="text-sm bg-gray-100 text-gray-800 px-3 py-1 rounded hover:bg-gray-200 flex items-center gap-1"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M5 4a3 3 0 00-3 3v6a3 3 0 003 3h10a3 3 0 003-3V7a3 3 0 00-3-3H5zm-1 9v-1h5v2H5a1 1 0 01-1-1zm7 1h4a1 1 0 001-1v-1h-5v2zm0-4h5V8h-5v2z" clipRule="evenodd" />
-                                        </svg>
-                                        Tabla
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => insertSpecialBlock('first-paragraph')}
-                                        className="text-sm bg-orange-100 text-orange-800 px-3 py-1 rounded hover:bg-orange-200 flex items-center gap-1"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
-                                            <path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" />
-                                        </svg>
-                                        Párrafo inicial
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => insertSpecialBlock('emphasis-paragraph')}
-                                        className="text-sm bg-orange-100 text-orange-800 px-3 py-1 rounded hover:bg-orange-200 flex items-center gap-1"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h7a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-                                        </svg>
-                                        Párrafo enfatizado
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => insertSpecialBlock('separator')}
-                                        className="text-sm bg-orange-100 text-orange-800 px-3 py-1 rounded hover:bg-orange-200 flex items-center gap-1"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-                                        </svg>
-                                        Separador decorativo
-                                    </button>
+                            {/* Barra de herramientas visual mejorada */}
+                            <div className="p-3 bg-gray-50 border-t border-gray-200">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {/* Columna 1: Títulos */}
+                                    <div className="space-y-2">
+                                        <h3 className="text-sm text-gray-600 font-medium mb-1 flex items-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                                            </svg>
+                                            Títulos
+                                        </h3>
+                                        <div className="flex flex-col gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => insertSpecialBlock('title-main')}
+                                                className="text-sm px-3 py-2 rounded hover:bg-indigo-50 border border-indigo-100 flex items-center gap-1 text-left"
+                                            >
+                                                <div className="flex-1">
+                                                    <span className="font-bold text-lg text-indigo-800 block">Título Principal</span>
+                                                    <span className="text-xs text-gray-500">Título grande centrado</span>
+                                                </div>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => insertSpecialBlock('title-section')}
+                                                className="text-sm px-3 py-2 rounded hover:bg-indigo-50 border border-indigo-100 flex items-center gap-1 text-left"
+                                            >
+                                                <div className="flex-1">
+                                                    <span className="font-bold text-base text-indigo-800 block" style={{borderBottom: '2px solid #f59e0b'}}>Título de Sección</span>
+                                                    <span className="text-xs text-gray-500">Título con subrayado</span>
+                                                </div>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => insertSpecialBlock('title-subsection')}
+                                                className="text-sm px-3 py-2 rounded hover:bg-indigo-50 border border-indigo-100 flex items-center gap-1 text-left"
+                                            >
+                                                <div className="flex-1">
+                                                    <span className="font-bold text-indigo-800 inline-block px-2 py-1" style={{backgroundColor: 'rgba(79, 70, 229, 0.1)', borderRadius: '4px'}}>Subtítulo</span>
+                                                    <span className="text-xs text-gray-500 block mt-1">Subtítulo con fondo</span>
+                                                </div>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Columna 2: Bloques especiales */}
+                                    <div className="space-y-2">
+                                        <h3 className="text-sm text-gray-600 font-medium mb-1 flex items-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 2h10v7h-2l-1 2H8l-1-2H5V5z" clipRule="evenodd" />
+                                            </svg>
+                                            Bloques especiales
+                                        </h3>
+                                        <div className="flex flex-col gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => insertSpecialBlock('formula')}
+                                                className="text-sm px-3 py-2 rounded hover:bg-blue-50 border border-blue-100 flex items-center gap-1 text-left"
+                                            >
+                                                <div className="flex-1">
+                                                    <span className="font-bold text-blue-800 block">Bloque de cálculo</span>
+                                                    <span className="text-xs text-gray-500 block" style={{fontFamily: 'monospace', backgroundColor: '#f8f9fa', padding: '2px 6px', borderLeft: '2px solid #4a89dc'}}>Fórmulas y cálculos</span>
+                                                </div>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => insertSpecialBlock('highlight')}
+                                                className="text-sm px-3 py-2 rounded hover:bg-yellow-50 border border-yellow-100 flex items-center gap-1 text-left"
+                                            >
+                                                <div className="flex-1">
+                                                    <span className="font-bold text-yellow-800 block">Bloque destacado</span>
+                                                    <span className="text-xs text-gray-500 block" style={{backgroundColor: '#fffde7', padding: '2px 6px', borderLeft: '2px solid #f59e0b'}}>Información importante</span>
+                                                </div>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => insertSpecialBlock('note')}
+                                                className="text-sm px-3 py-2 rounded hover:bg-green-50 border border-green-100 flex items-center gap-1 text-left"
+                                            >
+                                                <div className="flex-1">
+                                                    <span className="font-bold text-green-800 block">Bloque de nota</span>
+                                                    <span className="text-xs text-gray-500 block" style={{backgroundColor: '#e8f5e9', padding: '2px 6px', borderLeft: '2px solid #4caf50', fontStyle: 'italic'}}>Nota aclaratoria</span>
+                                                </div>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Columna 3: Elementos adicionales */}
+                                    <div className="space-y-2">
+                                        <h3 className="text-sm text-gray-600 font-medium mb-1 flex items-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                                            </svg>
+                                            Elementos adicionales
+                                        </h3>
+                                        <div className="flex flex-col gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => insertSpecialBlock('quote')}
+                                                className="text-sm px-3 py-2 rounded hover:bg-purple-50 border border-purple-100 flex items-center gap-1 text-left"
+                                            >
+                                                <div className="flex-1">
+                                                    <span className="font-bold text-purple-800 block">Cita o testimonio</span>
+                                                    <span className="text-xs text-gray-500 block" style={{backgroundColor: 'rgba(245, 158, 11, 0.05)', padding: '6px', borderRadius: '0.5rem', fontStyle: 'italic'}}>"Texto destacado entre comillas"</span>
+                                                </div>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => insertSpecialBlock('emphasis-paragraph')}
+                                                className="text-sm px-3 py-2 rounded hover:bg-orange-50 border border-orange-100 flex items-center gap-1 text-left"
+                                            >
+                                                <div className="flex-1">
+                                                    <span className="font-bold text-orange-800 block">Párrafo enfatizado</span>
+                                                    <span className="text-xs text-gray-500 block" style={{borderLeft: '2px solid #f59e0b', paddingLeft: '8px', fontStyle: 'italic'}}>Párrafo con estilo especial</span>
+                                                </div>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => insertSpecialBlock('separator')}
+                                                className="text-sm px-3 py-2 rounded hover:bg-orange-50 border border-orange-100 flex items-center gap-1 text-left"
+                                            >
+                                                <div className="flex-1">
+                                                    <span className="font-bold text-orange-800 block">Separador decorativo</span>
+                                                    <div className="my-1" style={{
+                                                        height: '4px',
+                                                        width: '100%',
+                                                        backgroundImage: 'radial-gradient(circle, #f59e0b 0%, transparent 60%), radial-gradient(circle, #f59e0b 0%, transparent 60%)',
+                                                        backgroundSize: '15px 15px'
+                                                    }}></div>
+                                                    <span className="text-xs text-gray-500">Línea decorativa</span>
+                                                </div>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+                        
+                        {/* Vista previa */}
+                        <div className="mt-8 border rounded-lg p-4 bg-white shadow-sm">
+                            <h3 className="text-lg font-semibold text-gray-700 mb-3 flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                                    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                                </svg>
+                                Vista previa del contenido
+                            </h3>
+                            <div 
+                                className="ql-editor preview-container p-4 border rounded bg-gray-50"
+                                dangerouslySetInnerHTML={{ __html: formData.content }}
+                            ></div>
+                        </div>
                     </div>
                     
-                    <div className="flex justify-between mt-8">
+                    {/* Botones de navegación */}
+                    <div className="flex justify-between">
                         <button
                             type="button"
                             onClick={prevStep}
-                            className="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium shadow-sm hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300"
+                            className="bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-bold hover:bg-gray-300 transition"
                         >
                             Anterior
                         </button>
                         <button
                             type="button"
                             onClick={nextStep}
-                            className="px-5 py-2 bg-blue-600 text-white rounded-lg font-medium shadow-sm hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300"
+                            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700 transition"
                         >
                             Siguiente
                         </button>
@@ -1221,7 +1333,7 @@ export default function BlogCreation() {
         `;
         break;
       case 'separator':
-        blockHtml = '<hr style="border: 0; height: 6px; margin: 4rem auto; width: 50%; background-image: radial-gradient(circle, #f59e0b 0%, transparent 60%), radial-gradient(circle, #f59e0b 0%, transparent 60%); background-size: 15px 15px; background-position: top center; opacity: 0.5;">';
+        blockHtml = `<hr class="separator-decorative" style="border: 0; height: 6px; margin: 4rem auto; width: 50%; background-image: radial-gradient(circle, #f59e0b 0%, transparent 60%), radial-gradient(circle, #f59e0b 0%, transparent 60%); background-size: 15px 15px; background-position: top center; opacity: 0.5;">`;
         break;
       case 'emphasis-paragraph':
         blockHtml = '<p style="margin-left: 2rem; padding-left: 1.5rem; border-left: 3px solid #f59e0b; font-style: italic; margin-bottom: 1.75rem;">Párrafo con énfasis especial que destaca información importante dentro del artículo.</p>';
@@ -1504,56 +1616,23 @@ export default function BlogCreation() {
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
-      <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
+      <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
         {/* Encabezado */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 py-6 px-8">
-          <h1 className="text-3xl font-bold text-white">Crear Nuevo Blog</h1>
-          <p className="text-blue-100 mt-2">Comparte tus conocimientos con la comunidad</p>
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-6">
+          <h1 className="text-3xl font-bold text-white">
+            {isEditMode ? 'Editar Blog' : 'Crear Nuevo Blog'}
+          </h1>
+          <p className="text-blue-100 mt-2">
+            {isEditMode 
+              ? 'Actualiza el contenido de tu blog' 
+              : 'Comparte información valiosa con tus lectores'}
+          </p>
         </div>
         
-        {/* Indicador de progreso */}
-        <div className="px-8 pt-6">
-          <div className="flex items-center justify-between mb-8 relative">
-            {[1, 2, 3].map((step) => (
-              <div key={step} className="flex flex-col items-center">
-                <div 
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                    currentStep === step
-                      ? 'bg-blue-600 text-white'
-                      : currentStep > step
-                        ? 'bg-green-500 text-white'
-                        : 'bg-gray-200 text-gray-600'
-                  }`}
-                >
-                  {currentStep > step ? '✓' : step}
-                </div>
-                <span className={`text-sm mt-2 ${currentStep >= step ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
-                  {step === 1 ? 'Información' : step === 2 ? 'Contenido' : 'Medios'}
-                </span>
-              </div>
-            ))}
-            
-            <div className="absolute left-0 right-0 top-5 h-0.5 bg-gray-200 -z-10">
-              <div 
-                className="h-full bg-blue-600 transition-all duration-300"
-                style={{ width: `${(currentStep - 1) * 50}%` }}
-              ></div>
-            </div>
-          </div>
+        {/* Contenido */}
+        <div className="px-8 py-6">
+          {/* ... existing code ... */}
         </div>
-        
-        {/* Mensajes de error */}
-        {error && (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mx-8 mb-4 rounded">
-            <p className="font-medium">Error</p>
-            <p>{error}</p>
-          </div>
-        )}
-        
-        {/* Formulario */}
-        <form className="px-8 pb-8" onSubmit={handleSubmit}>
-          {renderStep()}
-        </form>
       </div>
     </div>
   );

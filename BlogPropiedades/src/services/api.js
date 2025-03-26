@@ -1081,127 +1081,124 @@ export const deleteData = async (endpoint) => {
 
 /**
  * Sincroniza la imagen de perfil con el servidor
- * @param {string} [newImage] - Nueva imagen en base64 para actualizar
- * @returns {Promise<Object>} - Objeto con la URL de la imagen
+ * @param {string|Object} [newImage] - Nueva imagen en base64 o URL para actualizar
+ * @returns {Promise<string|null>} - URL de la imagen sincronizada o null en caso de error
  */
 export const syncProfileImage = async (newImage = null) => {
   try {
-    // Si se proporciona una nueva imagen, actualizar directamente
+    // Si se proporciona una nueva imagen, procesarla
     if (newImage) {
       let imageUrl = null;
       
+      // Evitar errores con tipos no esperados
+      if (newImage === null || newImage === undefined) {
+        return null;
+      }
+      
       // Manejar diferentes tipos de entrada
       if (typeof newImage === 'string') {
+        // Si es una cadena, usarla directamente
         imageUrl = newImage;
       } else if (newImage && typeof newImage === 'object') {
-        // Extraer URL de diferentes formatos de objeto
-        if (newImage.src) {
-          imageUrl = newImage.src;
-        } else if (newImage.url) {
-          imageUrl = newImage.url;
-        } else if (newImage.imageUrl) {
-          imageUrl = newImage.imageUrl;
-        } else if (newImage.profileImage) {
-          imageUrl = typeof newImage.profileImage === 'string' ? 
-                    newImage.profileImage : 
-                    (newImage.profileImage?.src || newImage.profileImage?.url);
-        } else if (newImage.profilePic) {
-          imageUrl = typeof newImage.profilePic === 'string' ? 
-                    newImage.profilePic : 
-                    (newImage.profilePic?.src || newImage.profilePic?.url);
+        try {
+          // Extraer URL de diferentes formatos de objeto
+          if (newImage.src) {
+            imageUrl = newImage.src;
+          } else if (newImage.url) {
+            imageUrl = newImage.url;
+          } else if (newImage.imageUrl) {
+            imageUrl = newImage.imageUrl;
+          } else if (newImage.profileImage) {
+            // Si profileImage es string, usarla; si es objeto, intentar extraer src o url
+            imageUrl = typeof newImage.profileImage === 'string' ? 
+                      newImage.profileImage : 
+                      ((newImage.profileImage?.src || newImage.profileImage?.url) || null);
+          } else if (newImage.profilePic) {
+            // Si profilePic es string, usarla; si es objeto, intentar extraer src o url
+            imageUrl = typeof newImage.profilePic === 'string' ? 
+                      newImage.profilePic : 
+                      ((newImage.profilePic?.src || newImage.profilePic?.url) || null);
+          }
+        } catch (extractError) {
+          console.error('Error al extraer URL de imagen:', extractError);
+          imageUrl = null;
         }
       }
       
-      if (imageUrl) {
+      // Si se encontró una URL válida, guardarla y devolverla
+      if (imageUrl && typeof imageUrl === 'string') {
         localStorage.setItem('profilePic', imageUrl);
         return imageUrl;
       }
       
-      // Si no se pudo extraer una URL, intentar usar profileImage de la respuesta del usuario
-      try {
-        // Buscar directamente datos de usuario en localStorage
-        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-        if (userData.profileImage) {
-          if (typeof userData.profileImage === 'string') {
-            localStorage.setItem('profilePic', userData.profileImage);
-            return userData.profileImage;
-          } else if (userData.profileImage && typeof userData.profileImage === 'object') {
-            const url = userData.profileImage.src || userData.profileImage.url;
-            if (url) {
-              localStorage.setItem('profilePic', url);
-              return url;
-            }
-          }
-        }
-      } catch (innerError) {
-        console.warn('Error al procesar datos de usuario del localStorage:', innerError);
-      }
-      
-      console.warn('No se pudo extraer URL de imagen del perfil:', newImage);
+      console.warn('No se pudo extraer URL de imagen del perfil:', 
+                  typeof newImage === 'object' ? JSON.stringify({}) : String(newImage));
       return null;
     }
 
-    // Obtener la imagen actual del localStorage
+    // Si no se proporcionó imagen, intentar usar la actual del localStorage
     const currentImage = localStorage.getItem('profilePic');
+    
+    // Si no hay imagen en localStorage, buscar en userData
     if (!currentImage) {
-      // Si no hay imagen en localStorage, intentar usar profileImage desde userData
       try {
         const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+        let profileUrl = null;
+        
+        // Buscar primero en profileImage
         if (userData.profileImage) {
           if (typeof userData.profileImage === 'string') {
-            localStorage.setItem('profilePic', userData.profileImage);
-            return userData.profileImage;
+            profileUrl = userData.profileImage;
           } else if (userData.profileImage && typeof userData.profileImage === 'object') {
-            const url = userData.profileImage.src || userData.profileImage.url;
-            if (url) {
-              localStorage.setItem('profilePic', url);
-              return url;
-            }
+            profileUrl = userData.profileImage.src || userData.profileImage.url || null;
           }
         }
-      } catch (innerError) {
-        console.warn('Error al procesar datos de usuario del localStorage:', innerError);
+        
+        // Si no se encontró en profileImage, buscar en profilePic
+        if (!profileUrl && userData.profilePic) {
+          if (typeof userData.profilePic === 'string') {
+            profileUrl = userData.profilePic;
+          } else if (userData.profilePic && typeof userData.profilePic === 'object') {
+            profileUrl = userData.profilePic.src || userData.profilePic.url || null;
+          }
+        }
+        
+        // Si se encontró una URL, guardarla y devolverla
+        if (profileUrl) {
+          localStorage.setItem('profilePic', profileUrl);
+          return profileUrl;
+        }
+      } catch (parseError) {
+        console.warn('Error al procesar datos de usuario del localStorage:', parseError);
       }
       
       return null;
     }
 
-    // Verificar si la imagen es una URL válida
+    // Verificar si la imagen actual es una URL válida
     if (typeof currentImage !== 'string') {
-      console.warn('URL de imagen de perfil no válida (no es string):', currentImage);
+      console.warn('URL de imagen de perfil no válida (no es string)');
       localStorage.removeItem('profilePic');
       return null;
     }
 
-    // Verificar si es una URL válida
-    if (!currentImage.startsWith('http') && !currentImage.startsWith('data:')) {
-      console.warn('URL de imagen de perfil no válida (no es URL):', currentImage);
-      localStorage.removeItem('profilePic');
-      return null;
-    }
-
-    // Verificar accesibilidad de la imagen
-    try {
-      const isAccessible = await checkImageAccessibility(currentImage);
-      if (!isAccessible) {
-        console.warn('Imagen de perfil no accesible:', currentImage);
-        localStorage.removeItem('profilePic');
-        return null;
-      }
-    } catch (error) {
-      console.error('Error al verificar accesibilidad de imagen:', error);
-      // No eliminar la imagen en caso de error de verificación
-      // Solo devolver la URL tal como está
+    // Si es base64 o URL válida, devolverla directamente
+    if (currentImage.startsWith('data:') || currentImage.startsWith('http')) {
       return currentImage;
     }
-
-    return currentImage;
+    
+    // Si llegamos aquí, la URL no parece válida
+    console.warn('URL de imagen de perfil no válida (formato desconocido)');
+    localStorage.removeItem('profilePic');
+    return null;
   } catch (error) {
     console.error('Error en syncProfileImage:', error);
-    // No eliminar la imagen en caso de error general
-    // Intentar recuperar la imagen del localStorage si existe
-    const fallbackImage = localStorage.getItem('profilePic');
-    return fallbackImage;
+    // Intentar recuperar la imagen del localStorage como último recurso
+    try {
+      return localStorage.getItem('profilePic');
+    } catch (e) {
+      return null;
+    }
   }
 };
 

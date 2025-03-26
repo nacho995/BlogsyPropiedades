@@ -415,13 +415,13 @@ function Principal() {
   // Renderizar la interfaz principal
   return (
     <motion.div 
-      className="min-h-screen bg-gradient-to-b from-blue-50 to-white"
+      className="min-h-screen bg-gradient-to-br from-blue-700 via-blue-400 to-white"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
       {/* Header mejorado con colores azules */}
-      <header className="bg-gradient-to-r from-blue-700 to-blue-600 shadow-lg">
+      <header className="bg-gradient-to-r from-blue-800 to-blue-600 shadow-lg">
         <div className="container mx-auto px-6 py-6 flex justify-between items-center">
           <h1 className="text-3xl font-bold text-white">
             <span className="text-yellow-300">Blog</span> de Propiedades
@@ -459,57 +459,132 @@ function Principal() {
               </div>
             ) : (
               <div className="flex items-center space-x-3">
-                <span className="text-white font-medium">Hola, {name || 'Usuario'}</span>
                 <div className="relative">
                   <img 
                     src={profileImage || defaultProfilePic} 
                     alt="Perfil" 
-                    className="h-10 w-10 rounded-full border-2 border-yellow-300 object-cover" 
+                    className="h-14 w-14 rounded-full border-3 border-yellow-300 object-cover shadow-lg" 
                     onError={handleImageError}
                   />
                 </div>
-                <button 
-                  onClick={handleLogout}
-                  className="px-3 py-1 bg-yellow-400 hover:bg-yellow-500 text-blue-900 text-sm font-semibold rounded-md transition duration-200"
-                >
-                  Salir
-                </button>
+                <div className="flex flex-col">
+                  <span className="text-white font-medium">Hola, {name || 'Usuario'}</span>
+                  <button 
+                    onClick={handleLogout}
+                    className="px-3 py-1 bg-yellow-400 hover:bg-yellow-500 text-blue-900 text-sm font-semibold rounded-md transition duration-200 mt-1"
+                  >
+                    Salir
+                  </button>
+                </div>
               </div>
             )}
           </div>
         </div>
       </header>
 
-      {/* Banner principal con efecto parallax */}
-      <div className="relative bg-blue-800 overflow-hidden">
-        <div className="absolute inset-0 opacity-20 bg-pattern-blueprint"></div>
-        <div className="container mx-auto px-6 py-20 relative z-10">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.8 }}
-            className="max-w-3xl"
-          >
-            <h2 className="text-4xl md:text-5xl font-bold text-white leading-tight">
-              Descubre las mejores propiedades y consejos inmobiliarios
-            </h2>
-            <p className="mt-6 text-xl text-blue-100">
-              Tu fuente de información sobre el mercado inmobiliario, tendencias y oportunidades de inversión.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-4">
-              <Link to="/blogs" className="px-6 py-3 bg-yellow-400 hover:bg-yellow-500 text-blue-900 font-bold rounded-md shadow-lg hover:shadow-xl transition duration-300">
-                Explorar Blogs
-              </Link>
-              <Link to="/properties" className="px-6 py-3 bg-transparent hover:bg-blue-700 text-white border-2 border-white font-bold rounded-md hover:shadow-lg transition duration-300">
-                Ver Propiedades
-              </Link>
+      {/* Sección de bienvenida personalizada */}
+      {isAuthenticated && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.6 }}
+          className="container mx-auto px-6 py-10"
+        >
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-8 flex items-center gap-6">
+            <div className="relative">
+              <img 
+                src={profileImage || defaultProfilePic} 
+                alt="Perfil" 
+                className="h-28 w-28 rounded-full border-4 border-blue-500 object-cover shadow-lg" 
+                onError={handleImageError}
+              />
+              <div className="absolute -bottom-2 -right-2 bg-yellow-400 rounded-full p-2 shadow-md">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                </svg>
+              </div>
             </div>
-          </motion.div>
+            <div>
+              <h2 className="text-3xl font-bold text-blue-800 mb-2">
+                ¡Bienvenido a tu espacio creativo, <span className="text-blue-600">{name || 'Usuario'}!</span>
+              </h2>
+              <p className="text-gray-600 text-lg">
+                Desde aquí podrás gestionar tus blogs y propiedades. ¿Qué te gustaría hacer hoy?
+              </p>
+              <div className="flex gap-3 mt-4">
+                <Link to="/crear-blog" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition duration-200">
+                  Crear nuevo blog
+                </Link>
+                <Link to="/add-property" className="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-blue-900 font-medium rounded-md transition duration-200">
+                  Añadir propiedad
+                </Link>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Banner principal con efecto parallax - solo para visitantes no autenticados */}
+      {!isAuthenticated && (
+        <div className="relative bg-blue-800 overflow-hidden">
+          <div className="absolute inset-0 opacity-20 bg-pattern-blueprint"></div>
+          <div className="container mx-auto px-6 py-20 relative z-10">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.8 }}
+              className="max-w-3xl"
+            >
+              <h2 className="text-4xl md:text-5xl font-bold text-white leading-tight">
+                Descubre las mejores propiedades y consejos inmobiliarios
+              </h2>
+              <p className="mt-6 text-xl text-blue-100">
+                Tu fuente de información sobre el mercado inmobiliario, tendencias y oportunidades de inversión.
+              </p>
+              <div className="mt-8 flex flex-wrap gap-4">
+                <Link to="/blogs" className="px-6 py-3 bg-yellow-400 hover:bg-yellow-500 text-blue-900 font-bold rounded-md shadow-lg hover:shadow-xl transition duration-300">
+                  Explorar Blogs
+                </Link>
+                <Link to="/properties" className="px-6 py-3 bg-transparent hover:bg-blue-700 text-white border-2 border-white font-bold rounded-md hover:shadow-lg transition duration-300">
+                  Ver Propiedades
+                </Link>
+              </div>
+            </motion.div>
+          </div>
         </div>
-      </div>
+      )}
+      
+      {/* Contenedor principal para usuarios autenticados */}
+      {isAuthenticated && (
+        <div className="container mx-auto px-6 py-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+            <Link to="/blogs" className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 flex flex-col items-center justify-center hover:shadow-xl transition-all duration-300 border-l-4 border-blue-600">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-blue-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+              </svg>
+              <h3 className="text-2xl font-bold text-blue-800 mb-2">Gestionar Blogs</h3>
+              <p className="text-gray-600 text-center">Administra tus publicaciones, edita contenido y crea nuevos artículos.</p>
+              <span className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition duration-200">
+                Ver mis blogs
+              </span>
+            </Link>
+            
+            <Link to="/properties" className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 flex flex-col items-center justify-center hover:shadow-xl transition-all duration-300 border-l-4 border-yellow-500">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-yellow-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              <h3 className="text-2xl font-bold text-blue-800 mb-2">Gestionar Propiedades</h3>
+              <p className="text-gray-600 text-center">Administra tus propiedades, actualiza la información y añade nuevos inmuebles.</p>
+              <span className="mt-4 px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-blue-900 font-medium rounded-md transition duration-200">
+                Ver mis propiedades
+              </span>
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Sección de blogs destacados */}
-      <section className="py-16 bg-white">
+      <section className="py-16 bg-white/70 backdrop-blur-sm">
         <div className="container mx-auto px-6">
           <div className="flex flex-col items-center mb-12">
             <h2 className="text-3xl font-bold text-blue-800 mb-2">Blogs Destacados</h2>
@@ -577,7 +652,7 @@ function Principal() {
       </section>
 
       {/* Sección de propiedades destacadas */}
-      <section className="py-16 bg-blue-50">
+      <section className="py-16 bg-blue-50/70 backdrop-blur-sm">
         <div className="container mx-auto px-6">
           <div className="flex flex-col items-center mb-12">
             <h2 className="text-3xl font-bold text-blue-800 mb-2">Propiedades Destacadas</h2>
