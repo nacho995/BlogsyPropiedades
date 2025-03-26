@@ -6,11 +6,17 @@ import { useUser } from '../context/UserContext';
 import useProfileImage from '../hooks/useProfileImage';
 import { fallbackImageBase64 } from '../utils/imageUtils';
 
-// SOLUCIÓN TDZ: Definición explícita de variables que causan TDZ
-// Esta es la solución al error "Cannot access 'y' before initialization"
-const y = {}; // Definición explícita para evitar TDZ
-const wi = {}; // Otra variable que podría causar problemas
-const Fp = {}; // Otra variable que podría causar problemas
+// Variables requeridas para evitar errores TDZ en producción - NO ELIMINAR
+window.y = window.y || {};
+window.wi = window.wi || {};
+window.Fp = window.Fp || {};
+window.Nc = window.Nc || {};
+
+// Definir variables localmente también
+const y = {};
+const wi = {};
+const Fp = {};
+const Nc = {};
 
 // Función de utilidad para combinar clases CSS
 function classNames(...classes) {
@@ -18,36 +24,20 @@ function classNames(...classes) {
 }
 
 export default function Navbar({ showOnlyAuth = false }) {
-  // Definición local por si acaso
+  // Variables locales para evitar TDZ
   const y = {};
   
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, user, logout } = useUser();
   
-  // Gestionar la imagen de perfil sin intentar sincronizar automáticamente
+  // Gestionar la imagen de perfil
   const { 
     profileImage, 
     isLoading, 
     error, 
-    handleImageError,
-    syncImage 
-  } = useProfileImage({
-    autoSync: false, // Desactivar sincronización automática para evitar errores
-    listenForUpdates: true
-  });
-  
-  // Intentar cargar la imagen solo cuando el usuario está autenticado
-  useEffect(() => {
-    // Esperar a que se confirme la autenticación antes de intentar sincronizar
-    if (isAuthenticated && user) {
-      // Intentar sincronizar la imagen solo si hay autenticación
-      syncImage().catch(err => {
-        console.warn("Error al sincronizar imagen en NavBar (ignorado):", err);
-        // Ignorar el error para no bloquear la UI
-      });
-    }
-  }, [isAuthenticated, user, syncImage]);
+    handleImageError
+  } = useProfileImage();
 
   // Verificar token expirado
   useEffect(() => {
@@ -101,33 +91,10 @@ export default function Navbar({ showOnlyAuth = false }) {
       }
     }, 60000); // Verificar cada minuto
     
-    // Escuchar evento de cierre de sesión para actualizar la UI
-    const handleLogout = (event) => {
-      console.log('NavBar: Evento de cierre de sesión detectado:', event.detail?.reason || 'sin razón');
-      
-      // Forzar actualización de componente si es necesario
-      if (isAuthenticated) {
-        // Esta es una forma de forzar la actualización del componente
-        syncImage().catch(() => {});
-      }
-    };
-    
-    // Escuchar evento de inicio de sesión
-    const handleLogin = (event) => {
-      console.log('NavBar: Evento de inicio de sesión detectado');
-      // Forzar actualización del componente
-      syncImage().catch(() => {});
-    };
-    
-    window.addEventListener('userLoggedOut', handleLogout);
-    window.addEventListener('userLoggedIn', handleLogin);
-    
     return () => {
       clearInterval(tokenVerifier);
-      window.removeEventListener('userLoggedOut', handleLogout);
-      window.removeEventListener('userLoggedIn', handleLogin);
     };
-  }, [logout, isAuthenticated, syncImage]);
+  }, [logout, isAuthenticated]);
   
   // Definir las rutas de navegación
   const navigation = [
@@ -220,24 +187,6 @@ export default function Navbar({ showOnlyAuth = false }) {
     );
   }
 
-  // Imprimir información del usuario para depuración
-  console.log("Estado de autenticación:", isAuthenticated);
-  console.log("Información del usuario:", JSON.stringify(user, null, 2));
-  console.log("Rol del usuario:", user?.role);
-  console.log("Es admin:", user?.isAdmin);
-  console.log("Token almacenado:", localStorage.getItem('token'));
-
-  // Decodificar el token para ver su contenido
-  try {
-    const token = localStorage.getItem('token');
-    if (token) {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      console.log("Contenido del token:", payload);
-    }
-  } catch (error) {
-    console.error("Error al decodificar token:", error);
-  }
-
   // Construir la navegación combinada basada en permisos
   let updatedNavigation = [...navigation];
   
@@ -246,7 +195,6 @@ export default function Navbar({ showOnlyAuth = false }) {
     
     // Añadir rutas de administrador si el usuario tiene el rol necesario
     if (user?.role === 'admin' || user?.role === 'ADMIN' || user?.isAdmin === true) {
-      console.log("Usuario es admin, añadiendo rutas de administrador");
       updatedNavigation = [...updatedNavigation, ...adminRoutes];
     }
   }

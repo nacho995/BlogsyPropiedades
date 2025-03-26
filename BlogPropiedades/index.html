@@ -2,60 +2,6 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <!-- SOLUCIÓN DEFINITIVA TDZ -->
-    <script>
-      (function() {
-        // 1. Definir variables críticas que causan TDZ
-        var y = window.y = {};
-        var wi = window.wi = {};
-        var Fp = window.Fp = {};
-        var Nc = window.Nc = {};
-        
-        // 2. Interceptar componentes problemáticos
-        try {
-          // Para ji (useProfileImage.js)
-          var originalJi = null;
-          Object.defineProperty(window, 'ji', {
-            get: function() { return typeof originalJi === 'function' ? 
-              function() { var y = {}; try { return originalJi.apply(this, arguments); } catch(e) { return null; } } : 
-              originalJi; 
-            },
-            set: function(value) { originalJi = value; return true; },
-            configurable: true
-          });
-          
-          // Para Ni (NavBar.jsx)
-          var originalNi = null;
-          Object.defineProperty(window, 'Ni', {
-            get: function() { return typeof originalNi === 'function' ? 
-              function() { var y = {}; try { return originalNi.apply(this, arguments); } catch(e) { return null; } } : 
-              originalNi; 
-            },
-            set: function(value) { originalNi = value; return true; },
-            configurable: true
-          });
-          
-          // 3. Detector de errores TDZ
-          window.addEventListener('error', function(event) {
-            if (event.message && (event.message.includes("Cannot access") || event.message.includes("before initialization"))) {
-              var varName = event.message.match(/'([^']+)'/) ? event.message.match(/'([^']+)'/)[1] : null;
-              if (varName) {
-                window[varName] = window[varName] || {};
-                console.warn("✓ TDZ corregido para: " + varName);
-                event.preventDefault();
-                return true;
-              }
-            }
-          }, true);
-        } catch(e) {
-          console.error("Error en solución TDZ:", e);
-        }
-      })();
-    </script>
-    
-    <!-- Script de protección TDZ adicional -->
-    <script src="/tdz-protector.js"></script>
-    
     <link rel="icon" type="image/svg+xml" href="/logo.jpg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Blog y Propiedades - GozaMadrid</title>
@@ -63,13 +9,22 @@
     
     <!-- Script básico de inicialización de entorno -->
     <script>
-      // Variables de entorno predeterminadas - siempre HTTPS para la API
+      // Variables de entorno predeterminadas
       window.ENV_VARS = {
         VITE_BACKEND_URL: 'https://api.realestategozamadrid.com',
         VITE_API_URL: 'https://api.realestategozamadrid.com',
         VITE_API_PUBLIC_API_URL: 'https://api.realestategozamadrid.com',
         VITE_FALLBACK_API: 'https://api.realestategozamadrid.com'
       };
+    </script>
+    
+    <!-- Protección TDZ mínima y necesaria -->
+    <script>
+      // Definir variables que podrían causar errores TDZ
+      window.y = window.y || {};
+      window.wi = window.wi || {};
+      window.Fp = window.Fp || {};
+      window.Nc = window.Nc || {};
     </script>
     
     <!-- Estilo para pantalla de carga -->
@@ -106,7 +61,6 @@
     
     <!-- Script para mostrar pantalla de carga si tarda demasiado -->
     <script>
-      // Configuración de timeout para mostrar mensaje de carga demorado
       window.appLoadTimeout = setTimeout(function() {
         if (document.getElementById('root') && document.getElementById('root').innerHTML === '') {
           document.getElementById('root').innerHTML = `
@@ -120,9 +74,8 @@
             </div>
           `;
         }
-      }, 10000); // 10 segundos
+      }, 10000);
       
-      // Cancelar el timeout cuando la aplicación se cargue correctamente
       window.addEventListener('load', function() {
         if (window.appLoadTimeout) {
           clearTimeout(window.appLoadTimeout);

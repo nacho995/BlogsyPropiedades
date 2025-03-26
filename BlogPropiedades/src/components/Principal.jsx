@@ -56,10 +56,7 @@ function Principal() {
     isLoading: profileLoading, 
     error: profileError, 
     handleImageError 
-  } = useProfileImage({
-    autoSync: true,
-    listenForUpdates: true
-  });
+  } = useProfileImage();
   
   // Obtener datos del usuario
   const { user, isAuthenticated: userAuthenticated, logout } = useUser();
