@@ -44,7 +44,6 @@ export const isImageUrlAccessible = async (url) => {
     'cloudinary.com',
     'res.cloudinary.com',
     'images.unsplash.com',
-    'goza-madrid.onrender.com',
     'api.realestategozamadrid.com',
     'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com'
   ];

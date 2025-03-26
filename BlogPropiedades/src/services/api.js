@@ -336,9 +336,14 @@ export const createUser = async (data) => {
 /**
  * Funciones específicas de autenticación
  */
-export const loginUser = async (email, password) => {
-  console.log(`📝 Intentando login con email: ${email}`);
+export const loginUser = async (credentials) => {
+  console.log(`📝 Intentando login con email: ${credentials.email}`);
   try {
+    // Validar que las credenciales sean un objeto con email y password
+    if (!credentials || typeof credentials !== 'object' || !credentials.email || !credentials.password) {
+      throw new Error('Credenciales inválidas: se requiere email y password');
+    }
+    
     // Usar la URL específica para login
     const loginUrl = '/user/login';
     
@@ -348,7 +353,10 @@ export const loginUser = async (email, password) => {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({
+        email: credentials.email,
+        password: credentials.password
+      })
     });
 
     console.log('Resultado login:', result);
@@ -375,7 +383,7 @@ export const loginUser = async (email, password) => {
 
       return { 
         success: true, 
-        user: result.user || { id: result.id, email }, 
+        user: result.user || { id: result.id, email: credentials.email }, 
         token: result.token 
       };
     } else {
@@ -388,7 +396,7 @@ export const loginUser = async (email, password) => {
     console.error('Error en el login:', error);
     return { 
       success: false, 
-      message: 'Error en el servidor. Por favor, intenta más tarde.' 
+      message: error.message || 'Error en el servidor. Por favor, intenta más tarde.' 
     };
   }
 };
@@ -1071,7 +1079,6 @@ const checkImageAccessibility = (url) => {
       'cloudinary.com',
       'res.cloudinary.com',
       'images.unsplash.com',
-      'goza-madrid.onrender.com',
       'api.realestategozamadrid.com',
       'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com'
     ];
@@ -1081,7 +1088,7 @@ const checkImageAccessibility = (url) => {
     
     // Si la URL contiene "uploads/properties" y es del servidor, verificar con fetch
     // ya que estos archivos pueden no existir (error 404)
-    if (url.includes('uploads/properties') && (url.includes('goza-madrid.onrender.com') || url.includes('api.realestategozamadrid.com') || url.includes('gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com'))) {
+    if (url.includes('uploads/properties') && (url.includes('api.realestategozamadrid.com') || url.includes('gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com'))) {
       console.log('Verificando accesibilidad de imagen en servidor con fetch:', url);
       
       // Usar fetch para verificar si la URL es accesible
