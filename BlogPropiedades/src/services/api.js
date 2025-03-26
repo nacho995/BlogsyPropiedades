@@ -313,8 +313,6 @@ export const getBlogPosts = async () => {
     if (Array.isArray(blogs)) {
       return blogs.map(blog => {
         console.log(`Blog ${blog._id} - Procesando...`);
-        console.log(`Blog ${blog._id} - Imagen original:`, blog.image);
-        console.log(`Blog ${blog._id} - Imágenes originales:`, blog.images);
         
         let processedImages = [];
         
@@ -357,8 +355,6 @@ export const getBlogPosts = async () => {
             }
           }
         }
-
-        console.log(`Blog ${blog._id} - Imágenes procesadas:`, processedImages);
         
         return {
           ...blog,
@@ -370,7 +366,8 @@ export const getBlogPosts = async () => {
     return [];
   } catch (error) {
     console.error('Error al obtener blogs:', error);
-    throw error;
+    // Devolver array vacío en caso de error
+    return [];
   }
 };
 
@@ -868,7 +865,6 @@ export const getPropertyPosts = async () => {
     if (Array.isArray(properties)) {
       return properties.map(property => {
         console.log(`Propiedad ${property._id} - Procesando...`);
-        console.log(`Propiedad ${property._id} - Imágenes originales:`, property.images);
         
         // Corregir el array de imágenes si es necesario
         if (!property.images || !Array.isArray(property.images)) {
@@ -890,16 +886,15 @@ export const getPropertyPosts = async () => {
           });
         }
         
-        console.log(`Propiedad ${property._id} - Imágenes corregidas:`, property.images);
-        
         return property;
       });
     }
     
-    return properties;
+    return [];
   } catch (error) {
     console.error('Error al obtener propiedades:', error);
-    throw error;
+    // Devolver array vacío en caso de error
+    return [];
   }
 };
 
@@ -985,11 +980,11 @@ export async function getUserProfile(token) {
     const now = Date.now();
     const recentAttempts = JSON.parse(localStorage.getItem(profileAttemptsKey) || '[]');
     const veryRecentAttempts = recentAttempts.filter(
-      time => (now - time) < 5000 // últimos 5 segundos
+      time => (now - time) < 2000 // últimos 2 segundos
     );
     
-    // Si hay más de 3 intentos en 5 segundos, crear respuesta local
-    if (veryRecentAttempts.length > 3) {
+    // Si hay más de 2 intentos en 2 segundos, crear respuesta local
+    if (veryRecentAttempts.length > 2) {
       console.warn('⚠️ Demasiados intentos de obtener perfil, usando datos locales');
       
       // Crear perfil de emergencia con datos almacenados
@@ -1132,7 +1127,6 @@ export const syncProfileImage = async (newImage = null) => {
     const token = localStorage.getItem('token');
     if (!token) {
       console.log('Sincronización de imagen omitida: No hay token de autenticación');
-      // Devolver un objeto de respuesta en lugar de lanzar error
       return { 
         imageUrl: localStorage.getItem('profilePic') || 
                 localStorage.getItem('profilePic_local') || 
@@ -1176,23 +1170,19 @@ export const syncProfileImage = async (newImage = null) => {
       }
       
       return { imageUrl };
-    } else {
-      // Si no hay nueva imagen, obtener los datos actuales del usuario
-      const response = await fetchAPI('/user/me');
-      
-      console.log('Respuesta al obtener datos de usuario:', response);
-      
-      // Procesar la URL para asegurar que use el mismo protocolo que la página
-      let imageUrl = response.profilePic || response.profileImage || response.imageUrl;
-      if (imageUrl && isHttps && imageUrl.startsWith('http:')) {
-        imageUrl = imageUrl.replace('http://', 'https://');
-      }
-      
-      return { imageUrl };
     }
+
+    // Si no hay nueva imagen, usar datos locales en lugar de hacer una llamada al servidor
+    const localImage = localStorage.getItem('profilePic') || 
+                      localStorage.getItem('profilePic_local') || 
+                      localStorage.getItem('profilePic_base64');
+    
+    return { 
+      imageUrl: localImage,
+      status: 'local_data'
+    };
   } catch (error) {
     console.error('Error en syncProfileImage:', error);
-    // Devolver un objeto de respuesta en lugar de propagar el error
     return { 
       imageUrl: localStorage.getItem('profilePic') || 
                localStorage.getItem('profilePic_local') || 
@@ -1211,9 +1201,9 @@ export const syncProfileImage = async (newImage = null) => {
  */
 const checkImageAccessibility = (url) => {
   return new Promise((resolve) => {
-    // Si no hay URL, no es accesible
-    if (!url) {
-      console.log('URL de imagen vacía, no es accesible');
+    // Si no hay URL o no es string, no es accesible
+    if (!url || typeof url !== 'string') {
+      console.log('URL de imagen inválida o no es string:', url);
       resolve(false);
       return;
     }
@@ -1239,7 +1229,8 @@ const checkImageAccessibility = (url) => {
     
     // Si la URL contiene "uploads/properties" y es del servidor, verificar con fetch
     // ya que estos archivos pueden no existir (error 404)
-    if (url.includes('uploads/properties') && (url.includes('api.realestategozamadrid.com') || url.includes('gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com'))) {
+    if (url.includes('uploads/properties') && (url.includes('api.realestategozamadrid.com') || 
+        url.includes('gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com'))) {
       console.log('Verificando accesibilidad de imagen en servidor con fetch:', url);
       
       // Usar fetch para verificar si la URL es accesible

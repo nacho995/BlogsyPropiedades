@@ -462,7 +462,7 @@ export function UserProvider({ children }) {
         refreshUserData().catch(error => {
           console.error("Error al refrescar datos periódicamente:", error);
         });
-      }, 5 * 60 * 1000); // 5 minutos
+      }, 15 * 60 * 1000); // 15 minutos
       
       return () => clearInterval(interval);
     }

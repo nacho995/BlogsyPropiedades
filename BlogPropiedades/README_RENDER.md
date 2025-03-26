@@ -2,6 +2,16 @@
 
 Este documento contiene las instrucciones para configurar correctamente la aplicación en Render, resolviendo los problemas de conexión entre el frontend HTTPS y el backend HTTP.
 
+## Variables de Producción
+
+```env
+VITE_BACKEND_URL=https://api.realestategozamadrid.com
+VITE_API_URL=https://api.realestategozamadrid.com
+VITE_API_PUBLIC_API_URL=https://api.realestategozamadrid.com
+VITE_FALLBACK_API=https://api.realestategozamadrid.com
+VITE_MAIN_DOMAIN=realestategozamadrid.com
+```
+
 ## Variables de entorno para Render
 
 Configura las siguientes variables de entorno en la sección "Environment" de tu servicio en Render:

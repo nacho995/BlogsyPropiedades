@@ -41,7 +41,7 @@ export default function CambiarPerfil() {
   const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
   // Definición de la URL de la API adaptada al protocolo
-  const API_DOMAIN = 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+  const API_DOMAIN = 'api.realestategozamadrid.com';
   const API_URL = `${isHttps ? 'https' : 'http'}://${API_DOMAIN}`;
 
   console.log(`🔄 CambiarPerfil usando API en: ${API_URL} (${isHttps ? 'HTTPS' : 'HTTP'})`);

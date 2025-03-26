@@ -140,7 +140,6 @@ function Principal() {
       // Las APIs de GozaMadrid deben usar HTTPS
       if (url.includes('gozamadrid-api') || 
           url.includes('api.realestategozamadrid.com') ||
-          url.includes('api.realestategozamadrid.com') ||
           url.includes('elasticbeanstalk.com')) {
         return url.replace('http://', 'https://');
       }
