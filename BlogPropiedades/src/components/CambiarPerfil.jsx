@@ -200,67 +200,145 @@ export default function CambiarPerfil() {
         throw new Error("No hay sesión activa. Por favor, inicia sesión nuevamente.");
       }
 
-      // Si tenemos una imagen, procesarla
-      let profileImageData = null;
+      // Crear FormData para enviar los datos
+      const formData = new FormData();
+      if (name) formData.append('name', name);
+      
+      // Si tenemos una imagen, añadirla al FormData con el nombre correcto esperado por el backend
       if (profilePic?.file) {
-        profileImageData = await validateAndProcessImage(profilePic.file);
+        console.log(`Añadiendo archivo de imagen (${profilePic.file.name}, ${profilePic.file.type}, ${profilePic.file.size} bytes) al FormData`);
+        formData.append('profilePic', profilePic.file);
         
-        // Actualizar la imagen localmente primero para respuesta inmediata
-        await updateProfileImage(profileImageData);
+        // También actualizar la imagen localmente para respuesta inmediata
+        try {
+          const imageData = await validateAndProcessImage(profilePic.file);
+          await updateProfileImage(imageData);
+          localStorage.setItem('profilePic', imageData);
+          localStorage.setItem('profilePic_backup', imageData);
+        } catch (imgError) {
+          console.error("Error al procesar imagen localmente:", imgError);
+        }
       }
 
-      const userData = {
-        name: name || user?.name,
-        profilePic: profileImageData
-      };
-
-      // Llamada al backend para actualizar el perfil
+      console.log("Enviando datos de perfil al servidor...");
+      
+      // Log para depuración - ver contenido del FormData
+      for (let pair of formData.entries()) {
+        console.log(`FormData contiene: ${pair[0]}: ${pair[1] instanceof File ? `Archivo: ${pair[1].name}` : pair[1]}`);
+      }
+      
+      // Llamada al backend para actualizar el perfil usando FormData
       const response = await fetch(`${API_URL}/user/update-profile`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(userData)
+        body: formData,
+        // No incluir Content-Type para que el navegador establezca el boundary correcto
+      });
+
+      // Registrar los detalles completos de la respuesta para depuración
+      console.log("Respuesta del servidor:", {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries([...response.headers.entries()])
       });
 
       if (!response.ok) {
+        console.error("Error del servidor:", response.status, response.statusText);
+        
         // Si hay error de autorización, intentar actualizar solo localmente
         if (response.status === 401) {
           console.warn("Error de autorización al actualizar perfil. Actualizando solo localmente.");
           
-          // Actualizar datos locales
           if (name) {
             localStorage.setItem('name', name);
           }
-          
-          // La imagen ya se actualizó localmente arriba
           
           setSuccess("Perfil actualizado localmente. Los cambios se sincronizarán cuando inicies sesión.");
           setTimeout(() => navigate("/"), 2000);
           return;
         }
         
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Error al actualizar el perfil: ${response.status}`);
+        // Intentar obtener más detalles del error
+        let errorMessage;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || `Error al actualizar el perfil: ${response.status}`;
+          console.error("Detalles del error:", errorData);
+        } catch (parseError) {
+          errorMessage = `Error al actualizar el perfil: ${response.status}`;
+          try {
+            const errorText = await response.text();
+            console.error("Respuesta de error (texto):", errorText);
+          } catch (textError) {
+            console.error("No se pudo leer la respuesta de error");
+          }
+        }
+        throw new Error(errorMessage);
       }
 
-      // Procesar respuesta
-      const data = await response.json();
+      // Intentar procesar la respuesta
+      let data;
+      try {
+        data = await response.json();
+        console.log("Respuesta del servidor (datos):", data);
+      } catch (parseError) {
+        console.warn("No se pudo parsear la respuesta como JSON:", parseError);
+        // Si la respuesta no es JSON pero el status es OK, asumimos éxito
+        if (response.ok) {
+          data = { success: true };
+        }
+      }
       
-      // Actualizar imagen local si hay respuesta del servidor
-      if (data.profilePic && typeof data.profilePic === 'string') {
-        console.log("📤 CambiarPerfil: Recibida imagen del servidor, actualizando...");
-        
-        // Actualizar la imagen localmente primero para respuesta inmediata
+      // Si la API devolvió una URL de imagen, actualizarla en toda la aplicación
+      let imageUpdated = false;
+      
+      // Buscar la imagen en diferentes ubicaciones de la respuesta
+      if (data?.profilePic && typeof data.profilePic === 'string') {
+        console.log("📤 Recibida imagen de perfil como string:", data.profilePic.substring(0, 30) + "...");
         localStorage.setItem('profilePic', data.profilePic);
-        
-        // Usar updateProfileImage que manejará todo el proceso de notificación
+        localStorage.setItem('profilePic_backup', data.profilePic);
         await updateProfileImage(data.profilePic);
+        imageUpdated = true;
+      } else if (data?.user?.profilePic && typeof data.user.profilePic === 'string') {
+        console.log("📤 Recibida imagen de perfil en user.profilePic:", data.user.profilePic.substring(0, 30) + "...");
+        localStorage.setItem('profilePic', data.user.profilePic);
+        localStorage.setItem('profilePic_backup', data.user.profilePic);
+        await updateProfileImage(data.user.profilePic);
+        imageUpdated = true;
+      } else if (data?.profileImage?.url && typeof data.profileImage.url === 'string') {
+        console.log("📤 Recibida imagen de perfil en profileImage.url:", data.profileImage.url.substring(0, 30) + "...");
+        localStorage.setItem('profilePic', data.profileImage.url);
+        localStorage.setItem('profilePic_backup', data.profileImage.url);
+        await updateProfileImage(data.profileImage.url);
+        imageUpdated = true;
+      } else if (data?.user?.profileImage?.url && typeof data.user.profileImage.url === 'string') {
+        console.log("📤 Recibida imagen de perfil en user.profileImage.url:", data.user.profileImage.url.substring(0, 30) + "...");
+        localStorage.setItem('profilePic', data.user.profileImage.url);
+        localStorage.setItem('profilePic_backup', data.user.profileImage.url);
+        await updateProfileImage(data.user.profileImage.url);
+        imageUpdated = true;
+      }
+      
+      // Si no se recibió imagen del servidor pero subimos una, usamos la versión local
+      if (!imageUpdated && profilePic?.file) {
+        console.log("📤 No se recibió imagen del servidor, usando versión local almacenada");
+        const currentImage = localStorage.getItem('profilePic');
+        if (currentImage) {
+          window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+            detail: { profileImage: currentImage, timestamp: Date.now() }
+          }));
+        }
       }
 
       // Actualizar datos de usuario
-      await refreshUserData();
+      if (refreshUserData) {
+        console.log("Refrescando datos de usuario después de actualizar perfil");
+        await refreshUserData().catch(err => {
+          console.warn("Error al actualizar datos de usuario:", err);
+        });
+      }
 
       setSuccess("¡Perfil actualizado correctamente!");
       setTimeout(() => navigate("/"), 2000);
@@ -410,6 +488,16 @@ export default function CambiarPerfil() {
             </button>
           </div>
         </form>
+        
+        {/* Enlace a la herramienta de diagnóstico */}
+        <div className="mt-6 text-center">
+          <a 
+            href="/test-imagen" 
+            className="text-xs text-blue-300 hover:text-blue-100 transition"
+          >
+            ¿Problemas con la imagen? Usar herramienta de diagnóstico
+          </a>
+        </div>
       </div>
     </div>
   );

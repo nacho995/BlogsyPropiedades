@@ -22,6 +22,7 @@ import CambiarPerfil from './components/CambiarPerfil';
 import SubirPage from './components/SubirPage';
 import DiagnosticPage from './components/DiagnosticPage';
 import NotFound from './components/NotFound';
+import TestImagePage from './pages/testImagePage';
 
 // Detección de ciclos de renderizado
 const RENDER_CYCLE_THRESHOLD = 10; // Número máximo de renderizados en un corto período de tiempo
@@ -825,6 +826,7 @@ function App() {
                                 <Route path="/property/:id" element={<SafeRender><PropertyDetail/></SafeRender>} />
                                 <Route path="/subir" element={<ProtectedRoute><SafeRender><SubirPage /></SafeRender></ProtectedRoute>} />
                                 <Route path="/diagnostico" element={<AdminRoute><SafeRender><DiagnosticPage /></SafeRender></AdminRoute>} />
+                                <Route path="/test-imagen" element={<ProtectedRoute><SafeRender><TestImagePage /></SafeRender></ProtectedRoute>} />
                                 <Route path="/not-found" element={<NotFound />} />
                                 <Route path="*" element={<Navigate to="/not-found" replace />} />
                             </Routes>
