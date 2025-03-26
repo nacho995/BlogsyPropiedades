@@ -521,7 +521,7 @@ export function UserProvider({ children }) {
   
   // Función para iniciar sesión
   const login = async (token, userData) => {
-    console.log("🔐 Iniciando sesión con token y datos de usuario");
+    console.log("🔐 Iniciando sesión con token y datos de usuario", { token: !!token, userData: !!userData });
     logAuthEvent('login_attempt');
     
     try {
@@ -529,6 +529,13 @@ export function UserProvider({ children }) {
       if (!token) {
         console.error("❌ Error de login: No se proporcionó token");
         logAuthEvent('login_failed_no_token');
+        return false;
+      }
+      
+      // Validación de datos de usuario
+      if (!userData || typeof userData !== 'object') {
+        console.error("❌ Error de login: Datos de usuario inválidos");
+        logAuthEvent('login_failed_invalid_user_data');
         return false;
       }
       
@@ -554,56 +561,46 @@ export function UserProvider({ children }) {
           
           const recentAttempts = loginAttempts.filter(time => (now - time) < 5000);
           
-          if (recentAttempts.length > 2) {
-            console.error("🛑 BUCLE DE LOGIN DETECTADO - Limpiando estado");
-            
-            // MEJORA 3: Limpieza completa para romper el bucle
-            localStorage.removeItem('token');
-            localStorage.removeItem('tempToken');
-            localStorage.removeItem('tokenType');
-            localStorage.removeItem('lastLogin');
-            localStorage.removeItem('loginAttempts');
-            localStorage.removeItem('user');
-            
-            setUser(null);
-            setIsAuthenticated(false);
-            
-            // Notificar a otros componentes
+          if (recentAttempts.length > 3) {
+            console.error("🛑 BUCLE DE LOGIN DETECTADO - Deteniendo");
             window.dispatchEvent(new CustomEvent('loginLoopDetected'));
-            
+            logAuthEvent('login_loop_detected');
             return false;
           }
-        } catch (e) {
-          console.error("Error al manejar detección de bucle:", e);
+        } catch (loopError) {
+          console.error("Error al detectar bucle de login:", loopError);
         }
       }
       
-      // Actualizar timestamp de último login
+      // Actualizar tiempo de último login
       localStorage.setItem('lastLogin', now.toString());
       
-      // MEJORA 4: Validación de datos de usuario
-      if (!userData || !userData.email) {
-        console.warn("⚠️ Datos de usuario incompletos, usando valores por defecto");
-        
-        // Crear un usuario mínimo usando el email almacenado o un valor por defecto
-        const email = localStorage.getItem('email') || 'usuario@ejemplo.com';
-        userData = {
-          email: email,
-          name: localStorage.getItem('name') || email.split('@')[0] || "Usuario",
-          role: localStorage.getItem('role') || 'user'
-        };
-      }
-      
-      // MEJORA 5: Almacenamiento de datos simplificado
       try {
+        // MEJORA 4: Asegurar datos mínimos de usuario
+        const email = userData.email || '';
+        const name = userData.name || (email ? email.split('@')[0] : 'Usuario') || 'Usuario';
+        
+        console.log("Datos de usuario para sesión:", { 
+          email: email || 'No disponible', 
+          name, 
+          role: userData.role || 'user'
+        });
+        
         // Guardar token
         localStorage.setItem('token', token);
         localStorage.setItem('tokenType', token.startsWith('temp_') ? 'temporary' : 'normal');
         
         // Guardar datos básicos del usuario
-        localStorage.setItem('email', userData.email);
-        localStorage.setItem('name', userData.name || userData.email.split('@')[0] || "Usuario");
-        localStorage.setItem('role', userData.role || 'user');
+        if (email) localStorage.setItem('email', email);
+        if (name) localStorage.setItem('name', name);
+        
+        // Solo guardar rol si existe
+        if (userData.role) localStorage.setItem('role', userData.role);
+        
+        // Si hay imagen de perfil, guardarla
+        if (userData.profilePic) {
+          localStorage.setItem('profilePic', userData.profilePic);
+        }
         
         console.log("✅ Datos de sesión guardados correctamente");
       } catch (storageError) {

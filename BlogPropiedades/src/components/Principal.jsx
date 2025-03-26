@@ -137,12 +137,12 @@ function Principal() {
     if (!url) return defaultProfilePic;
     
     try {
-      // Las APIs de GozaMadrid necesitan usar HTTP
+      // Las APIs de GozaMadrid deben usar HTTPS
       if (url.includes('gozamadrid-api') || 
           url.includes('api.realestategozamadrid.com') ||
           url.includes('api.realestategozamadrid.com') ||
           url.includes('elasticbeanstalk.com')) {
-        return url.replace('https://', 'http://');
+        return url.replace('http://', 'https://');
       }
       return url;
     } catch (e) {

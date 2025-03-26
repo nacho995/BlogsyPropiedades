@@ -45,68 +45,23 @@ const SignIn = ({ isRegistering = false }) => {
         }
     }, []);
 
-    // Control para prevenir redireccionamientos que causan ciclos
+    // Redirigir si ya está autenticado
     useEffect(() => {
         let isMounted = true;
+        let redirectTimer = null;
         
-        // Limpiar cualquier posible indicador de bucle al montar el componente
-        localStorage.removeItem('loginRedirects');
-        localStorage.removeItem('apiRequestLoop');
-        
-        // Limpiar el registro de solicitudes recientes al API
-        localStorage.removeItem('recentApiRequests');
-        
-        if (isAuthenticated && user && isMounted) {
-            console.log("Usuario autenticado, redirigiendo a la página principal");
+        // Solo redirigir si este componente aún está montado y existe información de usuario
+        if (isMounted && isAuthenticated && user) {
+            console.log("Usuario ya autenticado, redirigiendo a Principal...");
             
-            // Verificar si hay posibles bucles de redirección
-            const redirectsCount = parseInt(localStorage.getItem('loginRedirects') || '0', 10);
-            localStorage.setItem('loginRedirects', (redirectsCount + 1).toString());
-            
-            // Si hay demasiados redireccionamientos en poco tiempo, puede ser un bucle
-            if (redirectsCount > 2) {
-                try {
-                    console.warn("⚠️ Posible bucle de redirección detectado, permaneciendo en página de login");
-                    localStorage.setItem('redirectLoopDetected', JSON.stringify({
-                        timestamp: new Date().toISOString(),
-                        redirects: redirectsCount
-                    }));
-                    
-                    // Limpiamos todos los datos de sesión para romper el bucle
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('tempToken');
-                    
-                    // No redirigimos, dejamos al usuario en la página de login
-                    // y mostramos una notificación
-                    try {
-                        toast("Se ha detectado un problema con la navegación. Sesión reiniciada para evitar bucles.", {
-                            icon: "⚠️",
-                            duration: 5000
-                        });
-                    } catch (e) {
-                        console.error("Error al mostrar notificación:", e);
-                    }
-                    
-                    // Limpiamos el contador después de 5 segundos
-                    setTimeout(() => {
-                        if (isMounted) {
-                            localStorage.removeItem('loginRedirects');
-                            window.location.reload(); // Recargar la página para reiniciar todo
-                        }
-                    }, 5000);
-                    
-                    return;
-                } catch (e) {
-                    console.error("Error al manejar bucle de redirección:", e);
-                }
-            }
-            
-            // Usar timeout para evitar redirecciones demasiado rápidas
-            const redirectTimer = setTimeout(() => {
+            // Usar un temporizador pequeño para evitar redirecciones inmediatas
+            // que puedan causar problemas de renders
+            redirectTimer = setTimeout(() => {
                 if (isMounted) {
+                    console.log("Redirigiendo a Principal...");
                     navigate("/");
                 }
-            }, 300);
+            }, 100);
             
             return () => {
                 clearTimeout(redirectTimer);
@@ -200,11 +155,14 @@ const SignIn = ({ isRegistering = false }) => {
                 }
             } else {
                 // MEJORA 4: Simplificar el flujo de login y manejar errores
-                console.log("Intentando iniciar sesión con:", { email });
+                console.log("Intentando iniciar sesión con:", { email, password: '***' });
                 
                 try {
                     // Paso 1: Intentar login con la API
-                    const response = await loginUser({ email, password });
+                    const response = await loginUser({ 
+                        email: email,
+                        password: password 
+                    });
                     
                     // Paso 2: Verificar si tenemos una respuesta válida
                     if (!response) {

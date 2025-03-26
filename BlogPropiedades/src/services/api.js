@@ -337,26 +337,51 @@ export const createUser = async (data) => {
  * Funciones específicas de autenticación
  */
 export const loginUser = async (credentials) => {
-  console.log(`📝 Intentando login con email: ${credentials.email}`);
   try {
-    // Validar que las credenciales sean un objeto con email y password
-    if (!credentials || typeof credentials !== 'object' || !credentials.email || !credentials.password) {
-      throw new Error('Credenciales inválidas: se requiere email y password');
+    // Validar que las credenciales sean válidas
+    if (!credentials || typeof credentials !== 'object') {
+      console.error('Error: credenciales inválidas, se esperaba un objeto');
+      throw new Error('Credenciales inválidas: se requiere un objeto con email y password');
     }
+    
+    // Asegurar que email y password estén presentes
+    if (!credentials.email || !credentials.password) {
+      console.error('Error: faltan campos obligatorios en las credenciales', 
+                   { email: !!credentials.email, password: !!credentials.password });
+      throw new Error('Credenciales incompletas: se requiere email y password');
+    }
+    
+    // Crear un objeto de datos limpio para el login
+    const loginData = {
+      email: credentials.email,
+      password: credentials.password
+    };
+    
+    console.log(`📝 Intentando login con email: ${loginData.email}`);
     
     // Usar la URL específica para login
     const loginUrl = '/user/login';
+    
+    // Enviar las credenciales como JSON string
+    const body = JSON.stringify(loginData);
+    
+    // Log detallado
+    console.log('Enviando solicitud de login:', {
+      url: loginUrl,
+      method: 'POST',
+      bodyLength: body.length,
+      hasEmail: !!loginData.email,
+      hasPassword: !!loginData.password
+    });
     
     // Enviar las credenciales
     const result = await fetchAPI(loginUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
-      body: JSON.stringify({
-        email: credentials.email,
-        password: credentials.password
-      })
+      body: body
     });
 
     console.log('Resultado login:', result);
