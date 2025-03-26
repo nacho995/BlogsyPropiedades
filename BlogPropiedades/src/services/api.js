@@ -5,9 +5,63 @@
  * Este archivo se conecta directamente al backend HTTPS
  */
 
-// Importar utilidades
-import { combineUrls, detectAndPreventLoopError } from '../utils';
-import { ensureHttps } from '../utils/imageUtils';
+// Definimos las funciones que antes estaban en utils y utils/imageUtils
+const combineUrls = (baseUrl, relativeUrl) => {
+  if (!baseUrl) return relativeUrl;
+  if (!relativeUrl) return baseUrl;
+  
+  // Eliminar / al final de baseUrl si existe
+  const base = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+  // Eliminar / al inicio de relativeUrl si existe
+  const relative = relativeUrl.startsWith('/') ? relativeUrl : '/' + relativeUrl;
+  
+  return base + relative;
+};
+
+const detectAndPreventLoopError = (actionName, timeWindow = 5000, maxAttempts = 3) => {
+  try {
+    // Obtener o crear el registro de acciones
+    const actionsKey = `actionLog_${actionName}`;
+    const storedActions = JSON.parse(localStorage.getItem(actionsKey) || '[]');
+    
+    // Añadir la acción actual
+    const now = new Date().getTime();
+    storedActions.unshift(now);
+    
+    // Mantener solo las últimas 10 acciones para no ocupar mucho espacio
+    if (storedActions.length > 10) {
+      storedActions.length = 10;
+    }
+    
+    // Guardar el registro actualizado
+    localStorage.setItem(actionsKey, JSON.stringify(storedActions));
+    
+    // Verificar si hay demasiadas acciones en la ventana de tiempo
+    const recentActions = storedActions.filter(timestamp => 
+      (now - timestamp) < timeWindow
+    );
+    
+    // Si hay demasiadas acciones recientes, es posible que estemos en un bucle
+    if (recentActions.length >= maxAttempts) {
+      console.warn(`⚠️ Posible bucle detectado en "${actionName}": ${recentActions.length} acciones en ${timeWindow}ms`);
+      
+      // Registrar la detección del bucle
+      localStorage.setItem(`${actionName}_bucleDetectado`, 'true');
+      
+      return true; // Hay un bucle
+    }
+    
+    return false; // No hay bucle
+  } catch (error) {
+    console.error('Error al detectar bucle:', error);
+    return false; // En caso de error, asumimos que no hay bucle
+  }
+};
+
+const ensureHttps = (url) => {
+  if (!url) return url;
+  return url.replace(/^http:\/\//i, 'https://');
+};
 
 // URL base de la API
 // Modificar la URL base para asegurar que sea correcta
@@ -1081,256 +1135,34 @@ export const deleteData = async (endpoint) => {
 };
 
 /**
- * Sincroniza la imagen de perfil con el servidor
- * @param {string|Object} [newImage] - Nueva imagen en base64 o URL para actualizar
- * @returns {Promise<string|null>} - URL de la imagen sincronizada o null en caso de error
+ * Almacena la imagen de perfil en localStorage
+ * Versión simplificada sin sincronización entre componentes
+ * @param {string} imageUrl - URL de la imagen para guardar
  */
-export const syncProfileImage = async (newImage = null) => {
+export const syncProfileImage = (imageUrl) => {
+  if (!imageUrl) return;
+  
   try {
-    // Almacenar timestamp de la sincronización para depuración
-    try {
-      localStorage.setItem('lastProfileSyncAttempt', Date.now().toString());
-    } catch (e) {
-      console.warn('Error al almacenar timestamp de sincronización:', e);
-    }
+    localStorage.setItem('profilePic', imageUrl);
+    localStorage.setItem('profilePic_backup', imageUrl);
     
-    console.log("⏱️ Iniciando sincronización de imagen de perfil");
-    
-    // Si se proporciona una nueva imagen, procesarla
-    if (newImage) {
-      let imageUrl = null;
-      
-      // Evitar errores con tipos no esperados
-      if (newImage === null || newImage === undefined) {
-        console.warn("Se proporcionó un valor nulo o indefinido para sincronización");
-        return null;
-      }
-      
-      // Manejar diferentes tipos de entrada
-      if (typeof newImage === 'string') {
-        // Si es una cadena, usarla directamente
-        imageUrl = newImage;
-        console.log("💾 Sincronizando imagen directamente desde string");
-      } else if (newImage && typeof newImage === 'object') {
-        console.log("💾 Intentando extraer URL de objeto para sincronización");
-        try {
-          // Extraer URL de diferentes formatos de objeto
-          if (newImage.src) {
-            imageUrl = newImage.src;
-            console.log("- Usando src:", newImage.src.substring(0, 30) + "...");
-          } else if (newImage.url) {
-            imageUrl = newImage.url;
-            console.log("- Usando url:", newImage.url.substring(0, 30) + "...");
-          } else if (newImage.imageUrl) {
-            imageUrl = newImage.imageUrl;
-            console.log("- Usando imageUrl:", newImage.imageUrl.substring(0, 30) + "...");
-          } else if (newImage.profileImage) {
-            // Si profileImage es string, usarla; si es objeto, intentar extraer src o url
-            imageUrl = typeof newImage.profileImage === 'string' ? 
-                      newImage.profileImage : 
-                      ((newImage.profileImage?.src || newImage.profileImage?.url) || null);
-            console.log("- Usando profileImage");
-          } else if (newImage.profilePic) {
-            // Si profilePic es string, usarla; si es objeto, intentar extraer src o url
-            imageUrl = typeof newImage.profilePic === 'string' ? 
-                      newImage.profilePic : 
-                      ((newImage.profilePic?.src || newImage.profilePic?.url) || null);
-            console.log("- Usando profilePic");
-          }
-        } catch (extractError) {
-          console.error('Error al extraer URL de imagen:', extractError);
-          imageUrl = null;
-        }
-      }
-      
-      // Si se encontró una URL válida, guardarla en múltiples ubicaciones para redundancia
-      if (imageUrl && typeof imageUrl === 'string') {
-        console.log("✅ URL válida encontrada para sincronización");
-        
-        try {
-          // Guardar en localStorage principal
-          localStorage.setItem('profilePic', imageUrl);
-          
-          // Guardar en respaldo
-          localStorage.setItem('profilePic_backup', imageUrl);
-          localStorage.setItem('profilePic_temp', imageUrl);
-          
-          // Asegurar que userData tenga la imagen actualizada
-          const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-          userData.profilePic = imageUrl;
-          userData.profileImage = imageUrl;
-          localStorage.setItem('userData', JSON.stringify(userData));
-          
-          // Intentar guardar en userResponse si existe
-          try {
-            const userResponse = JSON.parse(localStorage.getItem('userResponse') || '{}');
-            if (userResponse && Object.keys(userResponse).length > 0) {
-              userResponse.profilePic = imageUrl;
-              userResponse.profileImage = imageUrl;
-              localStorage.setItem('userResponse', JSON.stringify(userResponse));
-              console.log("✓ También actualizada en userResponse");
-            }
-          } catch (e) {
-            console.warn('Error al actualizar userResponse:', e);
-          }
-          
-          // Guardar timestamp de última actualización
-          localStorage.setItem('profilePic_lastUpdated', Date.now().toString());
-          
-          // Disparar evento para notificar a otros componentes
-          try {
-            window.dispatchEvent(new CustomEvent('profileImageUpdated', {
-              detail: { imageUrl }
-            }));
-            console.log("🔔 Evento de actualización enviado a otros componentes");
-          } catch (e) {
-            console.warn('Error al disparar evento de actualización:', e);
-          }
-          
-          console.log('✅ Imagen de perfil sincronizada y guardada en múltiples ubicaciones');
-        } catch (storageError) {
-          console.error('Error al guardar imagen en localStorage:', storageError);
-        }
-        
-        return imageUrl;
-      }
-      
-      console.warn('No se pudo extraer URL de imagen del perfil:', 
-                  typeof newImage === 'object' ? JSON.stringify({}) : String(newImage));
-      return null;
-    }
-
-    // Si no se proporcionó imagen, intentar usar la actual del localStorage con estrategia de redundancia
-    console.log("🔍 Buscando imagen existente en varias ubicaciones");
-    const sources = [
-      localStorage.getItem('profilePic'),
-      localStorage.getItem('profilePic_backup'),
-      localStorage.getItem('profilePic_temp'),
-      localStorage.getItem('profilePic_local')
-    ];
-    
-    // Log para depuración
-    sources.forEach((src, index) => {
-      if (src) {
-        console.log(`Fuente #${index + 1}: ${src.substring(0, 30)}...`);
-      } else {
-        console.log(`Fuente #${index + 1}: No disponible`);
-      }
-    });
-    
-    // Buscar primera fuente válida
-    const currentImage = sources.find(src => src && typeof src === 'string' && 
-                                       (src.startsWith('http') || src.startsWith('data:')));
-    
-    // Si encontramos imagen en alguna fuente, asegurar que esté en todas las ubicaciones
-    if (currentImage) {
-      console.log("✅ Imagen encontrada en caché local:", currentImage.substring(0, 30) + "...");
-      
-      try {
-        localStorage.setItem('profilePic', currentImage);
-        localStorage.setItem('profilePic_backup', currentImage);
-        localStorage.setItem('profilePic_temp', currentImage);
-        console.log("✓ Sincronizadas todas las ubicaciones de caché");
-        
-        // Actualizar userData para mantener todo coherente
-        try {
-          const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-          userData.profilePic = currentImage;
-          userData.profileImage = currentImage;
-          localStorage.setItem('userData', JSON.stringify(userData));
-          console.log("✓ Actualizado en userData");
-        } catch (e) {
-          console.warn('Error al actualizar userData con imagen:', e);
-        }
-        
-        // Disparar evento para notificar a otros componentes
-        try {
-          window.dispatchEvent(new CustomEvent('profileImageUpdated', {
-            detail: { imageUrl: currentImage }
-          }));
-          console.log("🔔 Evento de actualización enviado a otros componentes");
-        } catch (e) {
-          console.warn('Error al disparar evento de actualización:', e);
-        }
-      } catch (e) {
-        console.warn('Error al sincronizar fuentes de imagen:', e);
-      }
-      
-      return currentImage;
-    }
-    
-    // Si no encontramos imagen en localStorage, buscar en userData
-    console.log("⚠️ No se encontró imagen en caché, buscando en userData");
+    // Actualizar userData si existe
     try {
       const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-      let profileUrl = null;
-      
-      // Buscar primero en profileImage
-      if (userData.profileImage) {
-        if (typeof userData.profileImage === 'string') {
-          profileUrl = userData.profileImage;
-          console.log("✓ Imagen encontrada en userData.profileImage");
-        } else if (userData.profileImage && typeof userData.profileImage === 'object') {
-          profileUrl = userData.profileImage.src || userData.profileImage.url || null;
-          if (profileUrl) console.log("✓ Imagen (objeto) encontrada en userData.profileImage");
-        }
+      if (userData) {
+        userData.profilePic = imageUrl;
+        userData.profileImage = imageUrl;
+        localStorage.setItem('userData', JSON.stringify(userData));
       }
-      
-      // Si no se encontró en profileImage, buscar en profilePic
-      if (!profileUrl && userData.profilePic) {
-        if (typeof userData.profilePic === 'string') {
-          profileUrl = userData.profilePic;
-          console.log("✓ Imagen encontrada en userData.profilePic");
-        } else if (userData.profilePic && typeof userData.profilePic === 'object') {
-          profileUrl = userData.profilePic.src || userData.profilePic.url || null;
-          if (profileUrl) console.log("✓ Imagen (objeto) encontrada en userData.profilePic");
-        }
-      }
-      
-      // Si se encontró una URL, guardarla y devolverla
-      if (profileUrl && (profileUrl.startsWith('http') || profileUrl.startsWith('data:'))) {
-        localStorage.setItem('profilePic', profileUrl);
-        localStorage.setItem('profilePic_backup', profileUrl);
-        localStorage.setItem('profilePic_temp', profileUrl);
-        
-        // Notificar a otros componentes
-        try {
-          window.dispatchEvent(new CustomEvent('profileImageUpdated', {
-            detail: { imageUrl: profileUrl }
-          }));
-          console.log("🔔 Evento de actualización enviado a otros componentes");
-        } catch (e) {
-          console.warn('Error al disparar evento de actualización:', e);
-        }
-        
-        return profileUrl;
-      }
-    } catch (parseError) {
-      console.warn('Error al procesar datos de usuario del localStorage:', parseError);
+    } catch (e) {
+      console.warn('Error al actualizar userData:', e);
     }
     
-    console.warn("❌ No se pudo encontrar ninguna imagen de perfil válida");
-    return null;
+    console.log('Imagen de perfil almacenada en localStorage');
+    return imageUrl;
   } catch (error) {
-    console.error('Error en syncProfileImage:', error);
-    // Intentar recuperar la imagen del localStorage como último recurso
-    try {
-      const sources = [
-        localStorage.getItem('profilePic'),
-        localStorage.getItem('profilePic_backup'),
-        localStorage.getItem('profilePic_temp'),
-        localStorage.getItem('profilePic_local')
-      ];
-      
-      const validImage = sources.find(src => src && typeof src === 'string');
-      if (validImage) {
-        console.log("🛟 Recuperada imagen de respaldo después de error:", validImage.substring(0, 30) + "...");
-      }
-      return validImage;
-    } catch (e) {
-      console.error("Error crítico en recuperación de emergencia:", e);
-      return null;
-    }
+    console.error('Error al guardar imagen en localStorage:', error);
+    return null;
   }
 };
 

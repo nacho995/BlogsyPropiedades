@@ -1,6 +1,43 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
 import { getUserProfile, syncProfileImage } from '../services/api';
-import { fallbackImageBase64, validateAndProcessImage, ensureHttps } from "../utils/imageUtils";
+
+// Definimos las constantes y funciones que antes estaban en utils/imageUtils
+const fallbackImageBase64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNlMWUxZTEiLz48dGV4dCB4PSI1MCIgeT0iNTAiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGFsaWdubWVudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZmlsbD0iIzg4OCI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4=';
+
+const validateAndProcessImage = (imageFile) => {
+  return new Promise((resolve, reject) => {
+    if (!imageFile) {
+      reject(new Error('No se proporcionó ninguna imagen'));
+      return;
+    }
+
+    // Verificar el tipo de archivo
+    if (!imageFile.type.match('image.*')) {
+      reject(new Error('El archivo seleccionado no es una imagen válida'));
+      return;
+    }
+
+    // Verificar el tamaño (máximo 2MB)
+    if (imageFile.size > 2 * 1024 * 1024) {
+      reject(new Error('La imagen es demasiado grande. El tamaño máximo es 2MB'));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      resolve(e.target.result);
+    };
+    reader.onerror = () => {
+      reject(new Error('Error al leer el archivo de imagen'));
+    };
+    reader.readAsDataURL(imageFile);
+  });
+};
+
+const ensureHttps = (url) => {
+  if (!url) return url;
+  return url.replace(/^http:\/\//i, 'https://');
+};
 
 // Crear contexto
 export const UserContext = createContext();
@@ -343,58 +380,23 @@ export function UserProvider({ children }) {
     }
   };
 
-  // Función para escuchar actualizaciones de imagen de perfil
-  useEffect(() => {
-    const handleProfileImageUpdate = (event) => {
-      const newImageUrl = event.detail?.imageUrl;
-      
-      if (newImageUrl && typeof newImageUrl === 'string') {
-        console.log("🖼️ UserContext: Actualizando imagen de perfil desde evento global");
-        
-        // Actualizar la imagen en el estado del usuario
-        setUser(prevUser => {
-          if (!prevUser) return prevUser;
-          
-          return {
-            ...prevUser,
-            profileImage: newImageUrl,
-            profilePic: newImageUrl
-          };
-        });
-      }
-    };
-    
-    // Escuchar evento de actualización de imagen
-    window.addEventListener('profileImageUpdated', handleProfileImageUpdate);
-    
-    return () => {
-      window.removeEventListener('profileImageUpdated', handleProfileImageUpdate);
-    };
-  }, []);
-
   // Sincronizar imagen al iniciar sesión o recargar
-  const safeProfileSync = async () => {
-    try {
-      console.log("🔄 Sincronizando imagen de perfil en contexto de usuario...");
-      
-      // Verificar si hay token válido
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.warn("No hay token disponible para sincronizar la imagen");
-        return;
-      }
-      
-      // Si hay token pero es inválido, intentar obtener uno nuevo
-      if (!isValidToken(token)) {
-        console.warn("Token inválido para sincronización de imagen");
+  useEffect(() => {
+    // Sincronizar imagen al iniciar sesión o recargar
+    const syncProfileFromLocalStorage = async () => {
+      try {
+        console.log("🔄 Cargando imagen de perfil desde localStorage...");
         
-        // Usar datos de localStorage como respaldo
-        const email = localStorage.getItem('email');
+        // Verificar si hay token válido
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.warn("No hay token disponible");
+          return;
+        }
+        
+        // Usar datos de localStorage
         const storedImage = localStorage.getItem('profilePic') || 
-                           localStorage.getItem('profilePic_backup') || 
-                           localStorage.getItem('profilePic_temp') || 
-                           localStorage.getItem('profilePic_local') || 
-                           localStorage.getItem('profilePic_base64');
+                           localStorage.getItem('profilePic_backup');
         
         if (storedImage) {
           // Actualizar la imagen en el estado del usuario
@@ -406,62 +408,16 @@ export function UserProvider({ children }) {
               profilePic: storedImage
             };
           });
-          
-          // Disparar evento para notificar a otros componentes
-          try {
-            window.dispatchEvent(new CustomEvent('profileImageUpdated', {
-              detail: { imageUrl: storedImage }
-            }));
-            console.log("Notificación de sincronización enviada (desde caché local)");
-          } catch (e) {
-            console.warn('Error al disparar evento de sincronización:', e);
-          }
         }
-        return;
+      } catch (error) {
+        console.error("Error al sincronizar imagen:", error);
       }
-      
-      // Sincronizar la imagen usando la API
-      await syncProfileImage();
-      
-      // Después de sincronizar, asegurar que el usuario tenga la imagen más reciente
-      const latestImage = localStorage.getItem('profilePic') || 
-                         localStorage.getItem('profilePic_backup') || 
-                         localStorage.getItem('profilePic_temp');
-      
-      if (latestImage && user) {
-        setUser(prevUser => ({
-          ...prevUser,
-          profileImage: latestImage,
-          profilePic: latestImage
-        }));
-        
-        // Notificar a otros componentes sobre el cambio
-        try {
-          window.dispatchEvent(new CustomEvent('profileImageUpdated', {
-            detail: { imageUrl: latestImage }
-          }));
-          console.log("Notificación de sincronización exitosa enviada");
-        } catch (e) {
-          console.warn('Error al disparar evento de sincronización:', e);
-        }
-      }
-    } catch (error) {
-      console.error("❌ Error al sincronizar imagen de perfil:", error);
-      
-      // Uso de imagen en caché como respaldo
-      const cachedImage = localStorage.getItem('profilePic') || 
-                         localStorage.getItem('profilePic_backup') || 
-                         localStorage.getItem('profilePic_temp');
-      
-      if (cachedImage && user) {
-        setUser(prevUser => ({
-          ...prevUser,
-          profileImage: cachedImage,
-          profilePic: cachedImage
-        }));
-      }
+    };
+    
+    if (isAuthenticated) {
+      syncProfileFromLocalStorage();
     }
-  };
+  }, [isAuthenticated]);
 
   // Función de logout
   const logout = (shouldRedirect = true, reason = 'user_action') => {
@@ -836,7 +792,7 @@ export function UserProvider({ children }) {
     login,
     logout,
     refreshUserData,
-    safeProfileSync
+    safeProfileSync: () => {}
   };
   
   return (
@@ -848,7 +804,7 @@ export function UserProvider({ children }) {
         login,
         logout,
         refreshUserData,
-        safeProfileSync
+        safeProfileSync: () => {}
       }}
     >
       {children}

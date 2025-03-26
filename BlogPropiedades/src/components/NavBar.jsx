@@ -3,8 +3,9 @@ import { Disclosure, Menu, Transition } from '@headlessui/react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import useProfileImage from '../hooks/useProfileImage';
-import { fallbackImageBase64 } from '../utils/imageUtils';
+
+// Definimos la constante que antes estaba en utils/imageUtils
+const fallbackImageBase64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNlMWUxZTEiLz48dGV4dCB4PSI1MCIgeT0iNTAiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGFsaWdubWVudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZmlsbD0iIzg4OCI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4=';
 
 // Variables requeridas para evitar errores TDZ en producción - NO ELIMINAR
 window.y = window.y || {};
@@ -31,13 +32,25 @@ export default function Navbar({ showOnlyAuth = false }) {
   const navigate = useNavigate();
   const { isAuthenticated, user, logout } = useUser();
   
-  // Gestionar la imagen de perfil
-  const { 
-    profileImage, 
-    isLoading, 
-    error, 
-    handleImageError
-  } = useProfileImage();
+  // Estado para manejar la imagen de perfil localmente
+  const [profileImage, setProfileImage] = useState(fallbackImageBase64);
+  
+  // Cargar imagen del localStorage al iniciar
+  useEffect(() => {
+    try {
+      const storedImage = localStorage.getItem('profilePic');
+      if (storedImage) {
+        setProfileImage(storedImage);
+      }
+    } catch (e) {
+      console.error("Error al cargar imagen del localStorage:", e);
+    }
+  }, []);
+  
+  // Manejador simple de errores de carga de imagen
+  const handleImageError = () => {
+    setProfileImage(fallbackImageBase64);
+  };
 
   // Verificar token expirado
   useEffect(() => {
@@ -138,7 +151,7 @@ export default function Navbar({ showOnlyAuth = false }) {
                           <span className="sr-only">Abrir menú de usuario</span>
                           <img
                             className="h-8 w-8 rounded-full object-cover"
-                            src={profileImage || fallbackImageBase64}
+                            src={profileImage}
                             alt="Foto de perfil"
                             onError={handleImageError}
                           />
@@ -242,7 +255,7 @@ export default function Navbar({ showOnlyAuth = false }) {
                         <span className="sr-only">Abrir menú de usuario</span>
                         <img
                           className="h-8 w-8 lg:h-9 lg:w-9 rounded-full object-cover border-2 border-gray-700"
-                          src={profileImage || fallbackImageBase64}
+                          src={profileImage}
                           alt="Perfil"
                           onError={handleImageError}
                         />
@@ -304,7 +317,7 @@ export default function Navbar({ showOnlyAuth = false }) {
                   <div className="flex items-center mr-2">
                     <img
                       className="h-7 w-7 rounded-full object-cover border border-gray-700"
-                      src={profileImage || fallbackImageBase64}
+                      src={profileImage}
                       alt="Perfil"
                       onError={handleImageError}
                     />
@@ -346,7 +359,7 @@ export default function Navbar({ showOnlyAuth = false }) {
                   <div className="flex items-center px-3 py-2">
                     <img
                       className="h-8 w-8 rounded-full mr-2 object-cover"
-                      src={profileImage || fallbackImageBase64}
+                      src={profileImage}
                       alt="Perfil"
                       onError={handleImageError}
                     />

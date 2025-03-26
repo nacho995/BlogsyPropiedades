@@ -1,8 +1,38 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from "../context/UserContext";
-import { fallbackImageBase64, validateAndProcessImage } from "../utils/imageUtils";
 import useProfileImage from "../hooks/useProfileImage";
+
+// Definimos la función que antes estaba en utils/imageUtils
+const validateAndProcessImage = (imageFile) => {
+  return new Promise((resolve, reject) => {
+    if (!imageFile) {
+      reject(new Error('No se proporcionó ninguna imagen'));
+      return;
+    }
+
+    // Verificar el tipo de archivo
+    if (!imageFile.type.match('image.*')) {
+      reject(new Error('El archivo seleccionado no es una imagen válida'));
+      return;
+    }
+
+    // Verificar el tamaño (máximo 2MB)
+    if (imageFile.size > 2 * 1024 * 1024) {
+      reject(new Error('La imagen es demasiado grande. El tamaño máximo es 2MB'));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      resolve(e.target.result);
+    };
+    reader.onerror = () => {
+      reject(new Error('Error al leer el archivo de imagen'));
+    };
+    reader.readAsDataURL(imageFile);
+  });
+};
 
 export default function CambiarPerfil() {
   const [name, setName] = useState("");
@@ -14,19 +44,14 @@ export default function CambiarPerfil() {
   const navigate = useNavigate();
   const { user, refreshUserData } = useUser();
   
-  // Usar el hook personalizado con sincronización automática
+  // Usar el hook simplificado
   const { 
     profileImage, 
     isLoading: profileLoading, 
     error: profileError, 
     handleImageError, 
-    updateProfileImage,
-    syncImage 
-  } = useProfileImage({
-    autoSync: true,
-    listenForUpdates: true,
-    syncInterval: 300000 // 5 minutos
-  });
+    updateProfileImage
+  } = useProfileImage();
 
   // Limpiar recursos al desmontar
   useEffect(() => {
@@ -68,43 +93,31 @@ export default function CambiarPerfil() {
       const localUrl = URL.createObjectURL(file);
       setProfilePic({ file, localUrl });
 
-      // Convertir a base64 para almacenamiento y sincronización
+      // Convertir a base64 para almacenamiento
       const reader = new FileReader();
       
       reader.onload = function(event) {
         try {
-          // Envolver en un bloque try-catch adicional
           const imageData = event.target.result;
           
-          // Guardar imagen en múltiples ubicaciones para mayor robustez
+          // Guardar imagen en localStorage
           try {
             localStorage.setItem('profilePic', imageData);
             localStorage.setItem('profilePic_backup', imageData);
-            localStorage.setItem('profilePic_temp', imageData);
-            console.log("Imagen guardada en múltiples ubicaciones para persistencia");
+            console.log("Imagen guardada en localStorage");
           } catch (storageError) {
             console.warn("Error al guardar imagen en localStorage:", storageError);
           }
           
-          // Actualizar imagen en el sistema de sincronización
+          // Actualizar imagen usando el hook simplificado
           updateProfileImage(imageData)
             .then(() => {
-              setSuccess("Imagen actualizada y sincronizada correctamente");
+              setSuccess("Imagen actualizada correctamente");
               setLoading(false);
-              
-              // Notificar a otros componentes sobre el cambio
-              try {
-                window.dispatchEvent(new CustomEvent('profileImageUpdated', {
-                  detail: { imageUrl: imageData }
-                }));
-                console.log("Notificación de cambio de imagen enviada a todos los componentes");
-              } catch (e) {
-                console.warn('Error al notificar actualización de imagen:', e);
-              }
             })
             .catch(err => {
-              console.error("Error al sincronizar imagen:", err);
-              setError("Error al sincronizar la imagen. Inténtalo de nuevo.");
+              console.error("Error al actualizar imagen:", err);
+              setError("Error al actualizar la imagen. Inténtalo de nuevo.");
               setLoading(false);
             });
         } catch (err) {
@@ -180,15 +193,6 @@ export default function CambiarPerfil() {
           if (profilePic?.localUrl) {
             localStorage.setItem('profilePic', profilePic.localUrl);
             localStorage.setItem('profilePic_backup', profilePic.localUrl);
-            
-            // Notificar a otros componentes del cambio
-            try {
-              window.dispatchEvent(new CustomEvent('profileImageUpdated', {
-                detail: { imageUrl: profilePic.localUrl }
-              }));
-            } catch (e) {
-              console.warn("Error al notificar actualización local:", e);
-            }
           }
           
           setSuccess("Perfil actualizado localmente. Los cambios se sincronizarán cuando inicies sesión.");
@@ -203,15 +207,12 @@ export default function CambiarPerfil() {
       // Procesar respuesta
       const data = await response.json();
       
-      // Forzar sincronización de imagen
+      // Actualizar imagen local si hay respuesta del servidor
       if (data.profilePic) {
-        await syncImage(true);
-        
-        // Guardar la imagen en múltiples lugares para asegurar persistencia
+        // Guardar la imagen en localStorage
         if (typeof data.profilePic === 'string') {
           localStorage.setItem('profilePic', data.profilePic);
           localStorage.setItem('profilePic_backup', data.profilePic);
-          localStorage.setItem('profilePic_temp', data.profilePic);
           
           // Actualizar userData para mantener todo coherente
           try {
@@ -222,15 +223,8 @@ export default function CambiarPerfil() {
             console.warn('Error al actualizar datos de usuario en localStorage:', e);
           }
           
-          // Notificar a otros componentes
-          try {
-            window.dispatchEvent(new CustomEvent('profileImageUpdated', {
-              detail: { imageUrl: data.profilePic }
-            }));
-            console.log("Notificación de cambio de imagen enviada a todos los componentes");
-          } catch (e) {
-            console.warn('Error al notificar actualización de imagen:', e);
-          }
+          // Actualizar la imagen local
+          updateProfileImage(data.profilePic);
         }
       }
 

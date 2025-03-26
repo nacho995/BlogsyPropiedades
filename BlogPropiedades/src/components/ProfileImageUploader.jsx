@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
 import { useUser } from '../context/UserContext';
-import { secureUrl } from '../services/api';
 
 const ProfileImageUploader = ({ currentImageUrl, onImageUpdated }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [previewImage, setPreviewImage] = useState(currentImageUrl || 
-                                                localStorage.getItem('profilePic_local') || 
                                                 localStorage.getItem('profilePic'));
   const { user } = useUser();
   
@@ -29,13 +27,22 @@ const ProfileImageUploader = ({ currentImageUrl, onImageUpdated }) => {
       // Mostrar vista previa
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPreviewImage(reader.result);
+        const imageDataUrl = reader.result;
+        setPreviewImage(imageDataUrl);
+        
+        // Guardar en localStorage
+        localStorage.setItem('profilePic', imageDataUrl);
+        localStorage.setItem('profilePic_backup', imageDataUrl);
+        
+        // Notificar al componente padre
+        if (onImageUpdated) {
+          onImageUpdated(imageDataUrl);
+        }
       };
       reader.readAsDataURL(file);
       
-      // Limpiar error previo y notificar al componente padre
+      // Limpiar error previo
       setUploadError(null);
-      onImageUpdated(file);
     }
   };
   
@@ -53,25 +60,10 @@ const ProfileImageUploader = ({ currentImageUrl, onImageUpdated }) => {
   const handlePreviewError = (e) => {
     // Mostrar mensaje en consola
     console.log("❌ No se pudo cargar la imagen de perfil");
-    console.log("�� URL que falló:", e.target.src);
     
     // Evitar que se repita el error infinitamente
     e.target.onerror = null;
     
-    // Intentar usar la copia local guardada
-    const imagenGuardadaLocal = localStorage.getItem('profilePic_local');
-    
-    // Si existe una copia local, intentar usarla
-    if (imagenGuardadaLocal) {
-      console.log("🔄 Intentando usar imagen guardada localmente");
-      console.log("📦 Longitud de imagen local:", imagenGuardadaLocal.length);
-      e.target.src = imagenGuardadaLocal;
-      return;
-    }
-    
-    console.log("⚠️ No hay imagen local disponible, mostrando avatar");
-    
-    // Si no hay copia local, mostrar avatar con iniciales
     // Ocultar la imagen que falló
     e.target.style.display = 'none';
     
@@ -94,31 +86,10 @@ const ProfileImageUploader = ({ currentImageUrl, onImageUpdated }) => {
     // Usar la primera letra del nombre o '?' si no hay nombre
     const letraInicial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
     textoInicial.textContent = letraInicial;
-    console.log("👤 Mostrando avatar con inicial:", letraInicial);
     
     // Añadir elementos al DOM
     avatarDiv.appendChild(textoInicial);
     contenedor.appendChild(avatarDiv);
-  };
-  
-  // Función para subir imagen
-  const handleImageUpload = async () => {
-    // ...código existente
-
-    // Después de subir la imagen
-    if (response && response.profilePic) {
-      // Normalizar URL para HTTPS cuando sea necesario
-      const secureImageUrl = typeof response.profilePic === 'string' 
-        ? secureUrl(response.profilePic)
-        : {
-            ...response.profilePic,
-            src: secureUrl(response.profilePic.src || '')
-          };
-      
-      // Actualizar con la URL segura
-      setImageUrl(secureImageUrl);
-      onImageUploaded(secureImageUrl);
-    }
   };
   
   return (

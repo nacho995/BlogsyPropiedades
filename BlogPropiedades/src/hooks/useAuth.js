@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext, useCallback } from 'react';
-import { loginUser, getCurrentUser, syncProfileImage } from '../services/api';
+import { loginUser, getCurrentUser } from '../services/api';
 import { jwtDecode } from 'jwt-decode';
 
 // Contexto de autenticación
@@ -175,9 +175,7 @@ export const AuthProvider = ({ children }) => {
           
           if (profileImageUrl) {
             localStorage.setItem('profilePic', profileImageUrl);
-            
-            // Sincronizar la imagen de perfil con la API
-            syncProfileImage(profileImageUrl);
+            localStorage.setItem('profilePic_backup', profileImageUrl);
           }
         }
         
@@ -192,9 +190,14 @@ export const AuthProvider = ({ children }) => {
           
           if (profilePicUrl) {
             localStorage.setItem('profilePic', profilePicUrl);
+            localStorage.setItem('profilePic_backup', profilePicUrl);
             
-            // Sincronizar la imagen de perfil con la API
-            syncProfileImage(profilePicUrl);
+            // Actualizar userData con la imagen
+            if (userData) {
+              userData.profilePic = profilePicUrl;
+              userData.profileImage = profilePicUrl;
+              localStorage.setItem('userData', JSON.stringify(userData));
+            }
           }
         }
         

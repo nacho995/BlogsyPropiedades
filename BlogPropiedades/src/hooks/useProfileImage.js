@@ -1,75 +1,57 @@
-// Variables requeridas para evitar errores TDZ en producción - NO ELIMINAR
-window.y = window.y || {};
-window.wi = window.wi || {};
-window.Fp = window.Fp || {};
-window.Nc = window.Nc || {};
-
-// Definir variables localmente también
-const y = {};
-const wi = {};
-const Fp = {};
-const Nc = {};
-
 import { useState, useEffect } from 'react';
-import { fallbackImageBase64 } from '../utils/imageUtils';
+// Definimos la imagen fallback como una constante en este archivo
+const fallbackImageBase64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNlMWUxZTEiLz48dGV4dCB4PSI1MCIgeT0iNTAiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGFsaWdubWVudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZmlsbD0iIzg4OCI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4=';
 
 /**
- * Hook simplificado para manejar la imagen de perfil local
+ * Hook simplificado para manejar la imagen de perfil usando solo localStorage
+ * Sin sincronización entre componentes ni eventos personalizados
  */
 const useProfileImage = () => {
-  const [profileImage, setProfileImage] = useState(null);
+  const [profileImage, setProfileImage] = useState(fallbackImageBase64);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  // Cargar la imagen desde localStorage al iniciar
+  // Cargar imagen del localStorage al montar el componente
   useEffect(() => {
     try {
       const storedImage = localStorage.getItem('profilePic');
       if (storedImage) {
         setProfileImage(storedImage);
-      } else {
-        setProfileImage(fallbackImageBase64);
-      }
-    } catch (error) {
-      console.error('Error al cargar imagen:', error);
-      setProfileImage(fallbackImageBase64);
-    }
-    setIsLoading(false);
-  }, []);
-  
-  // Manejador de errores de carga
-  const handleImageError = () => {
-    setProfileImage(fallbackImageBase64);
-    setError(new Error('Error al cargar imagen'));
-  };
-  
-  // Actualizar imagen de perfil en localStorage
-  const updateProfileImage = async (newImage) => {
-    try {
-      if (!newImage) {
-        throw new Error('No se proporcionó imagen');
-      }
-      
-      let imageUrl = newImage;
-      if (typeof newImage === 'object' && (newImage.src || newImage.url)) {
-        imageUrl = newImage.src || newImage.url;
-      }
-      
-      if (typeof imageUrl === 'string') {
-        localStorage.setItem('profilePic', imageUrl);
-        setProfileImage(imageUrl);
-        setError(null);
-        return true;
-      } else {
-        throw new Error('Formato de imagen no válido');
       }
     } catch (err) {
-      console.error('Error:', err);
-      setError(err);
+      console.error('Error al cargar imagen del localStorage:', err);
+      setError('Error al cargar la imagen de perfil');
+    }
+  }, []);
+  
+  // Manejar error de carga de imagen
+  const handleImageError = () => {
+    setProfileImage(fallbackImageBase64);
+  };
+  
+  // Actualizar la imagen en localStorage
+  const updateProfileImage = async (newImage) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Guardar en localStorage
+      localStorage.setItem('profilePic', newImage);
+      localStorage.setItem('profilePic_backup', newImage);
+      
+      // Actualizar el estado local
+      setProfileImage(newImage);
+      
+      setIsLoading(false);
+      return true;
+    } catch (err) {
+      console.error('Error al actualizar imagen de perfil:', err);
+      setError('Error al guardar la imagen');
+      setIsLoading(false);
       return false;
     }
   };
-
+  
   return {
     profileImage,
     isLoading,
