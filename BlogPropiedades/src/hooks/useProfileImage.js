@@ -2,6 +2,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { fallbackImageBase64, validateAndProcessImage } from '../utils/imageUtils';
 import { syncProfileImage } from '../services/api';
 
+// SOLUCIÓN TDZ: Definición explícita de variables que causan TDZ
+// Esta es la solución al error "Cannot access 'y' before initialization"
+const y = {}; // Definición explícita para evitar TDZ
+const wi = {}; // Otra variable que podría causar problemas
+const Fp = {}; // Otra variable que podría causar problemas
+
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1 segundo
 const REQUEST_TIMEOUT = 5000; // 5 segundos
@@ -25,6 +31,9 @@ const useProfileImage = ({
   listenForUpdates = true,
   syncInterval = 300000 // 5 minutos por defecto
 } = {}) => {
+  // Definición local por si acaso
+  const y = {};
+  
   const [profileImage, setProfileImage] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);

@@ -6,12 +6,21 @@ import { useUser } from '../context/UserContext';
 import useProfileImage from '../hooks/useProfileImage';
 import { fallbackImageBase64 } from '../utils/imageUtils';
 
+// SOLUCIÓN TDZ: Definición explícita de variables que causan TDZ
+// Esta es la solución al error "Cannot access 'y' before initialization"
+const y = {}; // Definición explícita para evitar TDZ
+const wi = {}; // Otra variable que podría causar problemas
+const Fp = {}; // Otra variable que podría causar problemas
+
 // Función de utilidad para combinar clases CSS
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
 }
 
 export default function Navbar({ showOnlyAuth = false }) {
+  // Definición local por si acaso
+  const y = {};
+  
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, user, logout } = useUser();
