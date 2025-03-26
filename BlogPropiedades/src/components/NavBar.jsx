@@ -184,16 +184,16 @@ export default function Navbar({ showOnlyAuth = false }) {
       {({ open }) => (
         <>
           <div className="mx-auto max-w-7xl px-2 sm:px-4 lg:px-8">
-            <div className="flex justify-between h-16">
+            <div className="relative flex h-14 sm:h-16 items-center justify-between">
               {/* Logo y navegación principal */}
               <div className="flex items-center">
                 <Link to="/" className="flex-shrink-0 flex items-center">
                   <img className="h-6 w-auto sm:h-8" src="/logo.jpg" alt="Logo" />
-                  <span className="ml-2 text-base sm:text-xl font-bold text-white">GozaMadrid</span>
+                  <span className="ml-1 sm:ml-2 text-sm sm:text-base md:text-xl font-bold text-white truncate max-w-[120px] sm:max-w-none">GozaMadrid</span>
                 </Link>
                 
                 {/* Enlaces de navegación en escritorio */}
-                <div className="hidden md:ml-6 md:flex md:space-x-3 lg:space-x-4">
+                <div className="hidden md:ml-4 lg:ml-6 md:flex md:space-x-2 lg:space-x-4">
                   {updatedNavigation.map((item) => (
                     <Link
                       key={item.name}
@@ -202,7 +202,7 @@ export default function Navbar({ showOnlyAuth = false }) {
                         item.current
                           ? 'border-blue-400 text-blue-400'
                           : 'border-transparent text-gray-300 hover:text-white hover:border-gray-300',
-                        'inline-flex items-center px-2 lg:px-3 py-2 border-b-2 text-sm font-medium transition-colors duration-200'
+                        'inline-flex items-center px-1 sm:px-2 lg:px-3 py-2 border-b-2 text-xs sm:text-sm font-medium transition-colors duration-200'
                       )}
                       aria-current={item.current ? 'page' : undefined}
                     >
@@ -212,28 +212,16 @@ export default function Navbar({ showOnlyAuth = false }) {
                 </div>
               </div>
               
-              {/* Botón de menú en móvil */}
-              <div className="flex items-center md:hidden">
-                <Disclosure.Button className="inline-flex items-center justify-center p-2 rounded-md text-gray-300 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-400">
-                  <span className="sr-only">Abrir menú principal</span>
-                  {open ? (
-                    <XMarkIcon className="block h-6 w-6" aria-hidden="true" />
-                  ) : (
-                    <Bars3Icon className="block h-6 w-6" aria-hidden="true" />
-                  )}
-                </Disclosure.Button>
-              </div>
-              
               {/* Menú de usuario */}
               <div className="hidden md:flex md:items-center">
                 {isAuthenticated ? (
-                  <div className="flex items-center space-x-3">
-                    <span className="hidden lg:block text-gray-300">{user?.name || "Usuario"}</span>
+                  <div className="flex items-center space-x-2 md:space-x-3">
+                    <span className="hidden lg:block text-gray-300 text-sm">{user?.name || "Usuario"}</span>
                     <Menu as="div" className="relative">
                       <Menu.Button className="flex rounded-full bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 ring-offset-2 ring-offset-black">
                         <span className="sr-only">Abrir menú de usuario</span>
                         <img
-                          className="h-8 w-8 lg:h-10 lg:w-10 rounded-full object-cover border-2 border-gray-700"
+                          className="h-8 w-8 lg:h-9 lg:w-9 rounded-full object-cover border-2 border-gray-700"
                           src={profileImage || fallbackImageBase64}
                           alt="Perfil"
                           onError={handleImageError}
@@ -253,13 +241,13 @@ export default function Navbar({ showOnlyAuth = false }) {
                           <Menu.Item>
                             {({ active }) => (
                               <Link
-                                to="/perfil"
+                                to="/cambiar-perfil"
                                 className={classNames(
                                   active ? 'bg-gray-100' : '',
                                   'block px-4 py-2 text-sm text-gray-700'
                                 )}
                               >
-                                Mi Perfil
+                                Cambiar mi perfil
                               </Link>
                             )}
                           </Menu.Item>
@@ -288,6 +276,28 @@ export default function Navbar({ showOnlyAuth = false }) {
                     Iniciar Sesión
                   </Link>
                 )}
+              </div>
+              
+              {/* Botón de menú en móvil */}
+              <div className="flex items-center md:hidden">
+                {isAuthenticated && (
+                  <div className="flex items-center mr-2">
+                    <img
+                      className="h-7 w-7 rounded-full object-cover border border-gray-700"
+                      src={profileImage || fallbackImageBase64}
+                      alt="Perfil"
+                      onError={handleImageError}
+                    />
+                  </div>
+                )}
+                <Disclosure.Button className="inline-flex items-center justify-center p-2 rounded-md text-gray-300 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-400">
+                  <span className="sr-only">Abrir menú principal</span>
+                  {open ? (
+                    <XMarkIcon className="block h-6 w-6" aria-hidden="true" />
+                  ) : (
+                    <Bars3Icon className="block h-6 w-6" aria-hidden="true" />
+                  )}
+                </Disclosure.Button>
               </div>
             </div>
           </div>
@@ -320,14 +330,14 @@ export default function Navbar({ showOnlyAuth = false }) {
                       alt="Perfil"
                       onError={handleImageError}
                     />
-                    <span className="text-gray-300 text-sm">{user?.name || "Usuario"}</span>
+                    <span className="text-gray-300 text-sm font-medium">{user?.name || "Usuario"}</span>
                   </div>
                   <div className="mt-1">
                     <Link
-                      to="/perfil"
+                      to="/cambiar-perfil"
                       className="block text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-base font-medium"
                     >
-                      Mi Perfil
+                      Cambiar mi perfil
                     </Link>
                     <button
                       onClick={() => logout(true)}

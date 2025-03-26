@@ -85,6 +85,7 @@ const quillModules = {
     container: [
       [{ 'header': [2, 3, false] }],
       ['bold', 'italic', 'underline'],
+      [{ 'color': [] }, { 'background': [] }],
       [{ 'list': 'ordered'}, { 'list': 'bullet' }],
       ['link'],
       ['clean']
@@ -96,7 +97,8 @@ const quillFormats = [
   'header',
   'bold', 'italic', 'underline',
   'list', 'bullet',
-  'link'
+  'link',
+  'color', 'background'
 ];
 
 // Plantillas para bloques especiales

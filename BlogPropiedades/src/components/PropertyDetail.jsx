@@ -299,326 +299,175 @@ export default function PropertyDetail() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="min-h-screen bg-gradient-to-tr from-blue-900 to-black/60 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
       </div>
     );
   }
 
   if (!property) {
     return (
-      <div className="text-center py-12">
-        <h2 className="text-2xl font-bold text-gray-800">Propiedad no encontrada</h2>
+      <div className="min-h-screen bg-gradient-to-tr from-blue-900 to-black/60 flex flex-col justify-center items-center text-white px-4">
+        <h2 className="text-2xl font-bold mb-4">Propiedad no encontrada</h2>
+        <p className="mb-6">La propiedad que buscas no existe o ha sido eliminada.</p>
+        <Link to="/propiedades" className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+          Volver a propiedades
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-        {/* Carrusel de imágenes */}
-        <div className="relative h-[400px] bg-gray-100">
-          {property.images && Array.isArray(property.images) && property.images.length > 0 ? (
-            <>
-              <img
-                src={property.images[currentImageIndex]?.src}
-                alt={property.images[currentImageIndex]?.alt || `Imagen ${currentImageIndex + 1}`}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.target.src = "https://via.placeholder.com/800x400?text=Imagen+no+disponible";
-                }}
-              />
-              {property.images.length > 1 && (
-                <>
-                  <button
-                    onClick={prevImage}
-                    className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-3 rounded-full hover:bg-black/75"
-                  >
-                    ←
-                  </button>
-                  <button
-                    onClick={nextImage}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-3 rounded-full hover:bg-black/75"
-                  >
-                    →
-                  </button>
-                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
-                    {property.images.map((_, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setCurrentImageIndex(index)}
-                        className={`w-3 h-3 rounded-full transition-all ${
-                          index === currentImageIndex ? 'bg-white' : 'bg-white/50'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-            </>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <span className="text-gray-400">No hay imágenes disponibles</span>
-            </div>
-          )}
+    <div className="min-h-screen bg-gradient-to-tr from-blue-900 to-black/60 py-6 sm:py-10 px-4 sm:px-6">
+      <div className="container mx-auto">
+        {/* Navegación de regreso */}
+        <div className="mb-6">
+          <Link to="/propiedades" className="text-white hover:text-yellow-300 transition flex items-center text-sm sm:text-base">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Volver a propiedades
+          </Link>
         </div>
-
-        {/* Miniaturas */}
-        {property.images && Array.isArray(property.images) && property.images.length > 1 && (
-          <div className="flex overflow-x-auto p-4 space-x-2">
-            {property.images.map((img, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentImageIndex(index)}
-                className={`flex-shrink-0 ${
-                  currentImageIndex === index ? 'ring-2 ring-blue-500' : ''
-                }`}
-              >
-                <img
-                  src={img.src}
-                  alt={img.alt || `Miniatura ${index + 1}`}
-                  className="h-20 w-20 object-cover rounded"
-                  onError={(e) => {
-                    e.target.src = "https://via.placeholder.com/80x80?text=Error";
-                  }}
-                />
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="p-6">
-          {!isEditing ? (
-            // Vista de detalles
-            <div className="space-y-6">
-              <h1 className="text-3xl font-bold">{property.typeProperty}</h1>
-              
-              <div className="grid grid-cols-2 gap-4 text-gray-600">
-                <div className="flex items-center">
-                  <FiMapPin className="mr-2" />
-                  <span>{property.address}</span>
-                </div>
-                <div className="flex items-center">
-                  <FiMaximize className="mr-2" />
-                  <span>{property.m2} m²</span>
-                </div>
-                <div className="flex items-center">
-                  <FiDollarSign className="mr-2" />
-                  <span>{property.price}</span>
-                </div>
-                <div className="flex items-center">
-                  <FiLayers className="mr-2" />
-                  <span>Planta {property.piso}</span>
-                </div>
-                <div className="flex items-center">
-                  <FiHome className="mr-2" />
-                  <span>{property.rooms} habitaciones</span>
-                </div>
-                <div className="flex items-center">
-                  <FiDroplet className="mr-2" />
-                  <span>{property.wc} baños</span>
-                </div>
-              </div>
-
-              <div>
-                <h2 className="text-xl font-semibold mb-2">Descripción</h2>
-                <div 
-                  className="property-description mt-4 text-gray-600 leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: property.description }}
-                ></div>
-              </div>
-
-              {user && (user.role === 'admin' || user.role === 'ADMIN') && (
-                <div className="flex justify-end">
-                  <button
-                    onClick={handleEdit}
-                    className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600"
-                  >
-                    Editar Propiedad
-                  </button>
+        
+        {/* Contenido principal */}
+        <div className="bg-white rounded-lg shadow-xl overflow-hidden">
+          {/* Carrusel de imágenes */}
+          <div className="relative">
+            <div className="h-48 sm:h-64 md:h-96 bg-gray-200 relative">
+              {property.images && property.images.length > 0 ? (
+                <>
+                  <img 
+                    src={property.images[currentImageIndex]?.src || ''} 
+                    alt={property.images[currentImageIndex]?.alt || "Imagen de la propiedad"}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.src = "https://via.placeholder.com/800x600?text=Imagen+no+disponible"
+                    }}
+                  />
+                  
+                  {/* Controles del carrusel para pantallas grandes */}
+                  {property.images.length > 1 && (
+                    <>
+                      <button 
+                        onClick={prevImage}
+                        className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition"
+                        aria-label="Imagen anterior"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                      <button 
+                        onClick={nextImage}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition"
+                        aria-label="Imagen siguiente"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                      
+                      {/* Indicadores de imágenes */}
+                      <div className="absolute bottom-2 left-0 right-0 flex justify-center space-x-2">
+                        {property.images.map((_, idx) => (
+                          <button 
+                            key={idx}
+                            className={`w-2 h-2 rounded-full ${currentImageIndex === idx ? 'bg-white' : 'bg-white/50'}`}
+                            onClick={() => setCurrentImageIndex(idx)}
+                            aria-label={`Ver imagen ${idx + 1}`}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <span className="text-gray-400">Sin imágenes disponibles</span>
                 </div>
               )}
             </div>
-          ) : (
-            // Formulario de edición
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tipo de Propiedad
-                </label>
-                <input
-                  type="text"
-                  name="typeProperty"
-                  value={editedProperty.typeProperty || ''}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border rounded-md"
-                />
+          </div>
+          
+          <div className="p-4 sm:p-6 md:p-8">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-6">
+              <div className="flex-1">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 mb-2">
+                  {property.title || property.typeProperty}
+                </h1>
+                <p className="text-gray-500 text-sm sm:text-base mb-1">
+                  <FiMapPin className="inline-block mr-1" />
+                  {property.address}
+                </p>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Dirección
-                </label>
-                <input
-                  type="text"
-                  name="address"
-                  value={editedProperty.address || ''}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border rounded-md"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Precio
-                  </label>
-                  <input
-                    type="text"
-                    name="price"
-                    value={editedProperty.price || ''}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-md"
-                  />
+              
+              <div className="mt-4 md:mt-0 flex flex-col md:items-end">
+                <div className="text-2xl sm:text-3xl font-bold text-blue-600 mb-2">
+                  {typeof property.price === 'number' 
+                    ? new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(property.price)
+                    : property.price}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Metros Cuadrados
-                  </label>
-                  <input
-                    type="text"
-                    name="m2"
-                    value={editedProperty.m2 || ''}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-md"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Planta
-                  </label>
-                  <input
-                    type="text"
-                    name="piso"
-                    value={editedProperty.piso || ''}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-md"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Habitaciones
-                  </label>
-                  <input
-                    type="number"
-                    name="rooms"
-                    value={editedProperty.rooms || ''}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-md"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Baños
-                  </label>
-                  <input
-                    type="number"
-                    name="wc"
-                    value={editedProperty.wc || ''}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-md"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Descripción
-                </label>
-                <textarea
-                  name="description"
-                  value={editedProperty.description || ''}
-                  onChange={handleChange}
-                  rows="4"
-                  className="w-full px-3 py-2 border rounded-md"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Imágenes
-                </label>
-                <div className="grid grid-cols-2 gap-4">
-                  {editedProperty.images && editedProperty.images.map((img, index) => (
-                    <div key={index} className="relative border p-2 rounded">
-                      <img
-                        src={img.src}
-                        alt={img.alt}
-                        className="w-full h-32 object-cover rounded mb-2"
-                      />
-                      <input
-                        type="text"
-                        value={img.src}
-                        onChange={(e) => handleImageChange(index, e.target.value)}
-                        className="w-full px-2 py-1 border rounded text-sm"
-                        placeholder="URL de la imagen"
-                      />
-                      <button
-                        onClick={() => handleDeleteImage(index)}
-                        className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                
-                <div className="mt-4 space-y-2">
-                  <input
-                    type="file"
-                    onChange={handleFileUpload}
-                    accept="image/*"
-                    className="hidden"
-                    id="file-upload"
-                  />
-                  <label
-                    htmlFor="file-upload"
-                    className="bg-blue-500 text-white px-4 py-2 rounded cursor-pointer hover:bg-blue-600 inline-block"
-                  >
-                    {uploading ? "Subiendo..." : "Subir nueva imagen"}
-                  </label>
-                  {uploadError && (
-                    <p className="text-red-500 text-sm">{uploadError}</p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleAddImage}
-                    className="ml-2 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-                  >
-                    Añadir URL de imagen
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-4">
-                <button
-                  onClick={() => setIsEditing(false)}
-                  className="px-6 py-2 border rounded-lg hover:bg-gray-100"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={openModifiedModal}
-                  className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-                >
-                  Guardar Cambios
-                </button>
+                <span className="inline-block bg-indigo-100 text-indigo-800 text-xs font-semibold px-2.5 py-0.5 rounded">
+                  {property.status || 'En venta'}
+                </span>
               </div>
             </div>
-          )}
+            
+            {/* Características principales */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 border-t border-b border-gray-200 py-4 mb-6">
+              <div className="flex flex-col items-center">
+                <FiHome className="text-blue-600 h-6 w-6 mb-1" />
+                <span className="text-xs sm:text-sm text-gray-600">Tipo</span>
+                <span className="font-semibold text-sm sm:text-base">{property.typeProperty}</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <FiMaximize className="text-blue-600 h-6 w-6 mb-1" />
+                <span className="text-xs sm:text-sm text-gray-600">Superficie</span>
+                <span className="font-semibold text-sm sm:text-base">{property.m2} m²</span>
+              </div>
+              {property.bedrooms && (
+                <div className="flex flex-col items-center">
+                  <svg className="text-blue-600 h-6 w-6 mb-1" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M21 9h-8V3H3v18h18V9zM5 19V5h6v14H5zm14 0h-6v-8h6v8z"></path>
+                  </svg>
+                  <span className="text-xs sm:text-sm text-gray-600">Habitaciones</span>
+                  <span className="font-semibold text-sm sm:text-base">{property.bedrooms}</span>
+                </div>
+              )}
+              {property.bathrooms && (
+                <div className="flex flex-col items-center">
+                  <svg className="text-blue-600 h-6 w-6 mb-1" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M21 10H7V7c0-1.103.897-2 2-2s2 .897 2 2h2c0-2.206-1.794-4-4-4S5 4.794 5 7v3H3a1 1 0 0 0-1 1v2c0 2.606 1.674 4.823 4 5.65V22h2v-3h8v3h2v-3.35c2.326-.827 4-3.044 4-5.65v-2a1 1 0 0 0-1-1zm-1 3c0 2.206-1.794 4-4 4H8c-2.206 0-4-1.794-4-4v-1h16v1z"></path>
+                  </svg>
+                  <span className="text-xs sm:text-sm text-gray-600">Baños</span>
+                  <span className="font-semibold text-sm sm:text-base">{property.bathrooms}</span>
+                </div>
+              )}
+            </div>
+            
+            {/* Descripción */}
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-3">Descripción</h2>
+              <div 
+                className="property-description mt-4 text-gray-600 leading-relaxed text-sm sm:text-base"
+                dangerouslySetInnerHTML={{ __html: property.description }}
+              ></div>
+            </div>
+            
+            {/* Acciones */}
+            <div className="flex flex-wrap gap-3 mt-6">
+              <button
+                onClick={handleEdit}
+                className="flex items-center gap-1 px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Editar Propiedad
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

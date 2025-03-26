@@ -381,16 +381,20 @@ export default function BlogDetail() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="min-h-screen bg-gradient-to-tr from-blue-900 to-black/60 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
       </div>
     );
   }
 
   if (!blog) {
     return (
-      <div className="text-center py-12">
-        <h2 className="text-2xl font-bold text-gray-800">Blog no encontrado</h2>
+      <div className="min-h-screen bg-gradient-to-tr from-blue-900 to-black/60 flex flex-col justify-center items-center text-white px-4">
+        <h2 className="text-2xl font-bold mb-4">Blog no encontrado</h2>
+        <p className="mb-6">El blog que buscas no existe o ha sido eliminado.</p>
+        <Link to="/ver-blogs" className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+          Volver a blogs
+        </Link>
       </div>
     );
   }
@@ -417,278 +421,149 @@ export default function BlogDetail() {
                     (blog && blog.image && blog.image.src ? [blog.image.src] : []);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      {!isEditing ? (
-        <article className="bg-white rounded-2xl shadow-xl overflow-hidden">
-          {/* Carrusel de imágenes */}
-          <div className="relative h-[400px] bg-gray-100">
-            {blog && blog.images && Array.isArray(blog.images) && blog.images.length > 0 ? (
-              <>
-                <img
-                  src={blog.images[currentImageIndex]?.src || ''}
-                  alt={blog.images[currentImageIndex]?.alt || `Imagen ${currentImageIndex + 1} del blog`}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    console.error("Error al cargar la imagen:", e);
-                    e.target.onerror = null;
-                    e.target.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjQwMCIgdmlld0JveD0iMCAwIDgwMCA0MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjgwMCIgaGVpZ2h0PSI0MDAiIGZpbGw9IiNFNUU3RUIiLz48dGV4dCB4PSI0MDAiIHk9IjIwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiM0QjU1NjMiPkltYWdlbiBubyBkaXNwb25pYmxlPC90ZXh0Pjwvc3ZnPg==";
-                  }}
-                />
-                {blog.images.length > 1 && (
-                  <>
-                    <button
-                      onClick={prevImage}
-                      className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition-all"
-                    >
-                      ←
-                    </button>
-                    <button
-                      onClick={nextImage}
-                      className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition-all"
-                    >
-                      →
-                    </button>
-                    <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
-                      {blog.images.map((_, index) => (
-                        <button
-                          key={index}
-                          onClick={() => setCurrentImageIndex(index)}
-                          className={`w-2 h-2 rounded-full transition-all ${
-                            index === currentImageIndex ? 'bg-white' : 'bg-white bg-opacity-50'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </>
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-500">
-                <div className="text-center">
-                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <p className="mt-2">No hay imágenes disponibles</p>
-                </div>
-              </div>
-            )}
-          </div>
+    <div className="min-h-screen bg-gradient-to-tr from-blue-900 to-black/60 py-6 sm:py-10 px-4 sm:px-6">
+      <div className="container mx-auto">
+        {/* Navegación de regreso */}
+        <div className="mb-6">
+          <Link to="/ver-blogs" className="text-white hover:text-yellow-300 transition flex items-center text-sm sm:text-base">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Volver a blogs
+          </Link>
+        </div>
 
-          {/* Miniaturas de imágenes */}
-          {blog.images && Array.isArray(blog.images) && blog.images.length > 1 && (
-            <div className="flex overflow-x-auto p-4 space-x-2">
-              {blog.images.map((img, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentImageIndex(index)}
-                  className={`flex-shrink-0 ${
-                    currentImageIndex === index ? 'ring-2 ring-blue-500' : ''
-                  }`}
-                >
-                  <img
-                    src={img.src}
-                    alt={img.alt || `Miniatura ${index + 1}`}
-                    className="h-20 w-20 object-cover rounded"
+        {/* Contenido principal */}
+        <div className="bg-white rounded-lg shadow-xl overflow-hidden">
+          {/* Imagen destacada */}
+          <div className="relative">
+            <div className="h-48 sm:h-64 md:h-80 bg-gray-200 relative">
+              {blog.images && blog.images.length > 0 ? (
+                <>
+                  <img 
+                    src={blog.images[currentImageIndex]?.src || ''} 
+                    alt={blog.images[currentImageIndex]?.alt || "Imagen del blog"}
+                    className="w-full h-full object-cover"
                     onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAiIGhlaWdodD0iODAiIGZpbGw9IiNFNUU3RUIiLz48cGF0aCBkPSJNNDAgMzBDNDAgMzMuMzEzNyAzNy4zMTM3IDM2IDM0IDM2QzMwLjY4NjMgMzYgMjggMzMuMzEzNyAyOCAzMEMyOCAyNi42ODYzIDMwLjY4NjMgMjQgMzQgMjRDMzcuMzEzNyAyNCA0MCAyNi42ODYzIDQwIDMwWiIgZmlsbD0iIzlDQTNBRiIvPjxwYXRoIGQ9Ik01NiA1Mkw0MCA0MEwyNCA1Mkg1NloiIGZpbGw9IiM5Q0EzQUYiLz48cGF0aCBkPSJNNjQgNTJMNDggMzZMMjQgNjRINjRWNTJaIiBmaWxsPSIjOUNBM0FGIi8+PC9zdmc+";
+                      e.target.src = "https://via.placeholder.com/800x400?text=Imagen+no+disponible"
                     }}
                   />
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="p-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">{blog.title}</h1>
-            
-            <div className="flex flex-wrap gap-4 text-gray-600 mb-8">
-              <div className="flex items-center">
-                <FiCalendar className="mr-2" />
-                <span>{new Date(blog.createdAt).toLocaleDateString()}</span>
-              </div>
-              <div className="flex items-center">
-                <FiClock className="mr-2" />
-                <span>{blog.readTime || '5'} min de lectura</span>
-              </div>
-              <div className="flex items-center">
-                <FiUser className="mr-2" />
-                <span>{blog.author}</span>
-              </div>
-              {blog.category && (
-                <div className="flex items-center">
-                  <FiTag className="mr-2" />
-                  <span>{blog.category}</span>
+                  
+                  {/* Controles del carrusel */}
+                  {blog.images.length > 1 && (
+                    <>
+                      <button 
+                        onClick={prevImage}
+                        className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition"
+                        aria-label="Imagen anterior"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                      <button 
+                        onClick={nextImage}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition"
+                        aria-label="Imagen siguiente"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                      
+                      {/* Indicadores de imágenes */}
+                      <div className="absolute bottom-2 left-0 right-0 flex justify-center space-x-2">
+                        {blog.images.map((_, idx) => (
+                          <button 
+                            key={idx}
+                            className={`w-2 h-2 rounded-full ${currentImageIndex === idx ? 'bg-white' : 'bg-white/50'}`}
+                            onClick={() => setCurrentImageIndex(idx)}
+                            aria-label={`Ver imagen ${idx + 1}`}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <span className="text-gray-400">Sin imágenes disponibles</span>
                 </div>
               )}
             </div>
-
-            <div className="prose max-w-none">
-              <div dangerouslySetInnerHTML={{ __html: blog.content }} />
+          </div>
+          
+          <div className="p-4 sm:p-6 md:p-8">
+            {/* Metadatos del blog */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 mb-4">
+              <span className="flex items-center">
+                <FiCalendar className="mr-1" />
+                {new Date(blog.createdAt).toLocaleDateString('es-ES')}
+              </span>
+              {blog.readTime && (
+                <span className="flex items-center">
+                  <FiClock className="mr-1" />
+                  {blog.readTime} min
+                </span>
+              )}
+              {blog.author && (
+                <span className="flex items-center">
+                  <FiUser className="mr-1" />
+                  {blog.author}
+                </span>
+              )}
+              {blog.category && (
+                <span className="flex items-center">
+                  <FiTag className="mr-1" />
+                  {blog.category}
+                </span>
+              )}
             </div>
             
-            {blog.tags && Array.isArray(blog.tags) && blog.tags.length > 0 && (
-              <div className="mt-8 pt-4 border-t">
-                <h3 className="text-lg font-semibold mb-2">Etiquetas:</h3>
+            {/* Título y descripción */}
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 mb-4">
+              {blog.title}
+            </h1>
+            
+            <p className="text-gray-600 text-sm sm:text-base md:text-lg mb-6">
+              {blog.description}
+            </p>
+            
+            {/* Contenido del blog */}
+            <div
+              className="prose prose-sm sm:prose lg:prose-lg max-w-none text-gray-800"
+              dangerouslySetInnerHTML={{ __html: blog.content }}
+            />
+            
+            {/* Tags */}
+            {blog.tags && blog.tags.length > 0 && (
+              <div className="mt-8 pt-4 border-t border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">Tags:</h3>
                 <div className="flex flex-wrap gap-2">
                   {blog.tags.map((tag, index) => (
-                    <span
-                      key={index}
-                      className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm"
-                    >
+                    <span key={index} className="inline-block bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs">
                       {tag}
                     </span>
                   ))}
                 </div>
               </div>
             )}
-
-            {/* Botones de acción */}
-            {user && (user.role === 'admin' || user.role === 'ADMIN') && (
-              <div className="flex justify-end gap-4 mt-6">
-                <button
-                  onClick={handleEdit}
-                  className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors"
-                >
-                  Editar Blog
-                </button>
-              </div>
-            )}
-          </div>
-        </article>
-      ) : (
-        /* Modo de edición */
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <h2 className="text-2xl font-bold mb-6">Editar Blog</h2>
-          
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Título
-              </label>
-              <input
-                type="text"
-                name="title"
-                value={editedBlog.title || ''}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Descripción
-              </label>
-              <input
-                type="text"
-                name="description"
-                value={editedBlog.description || ''}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Categoría
-              </label>
-              <input
-                type="text"
-                name="category"
-                value={editedBlog.category || ''}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Contenido
-              </label>
-              <textarea
-                name="content"
-                value={editedBlog.content || ''}
-                onChange={handleChange}
-                rows="10"
-                className="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Imágenes del Blog
-              </label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {editedBlog.images?.map((img, index) => (
-                  <div key={index} className="relative group">
-                    <img
-                      src={img.src}
-                      alt={img.alt || `Imagen ${index + 1}`}
-                      className="w-full h-32 object-cover rounded-lg shadow-md"
-                    />
-                    <button
-                      onClick={() => {
-                        setEditedBlog(prev => ({
-                          ...prev,
-                          images: prev.images.filter((_, i) => i !== index)
-                        }));
-                      }}
-                      className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <FiX />
-                    </button>
-                  </div>
-                ))}
-                <div className="flex items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 transition-colors">
-                  <button
-                    type="button"
-                    onClick={() => document.getElementById('image-upload').click()}
-                    className="flex flex-col items-center"
-                  >
-                    <FiUpload className="w-8 h-8 text-gray-400" />
-                    <span className="mt-2 text-sm text-gray-500">Subir imagen</span>
-                  </button>
-                  <input
-                    id="image-upload"
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={(e) => handleImageUpload(e.target.files)}
-                    className="hidden"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Etiquetas (separadas por comas)
-              </label>
-              <input
-                type="text"
-                value={editedBlog.tags ? editedBlog.tags.join(', ') : ''}
-                onChange={handleTagsChange}
-                className="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-
-            <div className="flex justify-end gap-4 pt-6">
+            
+            {/* Acciones */}
+            <div className="flex flex-wrap gap-3 mt-6 border-t border-gray-200 pt-6">
               <button
-                onClick={() => setIsEditing(false)}
-                className="px-6 py-2 border rounded-lg hover:bg-gray-100"
+                onClick={handleEdit}
+                className="flex items-center gap-1 px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm"
               >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSaveChanges}
-                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-              >
-                Guardar Cambios
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Editar Blog
               </button>
             </div>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Modal para vista ampliada de imágenes */}
       <Dialog

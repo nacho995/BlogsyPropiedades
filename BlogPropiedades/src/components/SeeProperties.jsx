@@ -105,20 +105,10 @@ export default function SeeProperties() {
     };
 
     const handleDeleteClick = (property_id) => {
-        try {
-            toast(`¿Desea eliminar la propiedad?`, {
-                icon: '🗑️',
-                duration: 4000,
-                action: {
-                    label: 'Sí',
-                    onClick: () => confirmDelete(property_id)
-                },
-            });
-        } catch (e) {
-            console.error('Error al mostrar notificación:', e);
-            if (confirm('¿Desea eliminar la propiedad?')) {
-                confirmDelete(property_id);
-            }
+        // Buscar la propiedad por su ID
+        const propertyToDelete = property.find(prop => prop._id === property_id);
+        if (propertyToDelete) {
+            openDeleteModal(propertyToDelete);
         }
     };
 
@@ -173,22 +163,22 @@ export default function SeeProperties() {
     }
 
     return (
-        <div className="bg-gradient-to-tr from-blue-900 to-black/60 min-h-screen py-8">
-            <div className="container mx-auto px-4">
-                <h1 className="text-4xl font-bold text-center mb-8">
+        <div className="bg-gradient-to-tr from-blue-900 to-black/60 min-h-screen py-6 sm:py-8">
+            <div className="container mx-auto px-4 sm:px-6">
+                <h1 className="text-3xl sm:text-4xl font-bold text-center mb-6 sm:mb-8">
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-yellow-400 to-white">
                         Propiedades
                     </span>
                 </h1>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                     {property.length === 0 ? (
                         <p className="text-white col-span-full text-center">No hay propiedades disponibles.</p>
                     ) : (
                         property.map((prop) => (
                             <div key={prop._id} className="bg-white rounded-lg shadow-xl overflow-hidden">
                                 {/* Imagen Principal */}
-                                <div className="relative h-48">
+                                <div className="relative h-40 sm:h-48">
                                     {prop.images && prop.images.length > 0 ? (
                                         <img
                                             src={prop.images[0].src}
@@ -204,40 +194,40 @@ export default function SeeProperties() {
                                         </div>
                                     )}
                                     {prop.images && prop.images.length > 1 && (
-                                        <span className="absolute bottom-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-sm">
+                                        <span className="absolute bottom-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs">
                                             +{prop.images.length - 1} fotos
                                         </span>
                                     )}
                                 </div>
 
                                 {/* Información de la propiedad */}
-                                <div className="p-4">
-                                    <h2 className="text-xl font-semibold mb-2">{prop.typeProperty}</h2>
-                                    <p className="text-gray-600 mb-4 line-clamp-2">{prop.description}</p>
+                                <div className="p-4 sm:p-5">
+                                    <h2 className="text-lg sm:text-xl font-semibold mb-2 line-clamp-1">{prop.typeProperty}</h2>
+                                    <p className="text-gray-600 mb-4 text-sm sm:text-base line-clamp-2">{prop.description}</p>
                                     
-                                    <div className="space-y-2 text-sm text-gray-600">
+                                    <div className="space-y-2 text-xs sm:text-sm text-gray-600 mb-3">
                                         <div className="flex items-center">
-                                            <FiMapPin className="mr-2" />
-                                            <span>{prop.address}</span>
+                                            <FiMapPin className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                                            <span className="line-clamp-1">{prop.address}</span>
                                         </div>
                                         <div className="flex items-center">
-                                            <FiMaximize className="mr-2" />
+                                            <FiMaximize className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                                             <span>{prop.m2} m²</span>
                                         </div>
                                         <div className="flex items-center">
-                                            <FiDollarSign className="mr-2" />
+                                            <FiDollarSign className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                                             <span>{prop.price}</span>
                                         </div>
                                     </div>
 
-                                    <div className="mt-4 flex justify-between gap-4">
-                                        <div className="flex gap-2">
+                                    <div className="mt-4 flex flex-wrap gap-2">
+                                        <div className="flex flex-wrap gap-2">
                                             <Link
                                                 to={`/property/${prop._id}`}
-                                                className="flex items-center gap-1 px-3 py-1.5 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors"
+                                                className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors text-xs sm:text-sm"
                                                 title="Ver detalles de la propiedad"
                                             >
-                                                <FiEye className="w-4 h-4" />
+                                                <FiEye className="h-3 w-3 sm:h-4 sm:w-4" />
                                                 <span>Ver detalles</span>
                                             </Link>
 
@@ -245,19 +235,19 @@ export default function SeeProperties() {
                                                 <>
                                                     <Link
                                                         to={`/add-property?edit=${prop._id}`}
-                                                        className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                                                        className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-xs sm:text-sm"
                                                         title="Editar propiedad"
                                                     >
-                                                        <FiEdit className="w-4 h-4" />
+                                                        <FiEdit className="h-3 w-3 sm:h-4 sm:w-4" />
                                                         <span>Editar</span>
                                                     </Link>
                                                     <button
                                                         onClick={() => handleDeleteClick(prop._id)}
-                                                        className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                                                        className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-xs sm:text-sm"
                                                         title="Eliminar propiedad"
                                                         disabled={deleteLoading[prop._id]}
                                                     >
-                                                        <FiTrash2 className="w-4 h-4" />
+                                                        <FiTrash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                                                         <span>{deleteLoading[prop._id] ? 'Eliminando...' : 'Eliminar'}</span>
                                                     </button>
                                                 </>

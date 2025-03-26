@@ -529,42 +529,42 @@ function Principal() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.6 }}
-          className="container mx-auto px-6 py-10"
+          className="container mx-auto px-4 sm:px-6 py-6 sm:py-10"
         >
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-8 flex items-center gap-6">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-4 sm:p-6 md:p-8 flex flex-col md:flex-row items-center gap-6">
             <div className="relative">
               <img 
                 src={profileImage || defaultProfilePic} 
                 alt="Perfil" 
-                className="h-28 w-28 rounded-full border-4 border-blue-500 object-cover shadow-lg" 
+                className="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 rounded-full border-4 border-blue-500 object-cover shadow-lg" 
                 onError={handleImageError}
               />
               <Link 
                 to="/profile/edit"
-                className="absolute -bottom-2 -right-2 bg-yellow-400 rounded-full p-2 shadow-md hover:bg-yellow-500 transition-colors"
+                className="absolute -bottom-2 -right-2 bg-yellow-400 rounded-full p-1.5 sm:p-2 shadow-md hover:bg-yellow-500 transition-colors"
                 title="Editar mi perfil"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-6 sm:w-6 text-blue-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                 </svg>
               </Link>
             </div>
-            <div>
-              <h2 className="text-3xl font-bold text-blue-800 mb-2">
+            <div className="text-center md:text-left mt-4 md:mt-0">
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-blue-800 mb-2">
                 ¡Bienvenido a tu espacio creativo, <span className="text-blue-600">{name || 'Usuario'}!</span>
               </h2>
-              <p className="text-gray-600 text-lg">
+              <p className="text-gray-600 text-sm sm:text-base md:text-lg">
                 Desde aquí podrás gestionar tus blogs y propiedades. ¿Qué te gustaría hacer hoy?
               </p>
-              <div className="flex gap-3 mt-4">
-                <Link to="/crear-blog" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition duration-200">
+              <div className="flex flex-wrap justify-center md:justify-start gap-2 sm:gap-3 mt-4">
+                <Link to="/crear-blog" className="px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium rounded-md transition duration-200">
                   Crear nuevo blog
                 </Link>
-                <Link to="/add-property" className="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-blue-900 font-medium rounded-md transition duration-200">
+                <Link to="/add-property" className="px-3 py-1.5 sm:px-4 sm:py-2 bg-yellow-400 hover:bg-yellow-500 text-blue-900 text-xs sm:text-sm font-medium rounded-md transition duration-200">
                   Añadir propiedad
                 </Link>
-                <Link to="/profile/edit" className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-md transition duration-200 flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <Link to="/profile/edit" className="px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs sm:text-sm font-medium rounded-md transition duration-200 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-5 sm:w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                   Editar mi perfil
@@ -607,26 +607,26 @@ function Principal() {
       
       {/* Contenedor principal para usuarios autenticados */}
       {isAuthenticated && (
-        <div className="container mx-auto px-6 py-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-            <Link to="/blogs" className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 flex flex-col items-center justify-center hover:shadow-xl transition-all duration-300 border-l-4 border-blue-600">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-blue-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="container mx-auto px-4 sm:px-6 py-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-10">
+            <Link to="/blogs" className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-4 sm:p-6 flex flex-col items-center justify-center hover:shadow-xl transition-all duration-300 border-l-4 border-blue-600">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 sm:h-16 sm:w-16 text-blue-600 mb-3 sm:mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
               </svg>
-              <h3 className="text-2xl font-bold text-blue-800 mb-2">Gestionar Blogs</h3>
-              <p className="text-gray-600 text-center">Administra tus publicaciones, edita contenido y crea nuevos artículos.</p>
-              <span className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition duration-200">
+              <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-blue-800 mb-2">Gestionar Blogs</h3>
+              <p className="text-gray-600 text-sm text-center">Administra tus publicaciones, edita contenido y crea nuevos artículos.</p>
+              <span className="mt-3 sm:mt-4 px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium rounded-md transition duration-200">
                 Ver mis blogs
               </span>
             </Link>
             
-            <Link to="/properties" className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 flex flex-col items-center justify-center hover:shadow-xl transition-all duration-300 border-l-4 border-yellow-500">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-yellow-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <Link to="/properties" className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-4 sm:p-6 flex flex-col items-center justify-center hover:shadow-xl transition-all duration-300 border-l-4 border-yellow-500">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 sm:h-16 sm:w-16 text-yellow-500 mb-3 sm:mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
               </svg>
-              <h3 className="text-2xl font-bold text-blue-800 mb-2">Gestionar Propiedades</h3>
-              <p className="text-gray-600 text-center">Administra tus propiedades, actualiza la información y añade nuevos inmuebles.</p>
-              <span className="mt-4 px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-blue-900 font-medium rounded-md transition duration-200">
+              <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-blue-800 mb-2">Gestionar Propiedades</h3>
+              <p className="text-gray-600 text-sm text-center">Administra tus propiedades, actualiza la información y añade nuevos inmuebles.</p>
+              <span className="mt-3 sm:mt-4 px-3 py-1.5 sm:px-4 sm:py-2 bg-yellow-400 hover:bg-yellow-500 text-blue-900 text-xs sm:text-sm font-medium rounded-md transition duration-200">
                 Ver mis propiedades
               </span>
             </Link>

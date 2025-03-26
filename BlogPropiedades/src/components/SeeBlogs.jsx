@@ -149,20 +149,10 @@ export default function SeeBlogs() {
   };
 
   const handleDeleteClick = (blog_id) => {
-    try {
-      toast(`¿Desea eliminar el blog?`, {
-        icon: '🗑️',
-        duration: 4000,
-        action: {
-          label: 'Sí',
-          onClick: () => confirmDelete(blog_id)
-        },
-      });
-    } catch (e) {
-      console.error('Error al mostrar notificación:', e);
-      if (confirm('¿Desea eliminar el blog?')) {
-        confirmDelete(blog_id);
-      }
+    // Buscar el blog por su ID
+    const blogToDelete = blogs.find(blog => blog._id === blog_id);
+    if (blogToDelete) {
+      openDeleteModal(blogToDelete);
     }
   };
 
@@ -218,20 +208,20 @@ export default function SeeBlogs() {
 
   return (
     <div className="min-h-screen bg-gradient-to-tr from-blue-900 to-black/60">
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-4xl font-bold text-center mb-8">
+      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <h1 className="text-3xl sm:text-4xl font-bold text-center mb-6 sm:mb-8">
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-yellow-400 to-white">
             Blogs
           </span>
         </h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {blogs.length === 0 ? (
             <p className="text-white col-span-full text-center">No hay blogs disponibles.</p>
           ) : (
             blogs.map((blog) => (
               <article key={blog._id} className="bg-white rounded-xl shadow-lg overflow-hidden transform transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                <div className="relative h-48 overflow-hidden">
+                <div className="relative h-40 sm:h-48 overflow-hidden">
                   {blog.images && blog.images.length > 0 ? (
                     <DirectImage
                       src={blog.images[0].src}
@@ -244,14 +234,14 @@ export default function SeeBlogs() {
                     </div>
                   )}
                   {blog.images && blog.images.length > 1 && (
-                    <span className="absolute bottom-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-sm">
+                    <span className="absolute bottom-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs">
                       +{blog.images.length - 1} fotos
                     </span>
                   )}
                 </div>
 
-                <div className="p-6">
-                  <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
+                <div className="p-4 sm:p-6">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
                     <span className="flex items-center">
                       <FiCalendar className="mr-1" />
                       {new Date(blog.createdAt).toLocaleDateString('es-ES')}
@@ -262,29 +252,29 @@ export default function SeeBlogs() {
                     </span>
                   </div>
 
-                  <h2 className="text-xl font-semibold mb-2 text-gray-800">{blog.title}</h2>
-                  <p className="text-gray-600 mb-4 line-clamp-3">{blog.description}</p>
+                  <h2 className="text-lg sm:text-xl font-semibold mb-2 text-gray-800 line-clamp-2">{blog.title}</h2>
+                  <p className="text-gray-600 mb-4 text-sm sm:text-base line-clamp-3">{blog.description}</p>
 
-                  <div className="flex items-center gap-2 mb-4">
+                  <div className="flex items-center gap-2 mb-3 sm:mb-4">
                     <FiUser className="text-gray-500" />
-                    <span className="text-sm text-gray-600">{blog.author}</span>
+                    <span className="text-xs sm:text-sm text-gray-600">{blog.author}</span>
                   </div>
 
                   {blog.category && (
-                    <div className="flex items-center gap-2 mb-4">
+                    <div className="flex items-center gap-2 mb-3 sm:mb-4">
                       <FiTag className="text-gray-500" />
-                      <span className="text-sm text-gray-600">{blog.category}</span>
+                      <span className="text-xs sm:text-sm text-gray-600">{blog.category}</span>
                     </div>
                   )}
 
                   <div className="flex justify-between items-center mt-4">
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Link
                         to={`/blog/${blog._id}`}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors"
+                        className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors text-xs sm:text-sm"
                         title="Ver blog completo"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4" viewBox="0 0 20 20" fill="currentColor">
                           <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
                           <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
                         </svg>
@@ -295,19 +285,19 @@ export default function SeeBlogs() {
                         <>
                           <Link
                             to={`/crear-blog?edit=${blog._id}`}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                            className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-xs sm:text-sm"
                             title="Editar blog"
                           >
-                            <FiEdit className="w-4 h-4" />
+                            <FiEdit className="h-3 w-3 sm:h-4 sm:w-4" />
                             <span>Editar</span>
                           </Link>
                           <button
                             onClick={() => handleDeleteClick(blog._id)}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                            className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-xs sm:text-sm"
                             title="Eliminar blog"
                             disabled={deleteLoading[blog._id]}
                           >
-                            <FiTrash2 className="w-4 h-4" />
+                            <FiTrash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                             <span>{deleteLoading[blog._id] ? 'Eliminando...' : 'Eliminar'}</span>
                           </button>
                         </>
