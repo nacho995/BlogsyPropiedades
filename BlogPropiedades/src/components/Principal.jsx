@@ -82,12 +82,6 @@ function Principal() {
   // Usar el hook de imagen directamente - esto asegura que siempre tengamos una imagen válida
   const { profileImage, handleImageError } = useProfileImage();
   
-  // Forzar actualización de la imagen cuando se monta el componente
-  useEffect(() => {
-    console.log("Principal: Verificando si hay una imagen de perfil guardada");
-    // El hook useProfileImage ya se encarga de cargar la imagen desde localStorage
-  }, []);
-  
   // Obtener datos del usuario
   const { user, isAuthenticated: userAuthenticated, logout } = useUser();
   const navigate = useNavigate(); // Replace useHistory with useNavigate
@@ -177,6 +171,24 @@ function Principal() {
     return () => {
       clearTimeout(timer);
       isMounted = false;
+    };
+  }, []);
+
+  // Cargar datos del usuario
+  useEffect(() => {
+    // El hook useProfileImage ya se encarga de cargar la imagen desde localStorage
+    
+    // Agregar detector de eventos para cambios en la imagen de perfil
+    const handleProfileImageUpdate = () => {
+      console.log("Principal: Evento de actualización de imagen de perfil recibido");
+      // No es necesario hacer nada aquí, el hook useProfileImage maneja esto
+    };
+    
+    window.addEventListener('profileImageUpdated', handleProfileImageUpdate);
+    
+    // Limpiar al desmontar
+    return () => {
+      window.removeEventListener('profileImageUpdated', handleProfileImageUpdate);
     };
   }, []);
 

@@ -1152,11 +1152,22 @@ export const syncProfileImage = (imageUrl) => {
   if (!imageUrl) return;
   
   try {
+    // Verificar si la imagen es válida
+    if (typeof imageUrl !== 'string' || 
+        imageUrl === 'undefined' || 
+        imageUrl === 'null') {
+      console.warn('syncProfileImage: Imagen inválida proporcionada');
+      return null;
+    }
+    
+    console.log('syncProfileImage: Sincronizando imagen:', imageUrl.substring(0, 30) + '...');
+    
+    // 1. Guardar en localStorage para persistencia
     localStorage.setItem('profilePic', imageUrl);
     localStorage.setItem('profilePic_backup', imageUrl);
     localStorage.setItem('profilePic_lastUpdate', Date.now().toString());
     
-    // Actualizar userData si existe
+    // 2. Actualizar userData si existe
     try {
       const userData = JSON.parse(localStorage.getItem('userData') || '{}');
       if (userData) {
@@ -1168,20 +1179,40 @@ export const syncProfileImage = (imageUrl) => {
       console.warn('Error al actualizar userData:', e);
     }
     
-    // Emitir evento de actualización para componentes que escuchan
+    // 3. Intentar actualizar userResponse si existe
     try {
-      window.dispatchEvent(new CustomEvent('profileImageUpdated', {
-        detail: { profileImage: imageUrl, timestamp: Date.now() }
-      }));
-      console.log('Evento de actualización de imagen emitido');
-    } catch (eventError) {
-      console.warn('Error al emitir evento de actualización:', eventError);
+      const userResponse = localStorage.getItem('userResponse');
+      if (userResponse) {
+        const responseData = JSON.parse(userResponse);
+        responseData.profilePic = imageUrl;
+        responseData.profileImage = imageUrl;
+        localStorage.setItem('userResponse', JSON.stringify(responseData));
+      }
+    } catch (e) {
+      console.warn('Error al actualizar userResponse:', e);
     }
     
-    console.log('Imagen de perfil almacenada en localStorage y notificada');
+    // 4. Emitir evento de actualización para componentes que escuchan
+    // Usar setTimeout para asegurar que los datos estén guardados antes
+    setTimeout(() => {
+      try {
+        window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+          detail: { 
+            profileImage: imageUrl, 
+            timestamp: Date.now(), 
+            source: 'syncProfileImage' 
+          }
+        }));
+        console.log('Evento de actualización de imagen emitido con éxito');
+      } catch (eventError) {
+        console.warn('Error al emitir evento de actualización:', eventError);
+      }
+    }, 50);
+    
+    console.log('Imagen de perfil sincronizada correctamente');
     return imageUrl;
   } catch (error) {
-    console.error('Error al guardar imagen en localStorage:', error);
+    console.error('Error crítico al guardar imagen en localStorage:', error);
     return null;
   }
 };

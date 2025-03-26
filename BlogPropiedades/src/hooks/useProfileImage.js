@@ -146,16 +146,39 @@ const useProfileImage = () => {
       // 1. Actualizar el estado local
       setProfileImage(newImage);
       
-      // 2. Notificar a toda la aplicación
-      notifyImageUpdate(newImage);
+      // 2. Guardar en localStorage para asegurar persistencia
+      try {
+        localStorage.setItem('profilePic', newImage);
+        localStorage.setItem('profilePic_backup', newImage);
+        localStorage.setItem('profilePic_lastUpdate', Date.now().toString());
+      } catch (storageError) {
+        console.error("Error al guardar en localStorage:", storageError);
+      }
       
-      // 3. Verificar que se haya almacenado correctamente
+      // 3. Notificar a toda la aplicación
+      try {
+        // Usamos setTimeout para asegurar que el evento se dispare después de que la imagen se guarde
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+            detail: { profileImage: newImage, timestamp: Date.now() }
+          }));
+          console.log("✅ Evento profileImageUpdated emitido globalmente");
+        }, 50);
+      } catch (eventError) {
+        console.error("Error al emitir evento:", eventError);
+      }
+      
+      // 4. Verificar que se haya almacenado correctamente
       const storedImage = localStorage.getItem('profilePic');
       
       if (storedImage !== newImage) {
         console.warn("⚠️ Posible problema al almacenar la imagen. Reintentando...");
-        localStorage.setItem('profilePic', newImage);
-        localStorage.setItem('profilePic_backup', newImage);
+        try {
+          localStorage.setItem('profilePic', newImage);
+          localStorage.setItem('profilePic_backup', newImage);
+        } catch (retryError) {
+          console.error("Error al reintentar guardar en localStorage:", retryError);
+        }
       }
       
       setIsLoading(false);

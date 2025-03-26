@@ -80,7 +80,39 @@ export default function CambiarPerfil() {
     } catch (err) {
       console.error("Error al cargar imagen inicial en CambiarPerfil:", err);
     }
-  }, [updateProfileImage]);
+    
+    // Agregar detector de eventos para cambios en la imagen de perfil
+    const handleProfileImageUpdate = (event) => {
+      console.log("CambiarPerfil: Evento de actualización de imagen recibido");
+      
+      if (event.detail?.profileImage && typeof event.detail.profileImage === 'string') {
+        // Si el evento vino de este mismo componente, no es necesario hacer nada
+        if (event.detail.source === 'CambiarPerfil') return;
+        
+        // Actualizar la vista previa si es necesario
+        const newImage = event.detail.profileImage;
+        
+        // Actualizar estado local solo si no tenemos una imagen en la vista previa
+        if (!profilePic) {
+          console.log("CambiarPerfil: Actualizando vista previa con imagen del evento");
+          setProfilePic(prevState => {
+            if (prevState) return prevState; // Mantener vista previa actual si existe
+            return { file: null, remoteUrl: newImage };
+          });
+        }
+      }
+    };
+    
+    window.addEventListener('profileImageUpdated', handleProfileImageUpdate);
+    
+    // Limpiar al desmontar
+    return () => {
+      window.removeEventListener('profileImageUpdated', handleProfileImageUpdate);
+      if (profilePic?.localUrl) {
+        URL.revokeObjectURL(profilePic.localUrl);
+      }
+    };
+  }, [updateProfileImage, profilePic]);
 
   // Determinar si estamos usando HTTPS
   const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
@@ -355,6 +387,9 @@ export default function CambiarPerfil() {
   const getCurrentImage = useCallback(() => {
     // Si hay una imagen en vista previa local, usarla
     if (profilePic?.localUrl) return profilePic.localUrl;
+    
+    // Si hay una URL remota en profilePic, usarla
+    if (profilePic?.remoteUrl) return profilePic.remoteUrl;
     
     // Si hay una imagen en el hook useProfileImage, usarla
     if (profileImage && profileImage !== fallbackImageBase64) return profileImage;

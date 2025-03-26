@@ -50,6 +50,23 @@ export default function Navbar({ showOnlyAuth = false }) {
     } catch (error) {
       console.error("Error al verificar imagen en NavBar:", error);
     }
+    
+    // Escuchar eventos de actualización de imagen
+    const handleProfileImageUpdate = (event) => {
+      // El componente se actualizará automáticamente gracias al hook useProfileImage
+      console.log("NavBar: Evento de actualización de imagen recibido");
+      
+      // Forzar rerenderizado del componente
+      // No es necesario ya que el hook useProfileImage maneja esto
+    };
+    
+    // Agregar escuchador para eventos de actualización de imagen
+    window.addEventListener('profileImageUpdated', handleProfileImageUpdate);
+    
+    // Limpiar escuchador al desmontar
+    return () => {
+      window.removeEventListener('profileImageUpdated', handleProfileImageUpdate);
+    };
   }, [user]);
   
   // Verificar token expirado

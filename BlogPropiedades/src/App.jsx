@@ -23,6 +23,7 @@ import SubirPage from './components/SubirPage';
 import DiagnosticPage from './components/DiagnosticPage';
 import NotFound from './components/NotFound';
 import TestImagePage from './pages/testImagePage';
+import ImageSynchronizer from './components/ImageSynchronizer';
 
 // Detección de ciclos de renderizado
 const RENDER_CYCLE_THRESHOLD = 10; // Número máximo de renderizados en un corto período de tiempo
@@ -814,6 +815,7 @@ function App() {
                         <BrowserRouter>
                             <ImageLoader />
                             <Navbar />
+                            <ImageSynchronizer />
                             <Routes>
                                 <Route path="/" element={<SafeRender><HomeRoute /></SafeRender>} />
                                 <Route path="/login" element={<SafeRender><SignIn /></SafeRender>} />
