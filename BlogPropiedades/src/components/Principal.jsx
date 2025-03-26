@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom"; // Replace useHistory with
 import { useUser } from "../context/UserContext";
 import { getBlogPosts, getPropertyPosts, testApiConnection } from "../services/api"; // Removed syncProfileImage import
 import { motion } from "framer-motion";
-import { fallbackImageBase64 } from "../utils";
+import { fallbackImageBase64, ensureHttps } from "../utils/imageUtils";
 import useProfileImage from "../hooks/useProfileImage"; // Import the new hook
 
 // Definir la imagen de perfil por defecto
@@ -243,7 +243,7 @@ function Principal() {
         
         // Verificar si la URL es válida
         if (typeof imageUrl === 'string' && imageUrl.trim() !== '') {
-          return ensureCorrectProtocol(imageUrl);
+          return ensureHttps(imageUrl);
         }
       }
       
@@ -252,7 +252,7 @@ function Principal() {
         console.log(`Imagen es un string directo:`, blog.image);
         
         if (blog.image.trim() !== '') {
-          return ensureCorrectProtocol(blog.image);
+          return ensureHttps(blog.image);
         }
       }
       
@@ -262,9 +262,9 @@ function Principal() {
         
         const firstImage = blog.images[0];
         if (typeof firstImage === 'string') {
-          return ensureCorrectProtocol(firstImage);
+          return ensureHttps(firstImage);
         } else if (firstImage && typeof firstImage === 'object' && firstImage.src) {
-          return ensureCorrectProtocol(firstImage.src);
+          return ensureHttps(firstImage.src);
         }
       }
     } catch (error) {
@@ -273,24 +273,6 @@ function Principal() {
     
     // Si todo falla, usar imagen por defecto
     return defaultProfilePic;
-  };
-  
-  // Función para asegurar que siempre se use HTTPS para las APIs
-  const ensureCorrectProtocol = (url) => {
-    if (!url) return defaultProfilePic;
-    
-    try {
-      // Las APIs de GozaMadrid deben usar HTTPS
-      if (url.includes('gozamadrid-api') || 
-          url.includes('api.realestategozamadrid.com') ||
-          url.includes('elasticbeanstalk.com')) {
-        return url.replace('http://', 'https://');
-      }
-      return url;
-    } catch (e) {
-      console.error('Error al procesar URL:', e);
-      return url;
-    }
   };
   
   // Función segura para manejar el cierre de sesión
@@ -413,12 +395,6 @@ function Principal() {
     // Si no hay imagen válida, devolver null
     console.log(`No se encontró ninguna imagen válida`);
     return null;
-  };
-
-  // Función para corregir URLs HTTP a HTTPS
-  const ensureHttps = (url) => {
-    if (!url) return null;
-    return typeof url === 'string' ? url.replace('http://', 'https://') : url;
   };
 
   // Datos filtrados para mostrar solo los primeros 3 elementos

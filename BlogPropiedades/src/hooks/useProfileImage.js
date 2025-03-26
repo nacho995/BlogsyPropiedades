@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { fallbackImageBase64, validateAndProcessImage } from '../utils';
+import { fallbackImageBase64, validateAndProcessImage } from '../utils/imageUtils';
 import { syncProfileImage } from '../services/api';
 
 const MAX_RETRIES = 3;

@@ -4,7 +4,7 @@ import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import useProfileImage from '../hooks/useProfileImage';
-import { fallbackImageBase64 } from '../utils';
+import { fallbackImageBase64 } from '../utils/imageUtils';
 
 // Función de utilidad para combinar clases CSS
 function classNames(...classes) {

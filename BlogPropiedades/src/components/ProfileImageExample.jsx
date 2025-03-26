@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import useProfileImage from '../hooks/useProfileImage';
-import { fallbackImageBase64 } from '../utils/profileUtils';
+import { fallbackImageBase64 } from '../utils/imageUtils';
 
 /**
  * Componente de ejemplo que muestra cómo utilizar el hook useProfileImage

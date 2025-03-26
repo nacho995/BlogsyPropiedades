@@ -6,7 +6,8 @@
  */
 
 // Importar utilidades
-import { combineUrls, ensureHttps, detectAndPreventLoopError } from '../utils';
+import { combineUrls, detectAndPreventLoopError } from '../utils';
+import { ensureHttps } from '../utils/imageUtils';
 
 // URL base de la API
 // Modificar la URL base para asegurar que sea correcta
