@@ -3,6 +3,7 @@ import { Disclosure, Menu, Transition } from '@headlessui/react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
+import useProfileImage from '../hooks/useProfileImage';
 
 // Definimos la constante que antes estaba en utils/imageUtils
 const fallbackImageBase64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNlMWUxZTEiLz48dGV4dCB4PSI1MCIgeT0iNTAiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGFsaWdubWVudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZmlsbD0iIzg4OCI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4=';
@@ -32,26 +33,9 @@ export default function Navbar({ showOnlyAuth = false }) {
   const navigate = useNavigate();
   const { isAuthenticated, user, logout } = useUser();
   
-  // Estado para manejar la imagen de perfil localmente
-  const [profileImage, setProfileImage] = useState(fallbackImageBase64);
+  // Usar el hook de imagen de perfil para la sincronización
+  const { profileImage, handleImageError } = useProfileImage();
   
-  // Cargar imagen del localStorage al iniciar
-  useEffect(() => {
-    try {
-      const storedImage = localStorage.getItem('profilePic');
-      if (storedImage) {
-        setProfileImage(storedImage);
-      }
-    } catch (e) {
-      console.error("Error al cargar imagen del localStorage:", e);
-    }
-  }, []);
-  
-  // Manejador simple de errores de carga de imagen
-  const handleImageError = () => {
-    setProfileImage(fallbackImageBase64);
-  };
-
   // Verificar token expirado
   useEffect(() => {
     const token = localStorage.getItem('token');

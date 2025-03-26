@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, Suspense, lazy } from "rea
 import { Link, useNavigate } from "react-router-dom"; // Replace useHistory with useNavigate
 import { useUser } from "../context/UserContext";
 import { motion } from "framer-motion";
+import useProfileImage from "../hooks/useProfileImage";
 
 // Definimos las constantes y funciones que antes estaban en utils/imageUtils
 const fallbackImageBase64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNlMWUxZTEiLz48dGV4dCB4PSI1MCIgeT0iNTAiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGFsaWdubWVudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZmlsbD0iIzg4OCI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4=';
@@ -56,25 +57,8 @@ function Principal() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef(null);
   
-  // Estado simple para manejar la imagen de perfil localmente
-  const [profileImage, setProfileImage] = useState(defaultProfilePic);
-  
-  // Cargar imagen del localStorage al iniciar
-  useEffect(() => {
-    try {
-      const storedImage = localStorage.getItem('profilePic');
-      if (storedImage) {
-        setProfileImage(storedImage);
-      }
-    } catch (error) {
-      console.error('Error al cargar imagen de perfil:', error);
-    }
-  }, []);
-  
-  // Manejador simple de errores de imagen
-  const handleImageError = () => {
-    setProfileImage(defaultProfilePic);
-  };
+  // Usar el hook de imagen de perfil para la sincronización
+  const { profileImage, handleImageError } = useProfileImage();
   
   // Obtener datos del usuario
   const { user, isAuthenticated: userAuthenticated, logout } = useUser();

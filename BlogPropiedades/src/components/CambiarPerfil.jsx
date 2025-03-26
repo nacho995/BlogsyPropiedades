@@ -47,7 +47,7 @@ export default function CambiarPerfil() {
   const navigate = useNavigate();
   const { user, refreshUserData } = useUser();
   
-  // Usar el hook simplificado
+  // Usar el hook simplificado con sincronización
   const { 
     profileImage, 
     isLoading: profileLoading, 
@@ -103,16 +103,7 @@ export default function CambiarPerfil() {
         try {
           const imageData = event.target.result;
           
-          // Guardar imagen en localStorage
-          try {
-            localStorage.setItem('profilePic', imageData);
-            localStorage.setItem('profilePic_backup', imageData);
-            console.log("Imagen guardada en localStorage");
-          } catch (storageError) {
-            console.warn("Error al guardar imagen en localStorage:", storageError);
-          }
-          
-          // Actualizar imagen usando el hook simplificado
+          // Actualizar imagen usando el hook simplificado que maneja la sincronización
           updateProfileImage(imageData)
             .then(() => {
               setSuccess("Imagen actualizada correctamente");
@@ -163,15 +154,19 @@ export default function CambiarPerfil() {
         throw new Error("No hay sesión activa. Por favor, inicia sesión nuevamente.");
       }
 
+      // Si tenemos una imagen, procesarla
+      let profileImageData = null;
+      if (profilePic?.file) {
+        profileImageData = await validateAndProcessImage(profilePic.file);
+        
+        // Actualizar la imagen localmente primero para respuesta inmediata
+        await updateProfileImage(profileImageData);
+      }
+
       const userData = {
         name: name || user?.name,
-        profilePic: profilePic?.file ? await validateAndProcessImage(profilePic.file) : null
+        profilePic: profileImageData
       };
-
-      // Guardar la imagen localmente incluso antes de enviarla al servidor
-      if (profilePic?.localUrl) {
-        localStorage.setItem('profilePic_temp', profilePic.localUrl);
-      }
 
       // Llamada al backend para actualizar el perfil
       const response = await fetch(`${API_URL}/user/update-profile`, {
@@ -193,10 +188,7 @@ export default function CambiarPerfil() {
             localStorage.setItem('name', name);
           }
           
-          if (profilePic?.localUrl) {
-            localStorage.setItem('profilePic', profilePic.localUrl);
-            localStorage.setItem('profilePic_backup', profilePic.localUrl);
-          }
+          // La imagen ya se actualizó localmente arriba
           
           setSuccess("Perfil actualizado localmente. Los cambios se sincronizarán cuando inicies sesión.");
           setTimeout(() => navigate("/"), 2000);
@@ -211,23 +203,17 @@ export default function CambiarPerfil() {
       const data = await response.json();
       
       // Actualizar imagen local si hay respuesta del servidor
-      if (data.profilePic) {
-        // Guardar la imagen en localStorage
-        if (typeof data.profilePic === 'string') {
-          localStorage.setItem('profilePic', data.profilePic);
-          localStorage.setItem('profilePic_backup', data.profilePic);
-          
-          // Actualizar userData para mantener todo coherente
-          try {
-            const storedUserData = JSON.parse(localStorage.getItem('userData') || '{}');
-            storedUserData.profilePic = data.profilePic;
-            localStorage.setItem('userData', JSON.stringify(storedUserData));
-          } catch (e) {
-            console.warn('Error al actualizar datos de usuario en localStorage:', e);
-          }
-          
-          // Actualizar la imagen local
-          updateProfileImage(data.profilePic);
+      if (data.profilePic && typeof data.profilePic === 'string') {
+        // Actualizar la imagen local
+        await updateProfileImage(data.profilePic);
+        
+        // Actualizar userData para mantener todo coherente
+        try {
+          const storedUserData = JSON.parse(localStorage.getItem('userData') || '{}');
+          storedUserData.profilePic = data.profilePic;
+          localStorage.setItem('userData', JSON.stringify(storedUserData));
+        } catch (e) {
+          console.warn('Error al actualizar datos de usuario en localStorage:', e);
         }
       }
 
