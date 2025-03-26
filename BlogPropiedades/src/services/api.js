@@ -1140,11 +1140,13 @@ export const syncProfileImage = async (newImage = null) => {
         } else if (newImage.imageUrl) {
           imageUrl = newImage.imageUrl;
         } else if (newImage.profileImage) {
-          imageUrl = newImage.profileImage;
+          imageUrl = typeof newImage.profileImage === 'string' ? 
+                    newImage.profileImage : 
+                    (newImage.profileImage?.src || newImage.profileImage?.url);
         } else if (newImage.profilePic) {
           imageUrl = typeof newImage.profilePic === 'string' ? 
                     newImage.profilePic : 
-                    newImage.profilePic?.src || newImage.profilePic?.url;
+                    (newImage.profilePic?.src || newImage.profilePic?.url);
         }
       }
       
@@ -1153,12 +1155,54 @@ export const syncProfileImage = async (newImage = null) => {
         return imageUrl;
       }
       
-      throw new Error('Formato de imagen no válido');
+      // Si no se pudo extraer una URL, intentar usar profileImage de la respuesta del usuario
+      try {
+        // Buscar directamente datos de usuario en localStorage
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+        if (userData.profileImage) {
+          if (typeof userData.profileImage === 'string') {
+            localStorage.setItem('profilePic', userData.profileImage);
+            return userData.profileImage;
+          } else if (userData.profileImage && typeof userData.profileImage === 'object') {
+            const url = userData.profileImage.src || userData.profileImage.url;
+            if (url) {
+              localStorage.setItem('profilePic', url);
+              return url;
+            }
+          }
+        }
+      } catch (innerError) {
+        console.warn('Error al procesar datos de usuario del localStorage:', innerError);
+      }
+      
+      console.warn('No se pudo extraer URL de imagen del perfil:', newImage);
+      return null;
     }
 
     // Obtener la imagen actual del localStorage
     const currentImage = localStorage.getItem('profilePic');
-    if (!currentImage) return null;
+    if (!currentImage) {
+      // Si no hay imagen en localStorage, intentar usar profileImage desde userData
+      try {
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+        if (userData.profileImage) {
+          if (typeof userData.profileImage === 'string') {
+            localStorage.setItem('profilePic', userData.profileImage);
+            return userData.profileImage;
+          } else if (userData.profileImage && typeof userData.profileImage === 'object') {
+            const url = userData.profileImage.src || userData.profileImage.url;
+            if (url) {
+              localStorage.setItem('profilePic', url);
+              return url;
+            }
+          }
+        }
+      } catch (innerError) {
+        console.warn('Error al procesar datos de usuario del localStorage:', innerError);
+      }
+      
+      return null;
+    }
 
     // Verificar si la imagen es una URL válida
     if (typeof currentImage !== 'string') {
@@ -1175,18 +1219,27 @@ export const syncProfileImage = async (newImage = null) => {
     }
 
     // Verificar accesibilidad de la imagen
-    const isAccessible = await checkImageAccessibility(currentImage);
-    if (!isAccessible) {
-      console.warn('Imagen de perfil no accesible:', currentImage);
-      localStorage.removeItem('profilePic');
-      return null;
+    try {
+      const isAccessible = await checkImageAccessibility(currentImage);
+      if (!isAccessible) {
+        console.warn('Imagen de perfil no accesible:', currentImage);
+        localStorage.removeItem('profilePic');
+        return null;
+      }
+    } catch (error) {
+      console.error('Error al verificar accesibilidad de imagen:', error);
+      // No eliminar la imagen en caso de error de verificación
+      // Solo devolver la URL tal como está
+      return currentImage;
     }
 
     return currentImage;
   } catch (error) {
     console.error('Error en syncProfileImage:', error);
-    localStorage.removeItem('profilePic');
-    return null;
+    // No eliminar la imagen en caso de error general
+    // Intentar recuperar la imagen del localStorage si existe
+    const fallbackImage = localStorage.getItem('profilePic');
+    return fallbackImage;
   }
 };
 
@@ -1197,9 +1250,16 @@ export const syncProfileImage = async (newImage = null) => {
  */
 const checkImageAccessibility = (url) => {
   return new Promise((resolve) => {
-    // Si no hay URL o no es string, no es accesible
-    if (!url || typeof url !== 'string') {
-      console.log('URL de imagen inválida o no es string:', url);
+    // Si no hay URL, no es accesible
+    if (!url) {
+      console.log('URL de imagen vacía');
+      resolve(false);
+      return;
+    }
+    
+    // Si no es una cadena de texto, no es accesible
+    if (typeof url !== 'string') {
+      console.log('URL de imagen no es string:', typeof url, url);
       resolve(false);
       return;
     }
@@ -1216,6 +1276,7 @@ const checkImageAccessibility = (url) => {
       'cloudinary.com',
       'res.cloudinary.com',
       'images.unsplash.com',
+      'goza-madrid.onrender.com',
       'api.realestategozamadrid.com',
       'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com'
     ];
@@ -1223,57 +1284,36 @@ const checkImageAccessibility = (url) => {
     // Verificar si la URL pertenece a un dominio confiable
     const isTrustedDomain = trustedDomains.some(domain => url.includes(domain));
     
-    // Si la URL contiene "uploads/properties" y es del servidor, verificar con fetch
-    // ya que estos archivos pueden no existir (error 404)
-    if (url.includes('uploads/properties') && (url.includes('api.realestategozamadrid.com') || 
-        url.includes('gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com'))) {
-      console.log('Verificando accesibilidad de imagen en servidor con fetch:', url);
-      
-      // Usar fetch para verificar si la URL es accesible
-      fetch(url, { method: 'HEAD' })
-        .then(response => {
-          const isAccessible = response.ok;
-          console.log(`Imagen ${isAccessible ? 'es' : 'no es'} accesible:`, url);
-          resolve(isAccessible);
-        })
-        .catch(error => {
-          console.log('Error al verificar accesibilidad de imagen:', error);
-          resolve(false);
-        });
-      
-      return;
-    }
-    
-    // Para dominios confiables, usar el método de Image
+    // Para dominios confiables, considerar accesible sin verificar
     if (isTrustedDomain) {
-      const img = new Image();
-      
-      // Establecer un timeout para evitar esperar demasiado
-      const timeout = setTimeout(() => {
-        console.log('Timeout al verificar accesibilidad de imagen');
-        resolve(false);
-      }, 5000);
-      
-      img.onload = () => {
-        clearTimeout(timeout);
-        console.log('Imagen cargada correctamente, es accesible:', url);
-        resolve(true);
-      };
-      
-      img.onerror = () => {
-        clearTimeout(timeout);
-        console.log('Error al cargar imagen durante verificación:', url);
-        resolve(false);
-      };
-      
-      // Añadir timestamp para evitar caché
-      img.src = url.includes('?') ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`;
+      console.log('URL de dominio confiable, asumiendo que es accesible:', url);
+      resolve(true);
       return;
     }
     
-    // Para dominios no confiables, asumir que no son accesibles
-    console.log('URL de dominio no confiable, asumiendo que no es accesible:', url);
-    resolve(false);
+    // Para dominios no confiables, verificar con el método de Image
+    const img = new Image();
+    
+    // Establecer un timeout para evitar esperar demasiado
+    const timeout = setTimeout(() => {
+      console.log('Timeout al verificar accesibilidad de imagen');
+      resolve(false);
+    }, 5000);
+    
+    img.onload = () => {
+      clearTimeout(timeout);
+      console.log('Imagen cargada correctamente, es accesible:', url);
+      resolve(true);
+    };
+    
+    img.onerror = () => {
+      clearTimeout(timeout);
+      console.log('Error al cargar imagen durante verificación:', url);
+      resolve(false);
+    };
+    
+    // Añadir timestamp para evitar caché
+    img.src = url.includes('?') ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`;
   });
 };
 
