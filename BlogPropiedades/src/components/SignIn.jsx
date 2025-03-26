@@ -13,6 +13,8 @@ const SignIn = ({ isRegistering = false }) => {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [showRecover, setShowRecover] = useState(false);
+    const [loadingTimeout, setLoadingTimeout] = useState(null);
     const navigate = useNavigate();
     const authAttemptCount = useRef(0);
     const isSubmitting = useRef(false);
@@ -80,6 +82,33 @@ const SignIn = ({ isRegistering = false }) => {
             isMounted = false;
         };
     }, [isAuthenticated, user, navigate]);
+
+    // Temporizador de seguridad para evitar carga infinita
+    useEffect(() => {
+        if (loading) {
+            // Si la carga dura más de 10 segundos, detenerla automáticamente
+            const timeout = setTimeout(() => {
+                console.error("🚨 Tiempo de carga excedido - Deteniendo");
+                setLoading(false);
+                setError("La aplicación tardó demasiado en responder. Por favor, intente nuevamente.");
+                setShowRecover(true);
+                
+                // Limpiar local storage si está atascado
+                if (ErrorHandler.detectAndPreventLoopError('signin_timeout', 30000, 2)) {
+                    console.log("🧹 Limpiando datos de sesión por timeout repetido");
+                    localStorage.removeItem('token');
+                }
+            }, 10000);
+            
+            setLoadingTimeout(timeout);
+            
+            return () => clearTimeout(timeout);
+        } else {
+            if (loadingTimeout) {
+                clearTimeout(loadingTimeout);
+            }
+        }
+    }, [loading]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -243,8 +272,8 @@ const SignIn = ({ isRegistering = false }) => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-900 to-indigo-800 py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-lg">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-700 to-amber-500 py-12 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-md w-full space-y-8 backdrop-blur-lg bg-white/10 p-8 rounded-xl shadow-2xl border border-white/20">
                 <div>
                     <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
                         Iniciar Sesión
@@ -259,6 +288,40 @@ const SignIn = ({ isRegistering = false }) => {
                         </Link>
                     </p>
                 </div>
+                
+                {/* ⚠️ Mensaje de Recuperación de Emergencia ⚠️ */}
+                {showRecover && (
+                    <div className="p-4 mb-4 bg-red-50 border-l-4 border-red-500 rounded-md">
+                        <div className="flex">
+                            <div className="flex-shrink-0">
+                                <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+                            <div className="ml-3">
+                                <h3 className="text-sm font-medium text-red-800">¿Problemas de carga?</h3>
+                                <div className="mt-2 text-sm text-red-700">
+                                    <p>Parece que la aplicación está teniendo problemas. Intente:</p>
+                                    <ul className="list-disc pl-5 mt-1 space-y-1">
+                                        <li>Refrescar la página</li>
+                                        <li>Revisar su conexión a internet</li>
+                                        <li>
+                                            <button 
+                                                onClick={() => {
+                                                    localStorage.clear();
+                                                    window.location.href = '/login';
+                                                }}
+                                                className="text-red-800 font-medium hover:text-red-900"
+                                            >
+                                                Reiniciar sesión (borrar datos)
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 
                 {error && (
                     <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4">

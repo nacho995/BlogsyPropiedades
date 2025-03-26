@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -7,4 +6,58 @@
   background: linear-gradient(to right, #000000, #b9b9b9);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+/* Optimizaciones para rendimiento */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Ajustes para dispositivos de bajo rendimiento */
+@media (max-width: 768px) {
+  /* Reducir complejidad visual */
+  .backdrop-blur-lg {
+    backdrop-filter: blur(5px) !important;
+  }
+  
+  /* Limitar animaciones en móviles */
+  .animate-pulse, .animate-spin, .animate-bounce {
+    animation: none !important;
+  }
+}
+
+/* Reglas de alto contraste para accesibilidad */
+@media (prefers-contrast: high) {
+  .bg-white\/10 {
+    background-color: white !important;
+    color: black !important;
+  }
+  
+  .text-white {
+    color: black !important;
+  }
+  
+  .text-blue-100, .text-blue-200 {
+    color: navy !important;
+  }
+}
+
+/* Estilos para modo recuperación */
+.error-recovery-mode {
+  animation: none !important;
+  background: white !important;
+  color: black !important;
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+/* Ayuda para debugging */
+.show-layout-debug * {
+  outline: 1px solid rgba(255, 0, 0, 0.2);
 }

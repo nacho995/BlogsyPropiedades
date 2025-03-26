@@ -35,8 +35,14 @@ window.useCorsProxy = false;
 // Función auxiliar para esperar un tiempo específico
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Función para manejar errores con límite de intentos
+// Función para manejar errores con límite de intentos y timeout
 export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
+  // Crear un controlador de aborto para limitar el tiempo máximo de espera
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, 10000); // 10 segundos de tiempo máximo
+  
   try {
     // Construir la URL completa - Siempre en HTTPS
     let url = combineUrls(BASE_URL, endpoint.startsWith('/') ? endpoint : `/${endpoint}`);
@@ -48,6 +54,22 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     
     console.log(`🔄 Enviando solicitud directa a: ${url}`);
     
+    // Verificar si estamos en un bucle de solicitudes repetidas
+    if (ErrorHandler.detectAndPreventLoopError('api_fetch_' + endpoint, 8000, 4)) {
+      console.error(`🛑 Bucle de solicitudes detectado para ${endpoint}. Cancelando operación.`);
+      clearTimeout(timeoutId);
+      
+      // Devolver respuesta vacía para evitar bucles
+      if (endpoint.includes('/blog') || endpoint.includes('/property')) {
+        return [];
+      }
+      
+      return {
+        error: true,
+        message: 'Demasiadas solicitudes repetidas. Intente de nuevo más tarde.'
+      };
+    }
+    
     // Configuración por defecto de fetch con CORS permisivo
     const fetchOptions = {
       method: options.method || 'GET',
@@ -57,7 +79,8 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
         ...options.headers
       },
       mode: 'cors',
-      credentials: 'include' // Incluir credenciales para CORS
+      credentials: 'include', // Incluir credenciales para CORS
+      signal: controller.signal // Añadir la señal para poder abortar
     };
     
     // Agregar token de autorización si existe en localStorage
@@ -178,6 +201,8 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     
     // Propagar el error para otros endpoints
     throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
 };
 

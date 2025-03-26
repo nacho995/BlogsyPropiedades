@@ -1,4 +1,4 @@
-import React, { useEffect, useState, lazy, Suspense, useRef, useMemo } from 'react';
+import React, { useEffect, useState, lazy, Suspense, useRef, useMemo, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { UserProvider, useUser } from './context/UserContext';
 import Navbar from './components/NavBar';
@@ -7,8 +7,7 @@ import ImageLoader from './components/ImageLoader';
 import SignIn from './components/SignIn';
 import BlogCreation from './components/blogCreation';
 import BlogDetail from './components/BlogDetail';
-import { Toaster } from 'react-hot-toast';
-import toast from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
 
 import Principal from './components/Principal';
 import SeeBlogs from './components/SeeBlogs';
@@ -18,6 +17,8 @@ import PropertyCreation from './components/addProperties';
 import PropertyDetail from './components/PropertyDetail';
 import SubirPage from './components/SubirPage';
 import DiagnosticPage from './components/DiagnosticPage';
+import Footer from './components/Footer';
+import NotFound from './components/NotFound';
 
 // Detección de ciclos de renderizado
 const RENDER_CYCLE_THRESHOLD = 10; // Número máximo de renderizados en un corto período de tiempo
@@ -608,6 +609,114 @@ function App() {
     // Verificar si hay un ciclo al renderizar App
     checkRenderCycle();
     
+    // Estado para seguimiento del rendimiento de la app
+    const [appHealth, setAppHealth] = useState({
+      loadStartTime: Date.now(),
+      appLoaded: false,
+      renderCount: 0,
+      lastRenderTime: null,
+      errors: []
+    });
+    
+    // Estado para mostrar el componente de recuperación
+    const [showRecovery, setShowRecovery] = useState(false);
+    
+    // Verificar el rendimiento de la aplicación
+    useEffect(() => {
+      // Marcar que la app está cargada
+      setAppHealth(prev => ({
+        ...prev,
+        appLoaded: true,
+        lastRenderTime: Date.now(),
+        renderCount: prev.renderCount + 1
+      }));
+      
+      // Sistema de detección y recuperación automática
+      const healthCheck = setInterval(() => {
+        // Comprobar si la aplicación está congelada
+        const now = Date.now();
+        const lastRender = appHealth.lastRenderTime;
+        
+        // Si han pasado más de 20 segundos desde el último render y ha habido errores
+        if (lastRender && (now - lastRender > 20000) && (appHealth.errors.length > 0)) {
+          console.error("⚠️ Aplicación posiblemente congelada - Activando recuperación");
+          setShowRecovery(true);
+          clearInterval(healthCheck);
+        }
+      }, 5000);
+      
+      // Capturar errores globales
+      const errorHandler = (error) => {
+        console.error("Capturado error global:", error);
+        setAppHealth(prev => ({
+          ...prev,
+          errors: [...prev.errors, {
+            message: error.message || "Error desconocido",
+            time: Date.now()
+          }]
+        }));
+        
+        // Si hay muchos errores, mostrar recuperación
+        if (appHealth.errors.length >= 5) {
+          setShowRecovery(true);
+        }
+      };
+      
+      // Suscribirse a eventos de error
+      window.addEventListener('error', errorHandler);
+      window.addEventListener('unhandledrejection', errorHandler);
+      
+      return () => {
+        clearInterval(healthCheck);
+        window.removeEventListener('error', errorHandler);
+        window.removeEventListener('unhandledrejection', errorHandler);
+      };
+    }, [appHealth.errors.length]);
+    
+    // Función para reiniciar la aplicación
+    const handleAppReset = useCallback(() => {
+      localStorage.clear();
+      window.location.href = '/';
+    }, []);
+    
+    // Componente de recuperación de emergencia
+    const EmergencyRecovery = () => (
+      <div className="fixed inset-0 bg-red-800 bg-opacity-50 backdrop-blur-md flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+          <div className="flex items-center justify-center mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-red-700 text-center mb-4">¡Oops! Algo salió mal</h2>
+          <p className="text-gray-700 mb-4">La aplicación está experimentando problemas. Por favor, elija una opción:</p>
+          
+          <div className="space-y-4">
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none"
+            >
+              Recargar la página
+            </button>
+            
+            <button 
+              onClick={handleAppReset}
+              className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none"
+            >
+              Reiniciar aplicación (borra datos locales)
+            </button>
+            
+            <button 
+              onClick={() => setShowRecovery(false)}
+              className="w-full py-2 px-4 border border-gray-300 rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none"
+            >
+              Continuar de todos modos
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+    
     return (
         <ErrorBoundary>
             <SafeAppContainer>
@@ -640,8 +749,12 @@ function App() {
                                 <Route path="/property/:id" element={<PropertyDetail/>} />
                                 <Route path="/subir" element={<ProtectedRoute><SubirPage /></ProtectedRoute>} />
                                 <Route path="/diagnostico" element={<AdminRoute><DiagnosticPage /></AdminRoute>} />
-                                <Route path="*" element={<Navigate to="/" />} />
+                                <Route path="/not-found" element={<NotFound />} />
+                                <Route path="*" element={<Navigate to="/not-found" replace />} />
                             </Routes>
+                            
+                            {/* Componente de recuperación de emergencia */}
+                            {showRecovery && <EmergencyRecovery />}
                         </BrowserRouter>
                     </div>
                 </UserProvider>
