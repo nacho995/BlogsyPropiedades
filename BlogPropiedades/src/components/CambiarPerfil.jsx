@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from "../context/UserContext";
 import useProfileImage from "../hooks/useProfileImage";
+import { syncProfileImageBetweenDevices } from "../services/api";
 
 // Definimos la constante que falta para el fallback de imagen
 const fallbackImageBase64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNlMWUxZTEiLz48dGV4dCB4PSI1MCIgeT0iNTAiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGFsaWdubWVudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZmlsbD0iIzg4OCI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4=';
@@ -166,7 +167,7 @@ export default function CambiarPerfil() {
           
           // Actualizar la imagen usando el hook con la función actualizada
           updateProfileImage(imageData)
-            .then((success) => {
+            .then(async (success) => {
               if (success) {
                 console.log("CambiarPerfil: Imagen actualizada correctamente en toda la aplicación");
                 setSuccess("Imagen actualizada correctamente");
@@ -181,6 +182,23 @@ export default function CambiarPerfil() {
                   refreshUserData().catch(err => 
                     console.warn("Error al actualizar datos de usuario:", err)
                   );
+                }
+                
+                // Sincronizar con la nube para otros dispositivos
+                try {
+                  console.log("Sincronizando imagen con la nube para otros dispositivos...");
+                  const syncResult = await syncProfileImageBetweenDevices(imageData);
+                  
+                  if (syncResult.success) {
+                    console.log("Imagen sincronizada correctamente con la nube");
+                    setSuccess(prev => prev + " (Sincronizada con todos tus dispositivos)");
+                  } else {
+                    console.warn("No se pudo sincronizar la imagen con la nube:", syncResult.error);
+                    // No mostrar error al usuario, ya que la imagen se actualizó localmente
+                  }
+                } catch (syncError) {
+                  console.error("Error al sincronizar imagen con la nube:", syncError);
+                  // No mostrar error al usuario, ya que la imagen se actualizó localmente
                 }
               } else {
                 setError("No se pudo actualizar la imagen correctamente");
@@ -332,24 +350,60 @@ export default function CambiarPerfil() {
         localStorage.setItem('profilePic', data.profilePic);
         localStorage.setItem('profilePic_backup', data.profilePic);
         await updateProfileImage(data.profilePic);
+        
+        // Sincronizar con la nube para otros dispositivos
+        try {
+          console.log("Sincronizando imagen recibida del servidor con la nube para otros dispositivos...");
+          await syncProfileImageBetweenDevices(data.profilePic);
+        } catch (syncError) {
+          console.warn("No se pudo sincronizar la imagen recibida con la nube:", syncError);
+        }
+        
         imageUpdated = true;
       } else if (data?.user?.profilePic && typeof data.user.profilePic === 'string') {
         console.log("📤 Recibida imagen de perfil en user.profilePic:", data.user.profilePic.substring(0, 30) + "...");
         localStorage.setItem('profilePic', data.user.profilePic);
         localStorage.setItem('profilePic_backup', data.user.profilePic);
         await updateProfileImage(data.user.profilePic);
+        
+        // Sincronizar con la nube para otros dispositivos
+        try {
+          console.log("Sincronizando imagen recibida del servidor con la nube...");
+          await syncProfileImageBetweenDevices(data.user.profilePic);
+        } catch (syncError) {
+          console.warn("No se pudo sincronizar la imagen recibida con la nube:", syncError);
+        }
+        
         imageUpdated = true;
       } else if (data?.profileImage?.url && typeof data.profileImage.url === 'string') {
         console.log("📤 Recibida imagen de perfil en profileImage.url:", data.profileImage.url.substring(0, 30) + "...");
         localStorage.setItem('profilePic', data.profileImage.url);
         localStorage.setItem('profilePic_backup', data.profileImage.url);
         await updateProfileImage(data.profileImage.url);
+        
+        // Sincronizar con la nube para otros dispositivos
+        try {
+          console.log("Sincronizando imagen recibida del servidor con la nube...");
+          await syncProfileImageBetweenDevices(data.profileImage.url);
+        } catch (syncError) {
+          console.warn("No se pudo sincronizar la imagen recibida con la nube:", syncError);
+        }
+        
         imageUpdated = true;
       } else if (data?.user?.profileImage?.url && typeof data.user.profileImage.url === 'string') {
         console.log("📤 Recibida imagen de perfil en user.profileImage.url:", data.user.profileImage.url.substring(0, 30) + "...");
         localStorage.setItem('profilePic', data.user.profileImage.url);
         localStorage.setItem('profilePic_backup', data.user.profileImage.url);
         await updateProfileImage(data.user.profileImage.url);
+        
+        // Sincronizar con la nube para otros dispositivos
+        try {
+          console.log("Sincronizando imagen recibida del servidor con la nube...");
+          await syncProfileImageBetweenDevices(data.user.profileImage.url);
+        } catch (syncError) {
+          console.warn("No se pudo sincronizar la imagen recibida con la nube:", syncError);
+        }
+        
         imageUpdated = true;
       }
       
@@ -472,19 +526,6 @@ export default function CambiarPerfil() {
             disabled={loading || profileLoading}
           />
 
-          {profilePic?.file && (
-            <div className="text-center">
-              <button
-                type="button"
-                className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg text-sm transition"
-                onClick={() => navigate("/")}
-                disabled={loading || profileLoading}
-              >
-                Guardar y volver
-              </button>
-            </div>
-          )}
-          
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-blue-100">
               Nombre
@@ -501,18 +542,34 @@ export default function CambiarPerfil() {
           </div>
           
           <div className="flex space-x-4">
-            <button 
-              type="submit" 
-              disabled={loading || profileLoading} 
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {(loading || profileLoading) ? (
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              ) : "Actualizar Perfil"}
-            </button>
+            {!profilePic?.file ? (
+              <button 
+                type="submit" 
+                disabled={loading || profileLoading} 
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {(loading || profileLoading) ? (
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : "Actualizar Perfil"}
+              </button>
+            ) : (
+              <button 
+                type="button" 
+                disabled={loading || profileLoading} 
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => navigate("/")}
+              >
+                {(loading || profileLoading) ? (
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : "Actualizar Perfil"}
+              </button>
+            )}
             
             <button 
               type="button" 

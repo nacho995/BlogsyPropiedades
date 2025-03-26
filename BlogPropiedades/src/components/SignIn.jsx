@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { loginUser, createUser } from "../services/api";
+import { loginUser, createUser, fetchProfileImageFromServer } from "../services/api";
 import { useUser } from "../context/UserContext";
 import toast from "react-hot-toast";
 import { UserContext } from '../context/UserContext';
@@ -302,6 +302,22 @@ const SignIn = ({ isRegistering = false }) => {
                     }
                 }
             }
+
+            // Sincronizar imagen de perfil desde el servidor
+            setTimeout(async () => {
+                try {
+                    console.log("Sincronizando imagen de perfil desde el servidor después del login...");
+                    const imageResult = await fetchProfileImageFromServer();
+                    
+                    if (imageResult.success) {
+                        console.log("Imagen sincronizada correctamente desde el servidor");
+                    } else {
+                        console.warn("No se pudo obtener la imagen del servidor, usando la local si existe");
+                    }
+                } catch (syncError) {
+                    console.error("Error al sincronizar imagen después del login:", syncError);
+                }
+            }, 1000);
         } catch (err) {
             console.error("Error general durante la autenticación:", err);
             setError(err.message || "Error durante la autenticación");

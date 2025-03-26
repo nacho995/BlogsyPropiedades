@@ -1397,3 +1397,150 @@ export const testApiConnection = async () => {
     };
   }
 };
+
+/**
+ * Sincroniza la imagen de perfil con el servidor para permitir sincronización entre dispositivos
+ * @param {string} imageData - Datos de la imagen o URL 
+ * @returns {Promise<Object>} - Resultado de la sincronización
+ */
+export const syncProfileImageBetweenDevices = async (imageData) => {
+  if (!imageData) {
+    console.error("No se proporcionó imagen para sincronizar entre dispositivos");
+    return { success: false, error: "Imagen no proporcionada" };
+  }
+
+  try {
+    // Verificar si hay token disponible
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.warn("No hay token disponible para sincronización entre dispositivos");
+      return { success: false, error: "No hay sesión activa" };
+    }
+
+    console.log("🔄 Iniciando sincronización de imagen entre dispositivos...");
+
+    // Primero guardar localmente (por si falla la petición al servidor)
+    syncProfileImage(imageData);
+
+    // Verificar si la imagen es base64 o URL
+    const isBase64 = imageData.startsWith('data:');
+    
+    let requestBody;
+    let headers = {
+      'Authorization': `Bearer ${token}`
+    };
+    
+    // Si es base64, enviar directamente
+    if (isBase64) {
+      console.log("📤 Enviando imagen base64 al servidor para sincronización entre dispositivos");
+      requestBody = JSON.stringify({ 
+        profilePic: imageData 
+      });
+      headers['Content-Type'] = 'application/json';
+    } 
+    // Si es una URL, enviar la URL
+    else {
+      console.log("📤 Enviando URL de imagen al servidor para sincronización entre dispositivos");
+      requestBody = JSON.stringify({ 
+        profilePicUrl: imageData 
+      });
+      headers['Content-Type'] = 'application/json';
+    }
+
+    // Enviar al servidor para almacenar en la cuenta del usuario
+    const response = await fetch(`${BASE_URL}/user/sync-profile-image`, {
+      method: 'POST',
+      headers,
+      body: requestBody
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error al sincronizar imagen entre dispositivos: ${response.status}`, errorText);
+      
+      // Usar respuesta de error como texto normal si no es JSON
+      try {
+        return { 
+          success: false, 
+          status: response.status,
+          error: JSON.parse(errorText).message || "Error de servidor" 
+        };
+      } catch (e) {
+        return { 
+          success: false, 
+          status: response.status,
+          error: errorText || "Error desconocido" 
+        };
+      }
+    }
+
+    // Procesar respuesta del servidor
+    const data = await response.json();
+    console.log("✅ Imagen sincronizada correctamente entre dispositivos");
+
+    // Registrar timestamp de última sincronización
+    localStorage.setItem('profilePic_lastCloudSync', Date.now().toString());
+
+    return {
+      success: true,
+      ...data
+    };
+  } catch (error) {
+    console.error("Error crítico al sincronizar imagen entre dispositivos:", error);
+    return { 
+      success: false, 
+      error: error.message || "Error desconocido" 
+    };
+  }
+};
+
+/**
+ * Obtener la imagen de perfil desde el servidor (útil al iniciar sesión en un nuevo dispositivo)
+ * @returns {Promise<Object>} - Imagen de perfil desde el servidor
+ */
+export const fetchProfileImageFromServer = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.warn("No hay token disponible para obtener imagen desde servidor");
+      return { success: false, error: "No hay sesión activa" };
+    }
+
+    console.log("🔍 Obteniendo imagen de perfil desde el servidor...");
+
+    const response = await fetch(`${BASE_URL}/user/sync-profile-image`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      console.error(`Error al obtener imagen desde servidor: ${response.status}`);
+      return { success: false, status: response.status, error: "Error al obtener imagen" };
+    }
+
+    const data = await response.json();
+    
+    if (data.profilePic) {
+      console.log("✅ Imagen obtenida del servidor correctamente");
+      
+      // Actualizar localmente
+      syncProfileImage(data.profilePic);
+      
+      return {
+        success: true,
+        profileImage: data.profilePic
+      };
+    } else {
+      console.warn("El servidor no devolvió ninguna imagen de perfil");
+      return { success: false, error: "No hay imagen de perfil en el servidor" };
+    }
+  } catch (error) {
+    console.error("Error al obtener imagen de perfil desde servidor:", error);
+    return { 
+      success: false, 
+      error: error.message || "Error desconocido" 
+    };
+  }
+};
