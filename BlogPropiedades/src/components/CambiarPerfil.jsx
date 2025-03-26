@@ -125,14 +125,21 @@ export default function CambiarPerfil() {
             throw new Error("La imagen procesada no es válida");
           }
           
-          // Guardar primero en localStorage
-          localStorage.setItem('profilePic', imageData);
+          console.log("CambiarPerfil: Imagen cargada desde el ordenador, actualizando...");
           
-          // Actualizar la imagen usando el hook
+          // Actualizar la imagen usando el hook con la función actualizada
           updateProfileImage(imageData)
             .then((success) => {
               if (success) {
+                console.log("CambiarPerfil: Imagen actualizada correctamente en toda la aplicación");
                 setSuccess("Imagen actualizada correctamente");
+                
+                // También actualizar el perfil del usuario si está disponible
+                if (user && refreshUserData) {
+                  refreshUserData().catch(err => 
+                    console.warn("Error al actualizar datos de usuario:", err)
+                  );
+                }
               } else {
                 setError("No se pudo actualizar la imagen correctamente");
               }
@@ -258,10 +265,34 @@ export default function CambiarPerfil() {
 
   // Obtener imagen actual
   const getCurrentImage = useCallback(() => {
+    // Si hay una imagen en vista previa local, usarla
     if (profilePic?.localUrl) return profilePic.localUrl;
-    if (profileImage) return profileImage;
+    
+    // Si hay una imagen en el hook useProfileImage, usarla
+    if (profileImage && profileImage !== fallbackImageBase64) return profileImage;
+    
+    // Buscar directamente en localStorage como último recurso
+    const storedImage = localStorage.getItem('profilePic');
+    if (storedImage && storedImage !== 'undefined' && storedImage !== 'null') {
+      return storedImage;
+    }
+    
+    // Usar la imagen de respaldo si no hay ninguna otra disponible
     return fallbackImageBase64;
   }, [profilePic, profileImage]);
+  
+  // Función para manejar errores al cargar imágenes
+  const onImageError = () => {
+    console.log("Error al cargar la imagen, usando fallback");
+    // Usar el manejador de errores del hook y también actualizar la vista previa local
+    handleImageError();
+    // Si hay una URL local, revocarla para liberar memoria
+    if (profilePic?.localUrl) {
+      URL.revokeObjectURL(profilePic.localUrl);
+    }
+    // Establecer la imagen de perfil como null para que use el fallback
+    setProfilePic(null);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-amber-600 py-12 px-4 sm:px-6 lg:px-8">
@@ -290,7 +321,7 @@ export default function CambiarPerfil() {
                 src={getCurrentImage()} 
                 alt="Vista previa" 
                 className="w-32 h-32 rounded-full object-cover border-4 border-white/30 shadow-lg"
-                onError={handleImageError}
+                onError={onImageError}
               />
               {(loading || profileLoading) && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full">

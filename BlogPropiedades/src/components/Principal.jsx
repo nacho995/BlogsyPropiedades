@@ -40,6 +40,28 @@ const safeApiCall = async (apiFunction, ...args) => {
   }
 };
 
+// Componentes para mostrar "No hay datos"
+const NoDataCard = ({ type, icon }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5 }}
+    className="col-span-full flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-8 text-center"
+  >
+    <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center mb-4">
+      {icon}
+    </div>
+    <h3 className="text-xl font-bold text-blue-800 mb-2">No hay {type} disponibles</h3>
+    <p className="text-gray-600 mb-4">Sé el primero en crear nuevo contenido.</p>
+    <Link 
+      to={type === "blogs" ? "/crear-blog" : "/add-property"} 
+      className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition duration-300"
+    >
+      {type === "blogs" ? "Crear un blog" : "Añadir una propiedad"}
+    </Link>
+  </motion.div>
+);
+
 function Principal() {
   // Obtener estado de autenticación directamente de localStorage
   const token = localStorage.getItem("token");
@@ -60,6 +82,12 @@ function Principal() {
   // Usar el hook de imagen directamente - esto asegura que siempre tengamos una imagen válida
   const { profileImage, handleImageError } = useProfileImage();
   
+  // Forzar actualización de la imagen cuando se monta el componente
+  useEffect(() => {
+    console.log("Principal: Verificando si hay una imagen de perfil guardada");
+    // El hook useProfileImage ya se encarga de cargar la imagen desde localStorage
+  }, []);
+  
   // Obtener datos del usuario
   const { user, isAuthenticated: userAuthenticated, logout } = useUser();
   const navigate = useNavigate(); // Replace useHistory with useNavigate
@@ -78,7 +106,7 @@ function Principal() {
     };
   }, [profileMenuRef]);
 
-  // Modificar la función fetchData para usar lazy loading
+  // Cargar datos de blogs y propiedades
   useEffect(() => {
     let isMounted = true;
     
@@ -95,7 +123,6 @@ function Principal() {
         // Realizar prueba de conexión a la API primero
         console.log("Probando conexión a la API...");
         const apiTest = await safeApiCall(apis.testApiConnection);
-        console.log("Resultados de prueba de API:", apiTest);
         
         // Actualizar estado basado en resultados de la prueba
         if (apiTest.error) {
@@ -109,128 +136,22 @@ function Principal() {
           console.error("API devolvió códigos de estado incorrectos:", apiTest);
         }
         
+        // Intentar obtener blogs
         try {
-          console.log("Intentando obtener blogs...");
           blogsData = await safeApiCall(apis.getBlogPosts);
-          console.log("Blogs obtenidos:", blogsData);
+          console.log(`Se obtuvieron ${blogsData?.length || 0} blogs`);
         } catch (error) {
           console.error("Error al cargar blogs:", error);
-          blogsData = []; // Usar array vacío en caso de error
+          blogsData = [];
         }
         
+        // Intentar obtener propiedades
         try {
-          console.log("Intentando obtener propiedades...");
           propertiesData = await safeApiCall(apis.getPropertyPosts);
-          console.log("Propiedades obtenidas:", propertiesData);
+          console.log(`Se obtuvieron ${propertiesData?.length || 0} propiedades`);
         } catch (error) {
           console.error("Error al cargar propiedades:", error);
-          propertiesData = []; // Usar array vacío en caso de error
-        }
-        
-        // Si no hay datos de la API, usar datos de ejemplo para demostración
-        if (blogsData.length === 0) {
-          console.log("Usando datos de ejemplo para blogs");
-          blogsData = [
-            {
-              id: "mock-blog-1",
-              title: "Las tendencias inmobiliarias para 2025",
-              description: "Descubre las nuevas tendencias que definirán el mercado inmobiliario en los próximos años.",
-              content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-              category: "Tendencias",
-              author: "María García",
-              readTime: "7",
-              createdAt: new Date().toISOString(),
-              image: {
-                src: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1000",
-                alt: "Tendencias inmobiliarias"
-              }
-            },
-            {
-              id: "mock-blog-2",
-              title: "Cómo preparar tu casa para venderla",
-              description: "Consejos prácticos para preparar tu vivienda antes de ponerla en venta en el mercado.",
-              content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-              category: "Consejos",
-              author: "Carlos Rodríguez",
-              readTime: "5",
-              createdAt: new Date().toISOString(),
-              image: {
-                src: "https://images.unsplash.com/photo-1582268611958-ebfd161ef9cf?q=80&w=1000",
-                alt: "Casa en venta"
-              }
-            },
-            {
-              id: "mock-blog-3",
-              title: "Inversión en propiedades: Guía para principiantes",
-              description: "Todo lo que necesitas saber para comenzar a invertir en el mercado inmobiliario con éxito.",
-              content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-              category: "Inversión",
-              author: "Ana Martínez",
-              readTime: "10",
-              createdAt: new Date().toISOString(),
-              image: {
-                src: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=1000",
-                alt: "Inversión inmobiliaria"
-              }
-            }
-          ];
-        }
-        
-        if (propertiesData.length === 0) {
-          console.log("Usando datos de ejemplo para propiedades");
-          propertiesData = [
-            {
-              id: "mock-property-1",
-              title: "Piso de lujo en el centro de Madrid",
-              description: "Espectacular piso reformado en pleno centro con acabados de alta calidad y vistas panorámicas.",
-              price: 450000,
-              bedrooms: 3,
-              bathrooms: 2,
-              area: 120,
-              location: "Madrid, Centro",
-              status: "En venta",
-              images: [
-                {
-                  src: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=1000",
-                  alt: "Exterior de la propiedad"
-                }
-              ]
-            },
-            {
-              id: "mock-property-2",
-              title: "Chalet independiente con piscina",
-              description: "Espectacular chalet con amplio jardín, piscina privada y zona de barbacoa en urbanización exclusiva.",
-              price: 750000,
-              bedrooms: 5,
-              bathrooms: 3,
-              area: 280,
-              location: "Las Rozas, Madrid",
-              status: "En venta",
-              images: [
-                {
-                  src: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?q=80&w=1000",
-                  alt: "Chalet con piscina"
-                }
-              ]
-            },
-            {
-              id: "mock-property-3",
-              title: "Apartamento moderno en zona exclusiva",
-              description: "Apartamento de diseño con amplias terrazas y zonas comunes premium con piscina y gimnasio.",
-              price: 325000,
-              bedrooms: 2,
-              bathrooms: 2,
-              area: 95,
-              location: "Chamberí, Madrid",
-              status: "En venta",
-              images: [
-                {
-                  src: "https://images.unsplash.com/photo-1493809842364-78817add7ffb?q=80&w=1000",
-                  alt: "Interior del apartamento"
-                }
-              ]
-            }
-          ];
+          propertiesData = [];
         }
         
         if (isMounted) {
@@ -310,19 +231,11 @@ function Principal() {
     console.log("Cerrando sesión...");
     
     try {
-      // Usar el método de logout del contexto
       logout(true);
     } catch (error) {
       console.error("Error durante el cierre de sesión:", error);
-      
-      // Fallback: limpiar manualmente localStorage y redireccionar
-      try {
-        localStorage.clear(); // Limpiar todo para prevenir problemas
-        navigate('/login');
-      } catch (e) {
-        console.error("Error en el fallback de cierre de sesión:", e);
-        window.location.href = '/login';
-      }
+      localStorage.clear();
+      navigate('/login');
     }
   };
 
@@ -428,216 +341,168 @@ function Principal() {
   };
 
   // Datos filtrados para mostrar solo los primeros 3 elementos
-  const topBlogs = useMemo(() => {
-    return blogs.slice(0, 3);
-  }, [blogs]);
-
-  const topProperties = useMemo(() => {
-    return properties.slice(0, 3);
-  }, [properties]);
+  const topBlogs = useMemo(() => blogs.slice(0, 3), [blogs]);
+  const topProperties = useMemo(() => properties.slice(0, 3), [properties]);
 
   // Renderizar la interfaz principal
   return (
     <motion.div 
-      className="min-h-screen bg-gradient-to-br from-blue-700 via-blue-400 to-white"
+      className="min-h-screen bg-gradient-to-b from-blue-900 via-blue-700 to-blue-50"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      {/* Header mejorado con colores azules */}
-      <header className="bg-gradient-to-r from-blue-800 to-blue-600 shadow-lg">
-        <div className="container mx-auto px-6 py-6 flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-white">
-            <span className="text-yellow-300">Blog</span> de Propiedades
-          </h1>
-          
-          {/* Indicador de estado de API */}
-          {apiStatus.testing && (
-            <div className="absolute top-2 right-2 bg-blue-900 text-white text-xs px-2 py-1 rounded-full flex items-center">
-              <div className="w-2 h-2 rounded-full bg-yellow-300 mr-1 animate-pulse"></div>
-              Probando API...
-            </div>
-          )}
-          {!apiStatus.testing && apiStatus.status === 'conectado' && (
-            <div className="absolute top-2 right-2 bg-green-700 text-white text-xs px-2 py-1 rounded-full flex items-center">
-              <div className="w-2 h-2 rounded-full bg-green-300 mr-1"></div>
-              API conectada
-            </div>
-          )}
-          {!apiStatus.testing && apiStatus.status === 'error' && (
-            <div className="absolute top-2 right-2 bg-red-700 text-white text-xs px-2 py-1 rounded-full flex items-center">
-              <div className="w-2 h-2 rounded-full bg-red-300 mr-1"></div>
-              Error de conexión
-            </div>
-          )}
-          
-          <div className="flex items-center space-x-4">
-            {!isAuthenticated ? (
-              <div className="flex space-x-2">
-                <Link to="/login" className="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-blue-900 font-semibold rounded-md transition duration-200">
-                  Iniciar Sesión
+      {/* Hero Section con Efecto Parallax */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-blue-900 opacity-80"></div>
+        
+        {/* Patrón de fondo creativo */}
+        <div className="absolute inset-0 opacity-10">
+          <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                <path d="M 0 10 L 40 10 M 10 0 L 10 40" stroke="white" strokeWidth="0.5" fill="none" />
+              </pattern>
+              <pattern id="dots" width="20" height="20" patternUnits="userSpaceOnUse">
+                <circle cx="10" cy="10" r="1.5" fill="white" />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#grid)" />
+            <rect width="100%" height="100%" fill="url(#dots)" />
+          </svg>
+        </div>
+        
+        {/* Contenido del hero */}
+        <div className="relative container mx-auto px-6 pt-24 pb-16 z-10">
+          {isAuthenticated ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.7 }}
+              className="flex flex-col md:flex-row items-center gap-8"
+            >
+              {/* Imagen de perfil con efecto de animación */}
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full opacity-50 blur-md animate-pulse"></div>
+                <div className="relative z-10">
+                  <img 
+                    src={profileImage} 
+                    alt="Perfil"
+                    className="h-28 w-28 md:h-36 md:w-36 rounded-full border-4 border-white object-cover shadow-lg"
+                    onError={handleImageError}
+                  />
+                </div>
+                <Link 
+                  to="/cambiar-perfil"
+                  className="absolute bottom-0 right-0 bg-yellow-400 rounded-full p-2 shadow-lg hover:bg-yellow-500 transition-colors z-20"
+                  title="Editar perfil"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
                 </Link>
-                <Link to="/register" className="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-900 font-semibold rounded-md transition duration-200">
+              </div>
+              
+              {/* Texto de bienvenida personalizado */}
+              <div className="text-center md:text-left">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.4, duration: 0.6 }}
+                >
+                  <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-white mb-2">
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200">¡Bienvenido</span>
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-100">, {name || 'Usuario'}!</span>
+                  </h1>
+                  <p className="mt-4 text-lg md:text-xl text-blue-100">
+                    ¿Qué te gustaría hacer hoy? Explora o crea nuevo contenido y administra tus publicaciones
+                  </p>
+                  
+                  <div className="mt-8 flex flex-wrap justify-center md:justify-start gap-3">
+                    <Link to="/crear-blog" className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+                      <span className="flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Crear nuevo blog
+                      </span>
+                    </Link>
+                    <Link to="/add-property" className="px-6 py-3 bg-yellow-400 hover:bg-yellow-500 text-blue-900 font-medium rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+                      <span className="flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                        </svg>
+                        Añadir propiedad
+                      </span>
+                    </Link>
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.7 }}
+              className="text-center max-w-3xl mx-auto"
+            >
+              <h1 className="text-3xl md:text-5xl font-extrabold text-white mb-6">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200">
+                  Blog de Propiedades
+                </span>
+              </h1>
+              <p className="text-xl text-blue-100 mb-8">
+                Tu portal para descubrir y compartir contenido inmobiliario de calidad.
+              </p>
+              <div className="flex flex-wrap justify-center gap-4">
+                <Link to="/login" className="px-8 py-3 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+                  Iniciar sesión
+                </Link>
+                <Link to="/register" className="px-8 py-3 bg-yellow-400 hover:bg-yellow-500 text-blue-900 font-medium rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
                   Registrarse
                 </Link>
               </div>
-            ) : (
-              <div className="flex items-center space-x-3">
-                <div className="relative" ref={profileMenuRef}>
-                  <img 
-                    src={profileImage} 
-                    alt="Perfil" 
-                    className="h-14 w-14 rounded-full border-3 border-yellow-300 object-cover shadow-lg cursor-pointer" 
-                    onError={handleImageError}
-                    onClick={() => setShowProfileMenu(!showProfileMenu)}
-                    title="Haz clic para opciones de perfil"
-                  />
-                  
-                  {/* Menú desplegable */}
-                  {showProfileMenu && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
-                      <div className="px-4 py-2 border-b border-gray-100">
-                        <p className="text-sm font-medium text-gray-700">Hola, {name || 'Usuario'}</p>
-                      </div>
-                      <Link 
-                        to="/profile/edit" 
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 flex items-center"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        Cambiar mi perfil
-                      </Link>
-                      <button 
-                        onClick={handleLogout}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-red-50 flex items-center"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        Cerrar sesión
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-white font-medium">Hola, {name || 'Usuario'}</span>
-                </div>
-              </div>
-            )}
-          </div>
+            </motion.div>
+          )}
         </div>
-      </header>
+      </div>
 
-      {/* Sección de bienvenida personalizada */}
+      {/* Sección de Tablero - Accesos rápidos */}
       {isAuthenticated && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.6 }}
-          className="container mx-auto px-4 sm:px-6 py-6 sm:py-10"
+          transition={{ delay: 0.3, duration: 0.6 }}
+          className="container mx-auto px-6 py-8"
         >
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-4 sm:p-6 md:p-8 flex flex-col md:flex-row items-center gap-6">
-            <div className="relative">
-              <img 
-                src={profileImage} 
-                alt="Perfil" 
-                className="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 rounded-full border-4 border-blue-500 object-cover shadow-lg" 
-                onError={handleImageError}
-              />
-              <Link 
-                to="/profile/edit"
-                className="absolute -bottom-2 -right-2 bg-yellow-400 rounded-full p-1.5 sm:p-2 shadow-md hover:bg-yellow-500 transition-colors"
-                title="Editar mi perfil"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-6 sm:w-6 text-blue-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl p-6 text-white shadow-lg flex flex-col items-center md:items-start text-center md:text-left hover:shadow-xl transition-shadow">
+              <div className="bg-blue-600 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
                 </svg>
+              </div>
+              <h3 className="text-xl font-bold mb-2">Gestionar Blogs</h3>
+              <p className="mb-4">Administra tus publicaciones, edita contenido y crea nuevos artículos.</p>
+              <Link to="/ver-blogs" className="mt-auto px-4 py-2 bg-white text-blue-700 font-medium rounded-lg hover:bg-blue-50 transition-colors">
+                Ver blogs
               </Link>
             </div>
-            <div className="text-center md:text-left mt-4 md:mt-0">
-              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-blue-800 mb-2">
-                ¡Bienvenido a tu espacio creativo, <span className="text-blue-600">{name || 'Usuario'}!</span>
-              </h2>
-              <p className="text-gray-600 text-sm sm:text-base md:text-lg">
-                Desde aquí podrás gestionar tus blogs y propiedades. ¿Qué te gustaría hacer hoy?
-              </p>
-              <div className="flex flex-wrap justify-center md:justify-start gap-2 sm:gap-3 mt-4">
-                <Link to="/crear-blog" className="px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium rounded-md transition duration-200">
-                  Crear nuevo blog
-                </Link>
-                <Link to="/add-property" className="px-3 py-1.5 sm:px-4 sm:py-2 bg-yellow-400 hover:bg-yellow-500 text-blue-900 text-xs sm:text-sm font-medium rounded-md transition duration-200">
-                  Añadir propiedad
-                </Link>
-                <Link to="/profile/edit" className="px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs sm:text-sm font-medium rounded-md transition duration-200 flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-5 sm:w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  Editar mi perfil
-                </Link>
+            
+            <div className="bg-gradient-to-br from-yellow-400 to-amber-500 rounded-xl p-6 text-blue-900 shadow-lg flex flex-col items-center md:items-start text-center md:text-left hover:shadow-xl transition-shadow">
+              <div className="bg-yellow-500 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
               </div>
+              <h3 className="text-xl font-bold mb-2">Gestionar Propiedades</h3>
+              <p className="mb-4">Administra tus propiedades, actualiza información y añade nuevos inmuebles.</p>
+              <Link to="/propiedades" className="mt-auto px-4 py-2 bg-white text-yellow-700 font-medium rounded-lg hover:bg-yellow-50 transition-colors">
+                Ver propiedades
+              </Link>
             </div>
           </div>
         </motion.div>
-      )}
-
-      {/* Banner principal con efecto parallax - solo para visitantes no autenticados */}
-      {!isAuthenticated && (
-        <div className="relative bg-blue-800 overflow-hidden">
-          <div className="absolute inset-0 opacity-20 bg-pattern-blueprint"></div>
-          <div className="container mx-auto px-6 py-20 relative z-10">
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.8 }}
-              className="max-w-3xl"
-            >
-              <h2 className="text-4xl md:text-5xl font-bold text-white leading-tight">
-                Descubre las mejores propiedades y consejos inmobiliarios
-              </h2>
-              <p className="mt-6 text-xl text-blue-100">
-                Tu fuente de información sobre el mercado inmobiliario, tendencias y oportunidades de inversión.
-              </p>
-              <div className="mt-8 flex flex-wrap gap-4">
-                <Link to="/blogs" className="px-6 py-3 bg-yellow-400 hover:bg-yellow-500 text-blue-900 font-bold rounded-md shadow-lg hover:shadow-xl transition duration-300">
-                  Explorar Blogs
-                </Link>
-                <Link to="/properties" className="px-6 py-3 bg-transparent hover:bg-blue-700 text-white border-2 border-white font-bold rounded-md hover:shadow-lg transition duration-300">
-                  Ver Propiedades
-                </Link>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      )}
-      
-      {/* Contenedor principal para usuarios autenticados */}
-      {isAuthenticated && (
-        <div className="container mx-auto px-4 sm:px-6 py-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-10">
-            <Link to="/blogs" className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-4 sm:p-6 flex flex-col items-center justify-center hover:shadow-xl transition-all duration-300 border-l-4 border-blue-600">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 sm:h-16 sm:w-16 text-blue-600 mb-3 sm:mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-              </svg>
-              <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-blue-800 mb-2">Gestionar Blogs</h3>
-              <p className="text-gray-600 text-sm text-center">Administra tus publicaciones, edita contenido y crea nuevos artículos.</p>
-              <span className="mt-3 sm:mt-4 px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium rounded-md transition duration-200">
-                Ver mis blogs
-              </span>
-            </Link>
-            
-            <Link to="/properties" className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-4 sm:p-6 flex flex-col items-center justify-center hover:shadow-xl transition-all duration-300 border-l-4 border-yellow-500">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 sm:h-16 sm:w-16 text-yellow-500 mb-3 sm:mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
-              <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-blue-800 mb-2">Gestionar Propiedades</h3>
-              <p className="text-gray-600 text-sm text-center">Administra tus propiedades, actualiza la información y añade nuevos inmuebles.</p>
-              <span className="mt-3 sm:mt-4 px-3 py-1.5 sm:px-4 sm:py-2 bg-yellow-400 hover:bg-yellow-500 text-blue-900 text-xs sm:text-sm font-medium rounded-md transition duration-200">
-                Ver mis propiedades
-              </span>
-            </Link>
-          </div>
-        </div>
       )}
 
       {/* Sección de blogs destacados */}
@@ -649,9 +514,18 @@ function Principal() {
           </div>
           
           {loading ? (
-            <div className="flex justify-center">
+            <div className="flex justify-center py-12">
               <div className="spinner"></div>
             </div>
+          ) : blogs.length === 0 ? (
+            <NoDataCard 
+              type="blogs" 
+              icon={
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              } 
+            />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {topBlogs.map((blog) => (
@@ -700,11 +574,13 @@ function Principal() {
             </div>
           )}
           
-          <div className="text-center mt-10">
-            <Link to="/blogs" className="inline-block px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-md shadow-md hover:shadow-lg transition duration-300">
-              Ver todos los blogs
-            </Link>
-          </div>
+          {blogs.length > 0 && (
+            <div className="text-center mt-10">
+              <Link to="/ver-blogs" className="inline-block px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-md shadow-md hover:shadow-lg transition duration-300">
+                Ver todos los blogs
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 
@@ -717,9 +593,18 @@ function Principal() {
           </div>
           
           {loading ? (
-            <div className="flex justify-center">
+            <div className="flex justify-center py-12">
               <div className="spinner"></div>
             </div>
+          ) : properties.length === 0 ? (
+            <NoDataCard 
+              type="propiedades" 
+              icon={
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+              } 
+            />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {topProperties.map((property) => (
@@ -788,36 +673,18 @@ function Principal() {
             </div>
           )}
           
-          <div className="text-center mt-10">
-            <Link to="/properties" className="inline-block px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-md shadow-md hover:shadow-lg transition duration-300">
-              Ver todas las propiedades
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Sección de llamada a la acción */}
-      <section className="py-20 bg-gradient-to-r from-blue-600 to-blue-800 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0 bg-repeat" style={{ backgroundImage: "url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMiIgZmlsbC1ydWxlPSJldmVub2RkIj48Y2lyY2xlIGN4PSIzIiBjeT0iMyIgcj0iMyIvPjxjaXJjbGUgY3g9IjEzIiBjeT0iMTMiIHI9IjMiLz48L2c+PC9zdmc+')" }}></div>
-        </div>
-        <div className="container mx-auto px-6 relative z-10">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-3xl font-bold text-white leading-tight mb-6">
-              ¿Buscas asesoramiento inmobiliario profesional?
-            </h2>
-            <p className="text-xl text-blue-100 mb-8">
-              Nuestro equipo de expertos está listo para ayudarte a encontrar la propiedad perfecta o a vender tu inmueble al mejor precio.
-            </p>
-            <Link to="/contact" className="inline-block px-8 py-4 bg-yellow-400 hover:bg-yellow-500 text-blue-900 font-bold rounded-md shadow-lg hover:shadow-xl transition duration-300">
-              Contactar ahora
-            </Link>
-          </div>
+          {properties.length > 0 && (
+            <div className="text-center mt-10">
+              <Link to="/propiedades" className="inline-block px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-md shadow-md hover:shadow-lg transition duration-300">
+                Ver todas las propiedades
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 
       {/* Footer mejorado */}
-      <footer className="bg-blue-900 text-white py-10">
+      <footer className="bg-blue-900 text-white py-12">
         <div className="container mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
@@ -825,37 +692,37 @@ function Principal() {
                 <span className="text-yellow-300">Blog</span> de Propiedades
               </h3>
               <p className="text-blue-200">
-                Tu fuente confiable de información inmobiliaria y propiedades destacadas.
+                Tu plataforma de gestión inmobiliaria y publicación de contenido especializado.
               </p>
             </div>
             <div>
               <h4 className="font-bold mb-4">Enlaces Rápidos</h4>
               <ul className="space-y-2">
-                <li><Link to="/blogs" className="text-blue-200 hover:text-yellow-300 transition">Blogs</Link></li>
-                <li><Link to="/properties" className="text-blue-200 hover:text-yellow-300 transition">Propiedades</Link></li>
-                <li><Link to="/about" className="text-blue-200 hover:text-yellow-300 transition">Sobre Nosotros</Link></li>
-                <li><Link to="/contact" className="text-blue-200 hover:text-yellow-300 transition">Contacto</Link></li>
+                <li><Link to="/ver-blogs" className="text-blue-200 hover:text-yellow-300 transition">Blogs</Link></li>
+                <li><Link to="/propiedades" className="text-blue-200 hover:text-yellow-300 transition">Propiedades</Link></li>
+                {isAuthenticated && (
+                  <>
+                    <li><Link to="/crear-blog" className="text-blue-200 hover:text-yellow-300 transition">Crear Blog</Link></li>
+                    <li><Link to="/add-property" className="text-blue-200 hover:text-yellow-300 transition">Añadir Propiedad</Link></li>
+                  </>
+                )}
               </ul>
             </div>
             <div>
-              <h4 className="font-bold mb-4">Síguenos</h4>
-              <div className="flex space-x-4">
-                <a href="https://facebook.com" className="bg-blue-800 hover:bg-blue-700 h-10 w-10 rounded-full flex items-center justify-center transition">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z"></path>
-                  </svg>
-                </a>
-                <a href="https://twitter.com" className="bg-blue-800 hover:bg-blue-700 h-10 w-10 rounded-full flex items-center justify-center transition">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M8.29 20.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.012-.53A8.348 8.348 0 0022 5.92a8.19 8.19 0 01-2.357.646 4.118 4.118 0 001.804-2.27 8.224 8.224 0 01-2.605.996 4.107 4.107 0 00-6.993 3.743 11.65 11.65 0 01-8.457-4.287 4.106 4.106 0 001.27 5.477A4.072 4.072 0 012.8 9.713v.052a4.105 4.105 0 003.292 4.022 4.095 4.095 0 01-1.853.07 4.108 4.108 0 003.834 2.85A8.233 8.233 0 012 18.407a11.616 11.616 0 006.29 1.84"></path>
-                  </svg>
-                </a>
-                <a href="https://instagram.com" className="bg-blue-800 hover:bg-blue-700 h-10 w-10 rounded-full flex items-center justify-center transition">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path fillRule="evenodd" d="M12.315 2c2.43 0 2.784.013 3.808.06 1.064.049 1.791.218 2.427.465a4.902 4.902 0 011.772 1.153 4.902 4.902 0 011.153 1.772c.247.636.416 1.363.465 2.427.048 1.067.06 1.407.06 4.123v.08c0 2.643-.012 2.987-.06 4.043-.049 1.064-.218 1.791-.465 2.427a4.902 4.902 0 01-1.153 1.772 4.902 4.902 0 01-1.772 1.153c-.636.247-1.363.416-2.427.465-1.067.048-1.407.06-4.123.06h-.08c-2.643 0-2.987-.012-4.043-.06-1.064-.049-1.791-.218-2.427-.465a4.902 4.902 0 01-1.772-1.153 4.902 4.902 0 01-1.153-1.772c-.247-.636-.416-1.363-.465-2.427-.047-1.024-.06-1.379-.06-3.808v-.63c0-2.43.013-2.784.06-3.808.049-1.064.218-1.791.465-2.427a4.902 4.902 0 011.153-1.772A4.902 4.902 0 015.45 2.525c.636-.247 1.363-.416 2.427-.465C8.901 2.013 9.256 2 11.685 2h.63zm-.081 1.802h-.468c-2.456 0-2.784.011-3.807.058-.975.045-1.504.207-1.857.344-.467.182-.8.398-1.15.748-.35.35-.566.683-.748 1.15-.137.353-.3.882-.344 1.857-.047 1.023-.058 1.351-.058 3.807v.468c0 2.456.011 2.784.058 3.807.045.975.207 1.504.344 1.857.182.466.399.8.748 1.15.35.35.683.566 1.15.748.353.137.882.3 1.857.344 1.054.048 1.37.058 4.041.058h.08c2.597 0 2.917-.01 3.96-.058.976-.045 1.505-.207 1.858-.344.466-.182.8-.398 1.15-.748.35-.35.566-.683.748-1.15.137-.353.3-.882.344-1.857.048-1.055.058-1.37.058-4.041v-.08c0-2.597-.01-2.917-.058-3.96-.045-.976-.207-1.505-.344-1.858a3.097 3.097 0 00-.748-1.15 3.098 3.098 0 00-1.15-.748c-.353-.137-.882-.3-1.857-.344-1.023-.047-1.351-.058-3.807-.058zM12 6.865a5.135 5.135 0 110 10.27 5.135 5.135 0 010-10.27zm0 1.802a3.333 3.333 0 100 6.666 3.333 3.333 0 000-6.666zm5.338-3.205a1.2 1.2 0 110 2.4 1.2 1.2 0 010-2.4z" clipRule="evenodd"></path>
-                  </svg>
-                </a>
-              </div>
+              <h4 className="font-bold mb-4">Cuenta</h4>
+              <ul className="space-y-2">
+                {isAuthenticated ? (
+                  <>
+                    <li><Link to="/cambiar-perfil" className="text-blue-200 hover:text-yellow-300 transition">Mi Perfil</Link></li>
+                    <li><button onClick={handleLogout} className="text-blue-200 hover:text-yellow-300 transition">Cerrar Sesión</button></li>
+                  </>
+                ) : (
+                  <>
+                    <li><Link to="/login" className="text-blue-200 hover:text-yellow-300 transition">Iniciar Sesión</Link></li>
+                    <li><Link to="/register" className="text-blue-200 hover:text-yellow-300 transition">Registrarse</Link></li>
+                  </>
+                )}
+              </ul>
             </div>
           </div>
           <div className="border-t border-blue-800 mt-8 pt-8 text-center text-blue-300 text-sm">
@@ -866,13 +733,10 @@ function Principal() {
 
       {/* Estilos adicionales para spinner y efectos */}
       <style jsx="true">{`
-        .bg-pattern-blueprint {
-          background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.15'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-        }
         .spinner {
-          border: 4px solid rgba(0, 0, 0, 0.1);
-          width: 36px;
-          height: 36px;
+          border: 4px solid rgba(59, 130, 246, 0.2);
+          width: 40px;
+          height: 40px;
           border-radius: 50%;
           border-left-color: #3B82F6;
           animation: spin 1s linear infinite;

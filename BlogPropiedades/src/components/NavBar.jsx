@@ -33,6 +33,25 @@ export default function Navbar({ showOnlyAuth = false }) {
   // Usar el hook de imagen directamente - esto asegura que siempre tengamos una imagen válida
   const { profileImage, handleImageError, fallbackImageBase64 } = useProfileImage();
   
+  // Forzar la actualización de la imagen cuando cambia el usuario
+  useEffect(() => {
+    // Si no hay usuario, no hacemos nada
+    if (!user) return;
+    
+    // Intentar cargar la imagen del localStorage cuando hay usuario
+    try {
+      const storedImage = localStorage.getItem('profilePic');
+      if (storedImage && storedImage !== 'undefined' && storedImage !== 'null') {
+        // No necesitamos hacer nada, el hook se encargará de esto
+        console.log("NavBar: Imagen de perfil disponible para", user.name || user.email);
+      } else {
+        console.log("NavBar: No hay imagen de perfil para el usuario actual");
+      }
+    } catch (error) {
+      console.error("Error al verificar imagen en NavBar:", error);
+    }
+  }, [user]);
+  
   // Verificar token expirado
   useEffect(() => {
     const token = localStorage.getItem('token');
