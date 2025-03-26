@@ -2,8 +2,7 @@
 /**
  * Servicios de API para la aplicación
  * 
- * Este archivo se conecta directamente al backend HTTP sin proxies CORS
- * Permite el acceso directo incluso desde frontend HTTPS (contenido mixto)
+ * Este archivo se conecta directamente al backend HTTPS
  */
 
 // Importar utilidades
@@ -17,10 +16,10 @@ import {
   FALLBACK_API
 } from '../utils/envConfig';
 
-// Determinar si estamos usando HTTPS (solo para registro)
+// Determinar si estamos usando HTTPS
 const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
-// Usar la API con HTTP directamente - Sin proxies CORS
+// Usar la API con HTTPS
 const BASE_URL = API_URL;
 const API_BASE_URL = API_URL;
 
@@ -37,12 +36,12 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 // Función para manejar errores con límite de intentos
 export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
   try {
-    // Construir la URL completa - Siempre en HTTP
+    // Construir la URL completa - Siempre en HTTPS
     let url = combineUrls(BASE_URL, endpoint.startsWith('/') ? endpoint : `/${endpoint}`);
     
-    // Asegurar que siempre sea HTTP para el backend
-    if (url.startsWith('https://')) {
-      url = url.replace('https://', 'http://');
+    // Asegurar que siempre sea HTTPS para el backend
+    if (url.startsWith('http://')) {
+      url = url.replace('http://', 'https://');
     }
     
     console.log(`🔄 Enviando solicitud directa a: ${url}`);
@@ -69,7 +68,7 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
         ...options.headers
       },
       mode: 'cors',
-      credentials: 'omit' // Omitir credenciales para evitar problemas de CORS
+      credentials: 'include' // Incluir credenciales para CORS
     };
     
     // Agregar cuerpo si existe
