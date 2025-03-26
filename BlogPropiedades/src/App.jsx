@@ -17,7 +17,6 @@ import PropertyCreation from './components/addProperties';
 import PropertyDetail from './components/PropertyDetail';
 import SubirPage from './components/SubirPage';
 import DiagnosticPage from './components/DiagnosticPage';
-import Footer from './components/Footer';
 import NotFound from './components/NotFound';
 
 // Detección de ciclos de renderizado
