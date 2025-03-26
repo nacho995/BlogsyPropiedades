@@ -3,11 +3,65 @@
  * para prevenir errores TDZ (Temporal Dead Zone)
  */
 
-const fs = require('fs');
-const path = require('path');
+import { writeFileSync, existsSync, readFileSync } from 'fs';
+import { resolve, basename } from 'path';
 
-// Exportar el plugin
-module.exports = function viteTDZFix() {
+/**
+ * Transformar código para prevenir errores TDZ
+ */
+function preventTDZErrors(code) {
+  // 1. Sustituir declaraciones let/const por var 
+  // para variables problemáticas como 'y', 'b', etc.
+  let modifiedCode = code
+    .replace(/\b(let|const)\s+(y|b|wi|Fp)\b/g, 'var $2')
+    
+    // 2. Añadir verificación para evitar sobrescritura
+    .replace(/\bexport\s+(let|const|var)\s+(y|b|wi|Fp)\b/g, 
+             'export var $2 = (typeof window !== "undefined" && window.$2) || ')
+             
+    // 3. Mover las inicializaciones antes de la declaración
+    .replace(/(\bfunction\b.*?\{)/g, '$1\n  var y,b,wi,Fp;\n')
+    
+    // 4. Añadir try-catch alrededor de código potencialmente problemático
+    .replace(/(\bimport\s+.+\s+from\s+['"].+['"];?)/g, 
+             'try { $1 } catch(e) { console.error("Error en import:", e); }');
+  
+  return modifiedCode;
+}
+
+/**
+ * Registrar archivos modificados para debug
+ */
+function logFileModification(filePath) {
+  try {
+    const logFile = resolve(process.cwd(), 'tdz-fix-log.json');
+    let log = [];
+    
+    // Cargar log existente si existe
+    if (existsSync(logFile)) {
+      log = JSON.parse(readFileSync(logFile, 'utf8'));
+    }
+    
+    // Añadir entrada
+    log.push({
+      file: basename(filePath),
+      time: new Date().toISOString()
+    });
+    
+    // Limitar a 100 entradas
+    if (log.length > 100) {
+      log = log.slice(-100);
+    }
+    
+    // Guardar log
+    writeFileSync(logFile, JSON.stringify(log, null, 2));
+  } catch (error) {
+    console.error('Error al registrar modificación de archivo:', error);
+  }
+}
+
+// Exportar el plugin (usando sintaxis de módulos ES)
+export default function viteTDZFix() {
   return {
     name: 'vite-plugin-tdz-fix',
     
@@ -63,58 +117,4 @@ module.exports = function viteTDZFix() {
       return html.replace('<head>', '<head>' + scriptToInject);
     }
   };
-};
-
-/**
- * Transformar código para prevenir errores TDZ
- */
-function preventTDZErrors(code) {
-  // 1. Sustituir declaraciones let/const por var 
-  // para variables problemáticas como 'y', 'b', etc.
-  let modifiedCode = code
-    .replace(/\b(let|const)\s+(y|b|wi|Fp)\b/g, 'var $2')
-    
-    // 2. Añadir verificación para evitar sobrescritura
-    .replace(/\bexport\s+(let|const|var)\s+(y|b|wi|Fp)\b/g, 
-             'export var $2 = (typeof window !== "undefined" && window.$2) || ')
-             
-    // 3. Mover las inicializaciones antes de la declaración
-    .replace(/(\bfunction\b.*?\{)/g, '$1\n  var y,b,wi,Fp;\n')
-    
-    // 4. Añadir try-catch alrededor de código potencialmente problemático
-    .replace(/(\bimport\s+.+\s+from\s+['"].+['"];?)/g, 
-             'try { $1 } catch(e) { console.error("Error en import:", e); }');
-  
-  return modifiedCode;
-}
-
-/**
- * Registrar archivos modificados para debug
- */
-function logFileModification(filePath) {
-  try {
-    const logFile = path.resolve(__dirname, '../tdz-fix-log.json');
-    let log = [];
-    
-    // Cargar log existente si existe
-    if (fs.existsSync(logFile)) {
-      log = JSON.parse(fs.readFileSync(logFile, 'utf8'));
-    }
-    
-    // Añadir entrada
-    log.push({
-      file: path.basename(filePath),
-      time: new Date().toISOString()
-    });
-    
-    // Limitar a 100 entradas
-    if (log.length > 100) {
-      log = log.slice(-100);
-    }
-    
-    // Guardar log
-    fs.writeFileSync(logFile, JSON.stringify(log, null, 2));
-  } catch (error) {
-    console.error('Error al registrar modificación de archivo:', error);
-  }
 } 

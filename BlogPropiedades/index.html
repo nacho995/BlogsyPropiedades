@@ -36,12 +36,13 @@
     </script>
     
     <!-- Precargar scripts de inicialización -->
+    <link rel="preload" href="/tdz-fix.cjs" as="script" />
     <link rel="preload" href="/tdz-resolver.js" as="script" />
     <link rel="preload" href="/bootstrap.js" as="script" />
     <link rel="preload" href="/ncfix.js" as="script" />
-    <link rel="preload" href="/tdz-fix.js" as="script" />
     
-    <!-- IMPORTANTE: Ejecutar tdz-resolver.js antes que nada -->
+    <!-- IMPORTANTE: Ejecutar scripts en este orden exacto -->
+    <script src="/tdz-fix.cjs"></script>
     <script src="/tdz-resolver.js"></script>
     
     <!-- Resolver errores de TDZ "Cannot access variable before initialization" -->
@@ -80,7 +81,6 @@
     <!-- Ejecutar scripts de inicialización en orden correcto -->
     <script src="/bootstrap.js"></script>
     <script src="/ncfix.js"></script>
-    <script src="/tdz-fix.js"></script>
     
     <!-- Monitorear errores de TDZ durante la carga -->
     <script>

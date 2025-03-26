@@ -1,12 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
-import tdz from './public/vite-plugin-tdz-fix'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    tdz(), // TDZ fix debe ser el primer plugin
     react()
   ],
   define: {
