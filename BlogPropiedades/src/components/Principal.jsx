@@ -1,13 +1,37 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, Suspense, lazy } from "react";
 import { Link, useNavigate } from "react-router-dom"; // Replace useHistory with useNavigate
 import { useUser } from "../context/UserContext";
-import { getBlogPosts, getPropertyPosts, testApiConnection } from "../services/api"; // Removed syncProfileImage import
 import { motion } from "framer-motion";
 import { fallbackImageBase64, ensureHttps } from "../utils/imageUtils";
 import useProfileImage from "../hooks/useProfileImage"; // Import the new hook
 
+// Importar funciones de API usando lazy loading para evitar problemas de inicialización
+const ApiService = lazy(() => import("../services/api").then(module => ({
+  default: {
+    getBlogPosts: module.getBlogPosts,
+    getPropertyPosts: module.getPropertyPosts,
+    testApiConnection: module.testApiConnection
+  }
+})));
+
 // Definir la imagen de perfil por defecto
 const defaultProfilePic = fallbackImageBase64;
+
+// Wrapper para ejecutar funciones de API de forma segura
+const safeApiCall = async (apiFunction, ...args) => {
+  try {
+    // En caso de que la API no esté cargada, devolver un array vacío
+    if (!apiFunction) {
+      console.warn('Función de API no disponible');
+      return [];
+    }
+    
+    return await apiFunction(...args);
+  } catch (error) {
+    console.error('Error en llamada a API:', error);
+    return [];
+  }
+};
 
 function Principal() {
   // Obtener estado de autenticación directamente de localStorage
@@ -55,7 +79,7 @@ function Principal() {
     };
   }, [profileMenuRef]);
 
-  // Cargar datos reales de la API con protección contra errores
+  // Modificar la función fetchData para usar lazy loading
   useEffect(() => {
     let isMounted = true;
     
@@ -66,9 +90,12 @@ function Principal() {
         let blogsData = [];
         let propertiesData = [];
         
+        // Cargar servicios de API de forma lazy
+        const apis = await import("../services/api");
+        
         // Realizar prueba de conexión a la API primero
         console.log("Probando conexión a la API...");
-        const apiTest = await testApiConnection();
+        const apiTest = await safeApiCall(apis.testApiConnection);
         console.log("Resultados de prueba de API:", apiTest);
         
         // Actualizar estado basado en resultados de la prueba
@@ -85,7 +112,7 @@ function Principal() {
         
         try {
           console.log("Intentando obtener blogs...");
-          blogsData = await getBlogPosts();
+          blogsData = await safeApiCall(apis.getBlogPosts);
           console.log("Blogs obtenidos:", blogsData);
         } catch (error) {
           console.error("Error al cargar blogs:", error);
@@ -94,7 +121,7 @@ function Principal() {
         
         try {
           console.log("Intentando obtener propiedades...");
-          propertiesData = await getPropertyPosts();
+          propertiesData = await safeApiCall(apis.getPropertyPosts);
           console.log("Propiedades obtenidas:", propertiesData);
         } catch (error) {
           console.error("Error al cargar propiedades:", error);
@@ -222,9 +249,13 @@ function Principal() {
       }
     };
     
-    fetchData();
+    // Usar un pequeño timeout para asegurar que todo esté inicializado
+    const timer = setTimeout(() => {
+      fetchData();
+    }, 100);
     
     return () => {
+      clearTimeout(timer);
       isMounted = false;
     };
   }, []);

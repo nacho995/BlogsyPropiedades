@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 // Primero cargar componentes básicos y utilidades
 import Navbar from './components/NavBar';
 import ImageLoader from './components/ImageLoader';
+import SafeRender from './components/SafeRender';
 
 // Luego cargar componentes de páginas
 import Principal from './components/Principal';
@@ -813,17 +814,17 @@ function App() {
                             <ImageLoader />
                             <Navbar />
                             <Routes>
-                                <Route path="/" element={<HomeRoute />} />
-                                <Route path="/login" element={<SignIn />} />
-                                <Route path="/crear-blog" element={<ProtectedRoute><BlogCreation /></ProtectedRoute>} />
-                                <Route path="/ver-blogs" element={<SeeBlogs />} />
-                                <Route path="/blog/:id" element={<BlogDetail />} />
-                                <Route path="/cambiar-perfil" element={<ProtectedRoute><CambiarPerfil/></ProtectedRoute>} />
-                                <Route path="/propiedades" element={<SeeProperty/>} />
-                                <Route path="/add-property" element={<ProtectedRoute><PropertyCreation/></ProtectedRoute>} />
-                                <Route path="/property/:id" element={<PropertyDetail/>} />
-                                <Route path="/subir" element={<ProtectedRoute><SubirPage /></ProtectedRoute>} />
-                                <Route path="/diagnostico" element={<AdminRoute><DiagnosticPage /></AdminRoute>} />
+                                <Route path="/" element={<SafeRender><HomeRoute /></SafeRender>} />
+                                <Route path="/login" element={<SafeRender><SignIn /></SafeRender>} />
+                                <Route path="/crear-blog" element={<ProtectedRoute><SafeRender><BlogCreation /></SafeRender></ProtectedRoute>} />
+                                <Route path="/ver-blogs" element={<SafeRender><SeeBlogs /></SafeRender>} />
+                                <Route path="/blog/:id" element={<SafeRender><BlogDetail /></SafeRender>} />
+                                <Route path="/cambiar-perfil" element={<ProtectedRoute><SafeRender><CambiarPerfil/></SafeRender></ProtectedRoute>} />
+                                <Route path="/propiedades" element={<SafeRender><SeeProperty/></SafeRender>} />
+                                <Route path="/add-property" element={<ProtectedRoute><SafeRender><PropertyCreation/></SafeRender></ProtectedRoute>} />
+                                <Route path="/property/:id" element={<SafeRender><PropertyDetail/></SafeRender>} />
+                                <Route path="/subir" element={<ProtectedRoute><SafeRender><SubirPage /></SafeRender></ProtectedRoute>} />
+                                <Route path="/diagnostico" element={<AdminRoute><SafeRender><DiagnosticPage /></SafeRender></AdminRoute>} />
                                 <Route path="/not-found" element={<NotFound />} />
                                 <Route path="*" element={<Navigate to="/not-found" replace />} />
                             </Routes>

@@ -1,7 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import React from "react";
-import App from "./App";
+import React, { Suspense, lazy } from "react";
 import "./index.css";
 
 // Script sencillo para verificar que Nc esté definido
@@ -9,6 +8,9 @@ if (typeof window.Nc === 'undefined') {
   window.Nc = {};
   console.log('Definido Nc en main.jsx');
 }
+
+// Importar App con lazy loading
+const App = lazy(() => import("./App"));
 
 // Componente límite para capturar errores
 class ErrorBoundary extends React.Component {
@@ -49,30 +51,33 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// Renderizar la aplicación con manejo de errores
-try {
-  // Asegurarnos de que existe el elemento root
-  const rootElement = document.getElementById("root");
-  if (!rootElement) {
-    const newRoot = document.createElement("div");
-    newRoot.id = "root";
-    document.body.appendChild(newRoot);
-  }
+// Componente de carga para mostrar mientras se carga la aplicación
+const Loading = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-900">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white mx-auto"></div>
+      <p className="mt-4 text-white text-xl">Cargando aplicación...</p>
+    </div>
+  </div>
+);
 
-  // Renderizar con un pequeño retraso para asegurar inicialización
-  setTimeout(() => {
-    try {
-      createRoot(document.getElementById("root")).render(
-        <StrictMode>
-          <ErrorBoundary>
-            <App />
-          </ErrorBoundary>
-        </StrictMode>
-      );
-    } catch(error) {
-      console.error("Error al renderizar la aplicación:", error);
-    }
-  }, 150);
-} catch (error) {
-  console.error("Error crítico en la inicialización:", error);
-}
+// Función para retrasar el renderizado para asegurar que todo esté cargado
+const initializeApp = () => {
+  const rootElement = document.getElementById("root");
+  if (!rootElement) throw new Error("No se encontró el elemento root");
+  
+  const root = createRoot(rootElement);
+  
+  root.render(
+    <StrictMode>
+      <ErrorBoundary>
+        <Suspense fallback={<Loading />}>
+          <App />
+        </Suspense>
+      </ErrorBoundary>
+    </StrictMode>
+  );
+};
+
+// Añadir un pequeño retraso antes de inicializar para evitar accesos a variables no inicializadas
+setTimeout(initializeApp, 100);
