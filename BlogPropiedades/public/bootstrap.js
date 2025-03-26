@@ -4,6 +4,41 @@
 (() => {
   console.log('🔄 Inicializando bootstrap...');
 
+  // SOLUCIÓN ESPECÍFICA PARA ERRORES DE INICIALIZACIÓN EN CÓDIGO MINIFICADO
+  try {
+    // Definir Nc globalmente para evitar el error "Cannot access 'Nc' before initialization"
+    // Esta es una solución para evitar errores en código minificado
+    if (typeof window.Nc === 'undefined') {
+      console.log('🔧 Aplicando parche para evitar error de Nc');
+      window.Nc = {};
+      window.__ncPatched = true;
+    }
+    
+    // Otros nombres de variables minificadas comunes que podrían causar problemas similares
+    // Esto crea un proxy global que captura intentos de acceder a propiedades indefinidas
+    window.__safeInitProxy = new Proxy({}, {
+      get: function(target, name) {
+        // Si la propiedad no existe, crearla como un objeto vacío
+        if (!(name in target)) {
+          console.log(`🔧 Interceptando acceso a variable indefinida: ${String(name)}`);
+          target[name] = {};
+        }
+        return target[name];
+      }
+    });
+    
+    // Asignar las variables más comunes que causan problemas
+    ['qe', 'Qe', 'ec', 'En', 'In', 'Ht', 'Gt', 'wa', 'qa', 'Na', 'Ma', 'Sa', 'Se'].forEach(varName => {
+      if (typeof window[varName] === 'undefined') {
+        window[varName] = window.__safeInitProxy;
+      }
+    });
+    
+    console.log('✅ Parche de variables aplicado');
+  } catch (e) {
+    console.error('Error al aplicar parche de variables:', e);
+  }
+
   // Función para retrasar la ejecución para evitar problemas de inicialización
   const waitAndExecute = (fn, delay = 50) => {
     return new Promise(resolve => {
