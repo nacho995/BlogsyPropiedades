@@ -1427,7 +1427,8 @@ export const syncProfileImageBetweenDevices = async (imageData) => {
     
     let requestBody;
     let headers = {
-      'Authorization': `Bearer ${token}`
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
     };
     
     // Si es base64, enviar directamente
@@ -1436,7 +1437,6 @@ export const syncProfileImageBetweenDevices = async (imageData) => {
       requestBody = JSON.stringify({ 
         profilePic: imageData 
       });
-      headers['Content-Type'] = 'application/json';
     } 
     // Si es una URL, enviar la URL
     else {
@@ -1444,12 +1444,24 @@ export const syncProfileImageBetweenDevices = async (imageData) => {
       requestBody = JSON.stringify({ 
         profilePicUrl: imageData 
       });
-      headers['Content-Type'] = 'application/json';
     }
 
-    // Obtenemos la URL base, preferimos la definida en localStorage si existe
+    // Obtenemos la URL base correcta
+    // 1. Primero intentar usar la URL definida en localStorage
+    let apiUrl;
     const storedApiUrl = localStorage.getItem('definitive_api_url');
-    const apiUrl = storedApiUrl || BASE_URL;
+    if (storedApiUrl) {
+      apiUrl = storedApiUrl;
+    } 
+    // 2. Si no existe, verificar el protocolo actual y construir la URL
+    else {
+      const isHttps = window.location.protocol === 'https:';
+      const API_DOMAIN = 'api.realestategozamadrid.com';
+      apiUrl = `${isHttps ? 'https' : 'http'}://${API_DOMAIN}`;
+      
+      // Guardar para futuros usos
+      localStorage.setItem('definitive_api_url', apiUrl);
+    }
 
     console.log(`🔄 Usando API URL: ${apiUrl} para sincronización de imagen`);
 
@@ -1498,6 +1510,14 @@ export const syncProfileImageBetweenDevices = async (imageData) => {
     // Eliminar banderas de sincronización pendiente
     localStorage.removeItem('pendingProfileSync');
     localStorage.removeItem('profilePic_pending');
+
+    // Notificar a toda la aplicación sobre la sincronización exitosa
+    window.dispatchEvent(new CustomEvent('profileImageSynced', {
+      detail: {
+        success: true,
+        timestamp: Date.now()
+      }
+    }));
 
     return {
       success: true,

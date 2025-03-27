@@ -481,9 +481,20 @@ export function UserProvider({ children }) {
   const logout = (shouldRedirect = true, reason = 'user_action') => {
     // Guardar una copia de la imagen de perfil temporalmente si existe
     try {
-      const profileImage = localStorage.getItem('profilePic');
+      const profileImage = localStorage.getItem('profilePic') || 
+                          localStorage.getItem('profilePic_local') || 
+                          localStorage.getItem('profilePic_base64');
+                          
       if (profileImage) {
+        // Guardar en múltiples ubicaciones para redundancia
         localStorage.setItem('profilePic_temp', profileImage);
+        localStorage.setItem('profilePic_backup', profileImage);
+        localStorage.setItem('profilePic_last', profileImage);
+        
+        // También guardar en sessionStorage para persistencia durante la sesión
+        sessionStorage.setItem('profilePic_temp', profileImage);
+        
+        console.log("✅ Imagen de perfil guardada para futura recuperación");
       }
     } catch (e) {
       console.error("Error al guardar imagen temporal:", e);
@@ -508,8 +519,10 @@ export function UserProvider({ children }) {
       localStorage.removeItem("redirectLoop");
       localStorage.removeItem("appRestarted");
       
-      // No borrar la imagen de perfil para que se mantenga entre sesiones
+      // NO borrar las imágenes guardadas
       // localStorage.removeItem("profilePic");
+      // localStorage.removeItem("profilePic_temp");
+      // localStorage.removeItem("profilePic_backup");
       
       // Despachar evento de cierre de sesión
       window.dispatchEvent(new CustomEvent('userLoggedOut', {
@@ -564,115 +577,88 @@ export function UserProvider({ children }) {
         localStorage.setItem("userData", JSON.stringify(userData));
         
         // Manejar imagen de perfil
-        if (userData.profileImage || userData.profilePic) {
-          let profileImageUrl = null;
+        let profileImageUrl = null;
+        
+        // Primero intentar obtener la imagen del servidor
+        if (userData.profileImage) {
+          profileImageUrl = typeof userData.profileImage === 'string' ? 
+                          userData.profileImage : 
+                          (userData.profileImage.url || userData.profileImage.src);
+        } else if (userData.profilePic) {
+          profileImageUrl = typeof userData.profilePic === 'string' ? 
+                          userData.profilePic : 
+                          (userData.profilePic.src || userData.profilePic.url);
+        }
+        
+        // Si se encontró URL de imagen del servidor, usarla
+        if (profileImageUrl) {
+          console.log("🖼️ Imagen de perfil encontrada en datos del servidor:", profileImageUrl.substring(0, 30) + "...");
           
-          // Extraer URL de la imagen según el formato disponible
-          if (userData.profileImage) {
-            if (typeof userData.profileImage === 'string') {
-              profileImageUrl = userData.profileImage;
-            } else if (userData.profileImage && typeof userData.profileImage === 'object') {
-              profileImageUrl = userData.profileImage.src || userData.profileImage.url;
-            }
-          } else if (userData.profilePic) {
-            if (typeof userData.profilePic === 'string') {
-              profileImageUrl = userData.profilePic;
-            } else if (userData.profilePic && typeof userData.profilePic === 'object') {
-              profileImageUrl = userData.profilePic.src || userData.profilePic.url;
-            }
-          }
+          // Guardar la imagen en localStorage
+          localStorage.setItem('profilePic', profileImageUrl);
+          localStorage.setItem('profilePic_backup', profileImageUrl);
+          localStorage.setItem('profilePic_temp', profileImageUrl);
+          sessionStorage.setItem('profilePic_temp', profileImageUrl);
           
-          // Si se encontró URL de imagen, sincronizarla
-          if (profileImageUrl) {
-            console.log("🖼️ Imagen de perfil encontrada, sincronizando:", profileImageUrl.substring(0, 30) + "...");
-            localStorage.setItem('profilePic', profileImageUrl);
-            localStorage.setItem('profilePic_backup', profileImageUrl);
-            localStorage.setItem('profilePic_temp', profileImageUrl);
-            
-            // Actualizar userResponse si existe
-            try {
-              const userResponse = localStorage.getItem('userResponse');
-              if (userResponse) {
-                const responseData = JSON.parse(userResponse);
-                responseData.profilePic = profileImageUrl;
-                responseData.profileImage = profileImageUrl;
-                localStorage.setItem('userResponse', JSON.stringify(responseData));
-              }
-            } catch (e) {
-              console.warn("Error al actualizar userResponse:", e);
+          // Actualizar userResponse si existe
+          try {
+            const userResponse = localStorage.getItem('userResponse');
+            if (userResponse) {
+              const responseData = JSON.parse(userResponse);
+              responseData.profilePic = profileImageUrl;
+              responseData.profileImage = profileImageUrl;
+              localStorage.setItem('userResponse', JSON.stringify(responseData));
             }
-            
-            syncProfileImage(profileImageUrl);
+          } catch (e) {
+            console.warn("Error al actualizar userResponse:", e);
           }
         } else {
-          // Si no hay imagen en los datos del usuario, verificar si hay una guardada
-          const profilePicTemp = localStorage.getItem('profilePic_temp');
-          if (profilePicTemp) {
-            console.log("🖼️ Usando imagen de perfil temporal guardada:", profilePicTemp.substring(0, 30) + "...");
-            localStorage.setItem('profilePic', profilePicTemp);
-            localStorage.setItem('profilePic_backup', profilePicTemp);
+          // Si no hay imagen en el servidor, usar la imagen local como respaldo
+          const localImage = localStorage.getItem('profilePic_temp') || 
+                           localStorage.getItem('profilePic_backup') || 
+                           localStorage.getItem('profilePic_last') ||
+                           sessionStorage.getItem('profilePic_temp') ||
+                           localStorage.getItem('profilePic');
+                           
+          if (localImage) {
+            console.log("🖼️ Usando imagen local como respaldo:", localImage.substring(0, 30) + "...");
+            profileImageUrl = localImage;
             
-            // Actualizar userData con la imagen guardada
-            userData.profilePic = profilePicTemp;
-            userData.profileImage = profilePicTemp;
-            localStorage.setItem("userData", JSON.stringify(userData));
-            
-            syncProfileImage(profilePicTemp);
+            // Guardar la imagen local en todas las ubicaciones
+            localStorage.setItem('profilePic', localImage);
+            localStorage.setItem('profilePic_backup', localImage);
+            localStorage.setItem('profilePic_temp', localImage);
+            sessionStorage.setItem('profilePic_temp', localImage);
+          } else {
+            // Si no hay imagen local, usar la imagen por defecto
+            console.log("🖼️ No hay imagen disponible, usando imagen por defecto");
+            profileImageUrl = fallbackImageBase64;
           }
         }
-      }
-      
-      // Intentar obtener perfil de usuario actualizado
-      try {
-        const userProfile = await getUserProfile(token);
-        console.log("Perfil de usuario obtenido:", userProfile);
         
-        // Si tiene imagen, sincronizarla
-        if (userProfile && (userProfile.profileImage || userProfile.profilePic)) {
-          let profilePicUrl = null;
-          
-          if (userProfile.profileImage) {
-            profilePicUrl = typeof userProfile.profileImage === 'string' ? 
-                          userProfile.profileImage : 
-                          userProfile.profileImage.src || userProfile.profileImage.url;
-          } else if (userProfile.profilePic) {
-            profilePicUrl = typeof userProfile.profilePic === 'string' ? 
-                          userProfile.profilePic : 
-                          userProfile.profilePic.src || userProfile.profilePic.url;
-          }
-          
-          console.log("🖼️ Imagen recibida del perfil del usuario:", profilePicUrl ? profilePicUrl.substring(0, 30) + "..." : "no disponible");
-          if (profilePicUrl) {
-            localStorage.setItem('profilePic', profilePicUrl);
-            localStorage.setItem('profilePic_backup', profilePicUrl);
-            localStorage.setItem('profilePic_temp', profilePicUrl);
-            
-            // Actualizar userData con la imagen recibida
-            if (userData) {
-              userData.profilePic = profilePicUrl;
-              userData.profileImage = profilePicUrl;
-              localStorage.setItem("userData", JSON.stringify(userData));
+        // Configurar estados
+        setIsAuthenticated(true);
+        setUser({
+          ...userData,
+          profileImage: profileImageUrl,
+          profilePic: profileImageUrl
+        });
+        
+        // Disparar evento para que otros componentes se enteren
+        try {
+          window.dispatchEvent(new CustomEvent('userLoggedIn', {
+            detail: { 
+              userData: {
+                ...userData,
+                profileImage: profileImageUrl,
+                profilePic: profileImageUrl
+              }
             }
-            
-            syncProfileImage(profilePicUrl);
-          }
+          }));
+          console.log("✅ Evento de login enviado a todos los componentes");
+        } catch (e) {
+          console.warn("Error al disparar evento userLoggedIn:", e);
         }
-      } catch (profileError) {
-        console.warn("Error al obtener perfil tras login (no crítico):", profileError);
-      }
-      
-      // Configurar estados
-      setIsAuthenticated(true);
-      setUser(userData);
-      
-      // Disparar evento para que otros componentes se enteren
-      try {
-        window.dispatchEvent(new CustomEvent('userLoggedIn', {
-          detail: { userData }
-        }));
-        console.log("✅ Evento de login enviado a todos los componentes");
-      } catch (e) {
-        console.warn("Error al disparar evento userLoggedIn:", e);
       }
       
       logAuthEvent('login_successful');

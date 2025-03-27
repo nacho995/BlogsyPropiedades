@@ -25,6 +25,15 @@ const ImageSynchronizer = () => {
             console.log("✅ ImageSynchronizer: Imagen pendiente sincronizada correctamente");
             localStorage.removeItem('pendingProfileSync');
             localStorage.removeItem('profilePic_pending');
+            
+            // Notificar a la aplicación para que actualice la interfaz
+            window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+              detail: { 
+                profileImage: pendingImage, 
+                timestamp: Date.now(),
+                source: 'pendingSync'
+              }
+            }));
           } else {
             console.warn("⚠️ ImageSynchronizer: No se pudo sincronizar imagen pendiente:", result.error);
           }
@@ -34,8 +43,37 @@ const ImageSynchronizer = () => {
       }
     };
     
+    // Intentar recuperar imagen temporal en el arranque
+    const recoverTemporaryImage = () => {
+      try {
+        const tempImage = localStorage.getItem('profilePic_temp');
+        const currentImage = localStorage.getItem('profilePic');
+        
+        // Si hay una imagen temporal pero no hay imagen actual, restaurarla
+        if (tempImage && (!currentImage || currentImage === 'undefined' || currentImage === 'null')) {
+          console.log("🔄 ImageSynchronizer: Restaurando imagen temporal");
+          localStorage.setItem('profilePic', tempImage);
+          localStorage.setItem('profilePic_backup', tempImage);
+          
+          // Notificar a la aplicación
+          window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+            detail: { 
+              profileImage: tempImage, 
+              timestamp: Date.now(),
+              source: 'tempRestore'
+            }
+          }));
+        }
+      } catch (error) {
+        console.error("🛑 ImageSynchronizer: Error al recuperar imagen temporal:", error);
+      }
+    };
+    
     // Verificar si hay una imagen en localStorage al montar
     try {
+      // Primero intentar recuperar imagen temporal
+      recoverTemporaryImage();
+      
       const storedImage = localStorage.getItem('profilePic');
       
       if (storedImage && 
@@ -85,9 +123,35 @@ const ImageSynchronizer = () => {
             const serverImage = await fetchProfileImageFromServer();
             if (serverImage.success && serverImage.profileImage) {
               console.log("✅ ImageSynchronizer: Imagen cargada correctamente del servidor");
-              // La función fetchProfileImageFromServer ya actualiza localStorage y emite evento
+              
+              // La función fetchProfileImageFromServer ya actualiza localStorage,
+              // pero notificamos explícitamente para asegurar
+              window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+                detail: { 
+                  profileImage: serverImage.profileImage, 
+                  timestamp: Date.now(),
+                  source: 'serverFetch'
+                }
+              }));
             } else {
               console.log("ℹ️ ImageSynchronizer: No hay imagen en el servidor");
+              
+              // Intentar recuperar de backup como último recurso
+              const backupImage = localStorage.getItem('profilePic_backup');
+              if (backupImage && 
+                  backupImage !== 'undefined' && 
+                  backupImage !== 'null') {
+                console.log("🔄 ImageSynchronizer: Recuperando imagen desde backup");
+                localStorage.setItem('profilePic', backupImage);
+                
+                window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+                  detail: { 
+                    profileImage: backupImage, 
+                    timestamp: Date.now(),
+                    source: 'backupRestore'
+                  }
+                }));
+              }
             }
           } catch (loadError) {
             console.warn("⚠️ ImageSynchronizer: Error al cargar imagen del servidor:", loadError);
@@ -149,6 +213,9 @@ const ImageSynchronizer = () => {
           // La imagen del servidor es diferente a la local
           if (serverImage.profileImage !== storedImage) {
             console.log("🔄 ImageSynchronizer: Imagen del servidor diferente, actualizando local...");
+            localStorage.setItem('profilePic', serverImage.profileImage);
+            localStorage.setItem('profilePic_backup', serverImage.profileImage);
+            
             window.dispatchEvent(new CustomEvent('profileImageUpdated', {
               detail: { 
                 profileImage: serverImage.profileImage, 
@@ -176,7 +243,13 @@ const ImageSynchronizer = () => {
     // Recuperar imagen en caso de fallo al inicio de sesión
     const recoverImageOnLogin = () => {
       try {
-        const backupImage = localStorage.getItem('profilePic_backup');
+        // Intentar varias fuentes en orden de prioridad
+        const backupImage = localStorage.getItem('profilePic_temp') || 
+                           localStorage.getItem('profilePic_backup') || 
+                           localStorage.getItem('profilePic_last') ||
+                           sessionStorage.getItem('profilePic_temp') ||
+                           localStorage.getItem('profilePic');
+                            
         if (backupImage && 
             backupImage !== 'undefined' && 
             backupImage !== 'null' && 
@@ -184,7 +257,12 @@ const ImageSynchronizer = () => {
           
           // La imagen principal se ha perdido pero tenemos backup
           console.log("🔄 ImageSynchronizer: Recuperando imagen de backup tras inicio de sesión");
+          
+          // Guardar en múltiples ubicaciones para redundancia
           localStorage.setItem('profilePic', backupImage);
+          localStorage.setItem('profilePic_backup', backupImage);
+          localStorage.setItem('profilePic_temp', backupImage);
+          sessionStorage.setItem('profilePic_temp', backupImage);
           
           // Emitir evento para actualizar UI
           window.dispatchEvent(new CustomEvent('profileImageUpdated', {
@@ -203,6 +281,34 @@ const ImageSynchronizer = () => {
               console.warn("⚠️ ImageSynchronizer: Error al sincronizar imagen recuperada:", syncError);
             }
           }, 2000);
+        } else {
+          // Si no hay backup, intentar obtener del servidor
+          setTimeout(async () => {
+            try {
+              console.log("🔄 ImageSynchronizer: Intentando obtener imagen del servidor tras login");
+              const serverImage = await fetchProfileImageFromServer();
+              if (serverImage.success && serverImage.profileImage) {
+                console.log("✅ ImageSynchronizer: Imagen obtenida del servidor tras login");
+                
+                // Guardar la imagen del servidor localmente
+                localStorage.setItem('profilePic', serverImage.profileImage);
+                localStorage.setItem('profilePic_backup', serverImage.profileImage);
+                localStorage.setItem('profilePic_temp', serverImage.profileImage);
+                sessionStorage.setItem('profilePic_temp', serverImage.profileImage);
+                
+                // Notificar a la aplicación
+                window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+                  detail: { 
+                    profileImage: serverImage.profileImage, 
+                    timestamp: Date.now(),
+                    source: 'serverFetch'
+                  }
+                }));
+              }
+            } catch (err) {
+              console.warn("⚠️ ImageSynchronizer: Error al obtener imagen del servidor tras login:", err);
+            }
+          }, 3000);
         }
       } catch (e) {
         console.error("🛑 ImageSynchronizer: Error al recuperar imagen de backup:", e);
@@ -226,6 +332,24 @@ const ImageSynchronizer = () => {
       }, 3000);
     });
     
+    // Escuchar eventos de cierre de sesión
+    window.addEventListener('userLoggedOut', () => {
+      console.log("🔄 ImageSynchronizer: Evento de logout detectado, guardando imagen para futura recuperación");
+      
+      // Guardar la imagen actual para futuras sesiones si no está ya guardada
+      try {
+        const currentImage = localStorage.getItem('profilePic');
+        if (currentImage && 
+            currentImage !== 'undefined' && 
+            currentImage !== 'null') {
+          localStorage.setItem('profilePic_temp', currentImage);
+          console.log("✅ ImageSynchronizer: Imagen guardada temporalmente tras logout");
+        }
+      } catch (e) {
+        console.error("🛑 ImageSynchronizer: Error al guardar imagen en logout:", e);
+      }
+    });
+    
     // Configurar listener para cambios en localStorage
     window.addEventListener('storage', handleStorageChange);
     
@@ -233,6 +357,8 @@ const ImageSynchronizer = () => {
     return () => {
       clearInterval(syncInterval);
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('userLoggedIn', recoverImageOnLogin);
+      console.log("👋 ImageSynchronizer: Servicio de sincronización detenido");
     };
   }, []);
 
