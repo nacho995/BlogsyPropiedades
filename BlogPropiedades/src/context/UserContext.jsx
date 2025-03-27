@@ -87,10 +87,42 @@ export function UserProvider({ children }) {
         console.warn("Token expirado:", new Date(payload.exp * 1000).toLocaleString());
         logAuthEvent('token_expired', { expiry: new Date(payload.exp * 1000).toLocaleString() });
         
-        // Al detectar token expirado, cerrar sesión automáticamente
-        setTimeout(() => {
-          logout(true, 'token_expired');
-        }, 0);
+        // Al detectar token expirado, cerrar sesión inmediatamente
+        try {
+          // Guardar una copia de la imagen de perfil temporalmente si existe
+          const profileImage = localStorage.getItem('profilePic');
+          if (profileImage) {
+            localStorage.setItem('profilePic_temp', profileImage);
+          }
+          
+          // Limpiar todos los datos relacionados con la sesión
+          localStorage.removeItem("token");
+          localStorage.removeItem("userData");
+          localStorage.removeItem("userResponse");
+          localStorage.removeItem("tempToken");
+          localStorage.removeItem("email");
+          localStorage.removeItem("name");
+          localStorage.removeItem("role");
+          
+          // También limpiar banderas y estados de recuperación
+          localStorage.removeItem("authRedirects");
+          localStorage.removeItem("redirectLoop");
+          localStorage.removeItem("appRestarted");
+          
+          // Despachar evento de cierre de sesión
+          window.dispatchEvent(new CustomEvent('userLoggedOut', {
+            detail: { reason: 'token_expired' }
+          }));
+          
+          console.log("🔒 Sesión cerrada por token expirado");
+          
+          // Redirigir inmediatamente a la página de login
+          window.location.replace("/login");
+        } catch (e) {
+          console.error("Error al cerrar sesión por token expirado:", e);
+          // Si falla, intentar redirección directa como última opción
+          window.location.href = "/login";
+        }
         
         return false;
       }
@@ -106,10 +138,36 @@ export function UserProvider({ children }) {
       console.error("Error al validar token:", error);
       logAuthEvent('token_validation_error', { error: error.message });
       
-      // Si hay un error al validar el token, también cerrar sesión
-      setTimeout(() => {
-        logout(true, 'token_invalid');
-      }, 0);
+      // Si hay un error al validar el token, también cerrar sesión inmediatamente
+      try {
+        // Limpiar todos los datos relacionados con la sesión
+        localStorage.removeItem("token");
+        localStorage.removeItem("userData");
+        localStorage.removeItem("userResponse");
+        localStorage.removeItem("tempToken");
+        localStorage.removeItem("email");
+        localStorage.removeItem("name");
+        localStorage.removeItem("role");
+        
+        // También limpiar banderas y estados de recuperación
+        localStorage.removeItem("authRedirects");
+        localStorage.removeItem("redirectLoop");
+        localStorage.removeItem("appRestarted");
+        
+        // Despachar evento de cierre de sesión
+        window.dispatchEvent(new CustomEvent('userLoggedOut', {
+          detail: { reason: 'token_invalid' }
+        }));
+        
+        console.log("🔒 Sesión cerrada por token inválido");
+        
+        // Redirigir inmediatamente a la página de login
+        window.location.replace("/login");
+      } catch (e) {
+        console.error("Error al cerrar sesión por token inválido:", e);
+        // Si falla, intentar redirección directa como última opción
+        window.location.href = "/login";
+      }
       
       return false;
     }
@@ -436,10 +494,19 @@ export function UserProvider({ children }) {
     setIsAuthenticated(false);
     
     try {
+      // Limpiar todos los datos relacionados con la sesión
       localStorage.removeItem("token");
       localStorage.removeItem("userData");
       localStorage.removeItem("userResponse");
       localStorage.removeItem("tempToken");
+      localStorage.removeItem("email");
+      localStorage.removeItem("name");
+      localStorage.removeItem("role");
+      
+      // También limpiar banderas y estados de recuperación
+      localStorage.removeItem("authRedirects");
+      localStorage.removeItem("redirectLoop");
+      localStorage.removeItem("appRestarted");
       
       // No borrar la imagen de perfil para que se mantenga entre sesiones
       // localStorage.removeItem("profilePic");
@@ -454,14 +521,20 @@ export function UserProvider({ children }) {
       console.error("❌ Error al eliminar token:", e);
     }
     
-    // Redireccionar si es necesario
-    if (shouldRedirect) {
-      console.log("🔄 Redirigiendo a página de login...");
-      
-      // Pequeño retraso para permitir que otros componentes reaccionen primero
+    // Siempre redirigir a la página de login, ignorando el parámetro shouldRedirect
+    console.log("🔄 Redirigiendo a página de login...");
+    
+    // Asegurar que la redirección funcione correctamente
+    try {
+      // Retrasar la redirección para permitir que otros componentes reaccionen primero
       setTimeout(() => {
-        window.location.href = "/login";
+        // Usar replace para evitar problemas con el historial
+        window.location.replace("/login");
       }, 100);
+    } catch (error) {
+      console.error("Error durante la redirección:", error);
+      // Plan B: usar href directo
+      window.location.href = "/login";
     }
   };
   

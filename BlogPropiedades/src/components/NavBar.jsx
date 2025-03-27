@@ -100,17 +100,49 @@ export default function Navbar({ showOnlyAuth = false }) {
           // Si expira en menos de 2 minutos, mostrar advertencia
           if (timeRemaining > 0 && timeRemaining < 120000) {
             console.warn(`⚠️ Token expirará pronto (en ${minutesRemaining} minutos)`);
-            // Aquí se podría implementar un toast o notificación visual
+            // Mostrar toast de advertencia
+            try {
+              window.dispatchEvent(new CustomEvent('tokenExpiringWarning', {
+                detail: { minutesRemaining }
+              }));
+            } catch (e) {
+              console.error('Error al disparar evento de advertencia:', e);
+            }
           }
           
           // Si ya expiró, cerrar sesión
           if (expiryTime < Date.now()) {
             console.log('Token expirado durante la verificación periódica en NavBar, cerrando sesión...');
-            logout(true);
+            
+            // Limpiar datos de sesión y redireccionar
+            try {
+              // Despachar evento de cierre de sesión
+              window.dispatchEvent(new CustomEvent('userLoggedOut', {
+                detail: { reason: 'token_expired' }
+              }));
+              
+              // Limpiar todos los datos relacionados con la sesión
+              localStorage.removeItem("token");
+              localStorage.removeItem("userData");
+              localStorage.removeItem("userResponse");
+              localStorage.removeItem("tempToken");
+              localStorage.removeItem("email");
+              localStorage.removeItem("name");
+              localStorage.removeItem("role");
+              
+              // Actualizar estado local para reflejar el cierre de sesión
+              logout(true);
+            } catch (e) {
+              console.error('Error al manejar expiración de token:', e);
+              // Última opción - redirección directa
+              window.location.href = "/login";
+            }
+            
             clearInterval(tokenVerifier);
           }
         } catch (e) {
           console.error('Error al verificar token periódicamente:', e);
+          logout(true);
         }
       } else {
         // Si no hay token, verificar si debería estar no autenticado
