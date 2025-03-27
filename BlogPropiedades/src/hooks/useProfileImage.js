@@ -1,204 +1,167 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 // Definimos la imagen fallback como una constante en este archivo
 const fallbackImageBase64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNlMWUxZTEiLz48dGV4dCB4PSI1MCIgeT0iNTAiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGFsaWdubWVudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZmlsbD0iIzg4OCI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4=';
 
 /**
- * Hook mejorado para manejar la imagen de perfil
- * Versión robusta que maneja imágenes locales y remotas
+ * Hook para gestionar la imagen de perfil del usuario con persistencia
  */
 const useProfileImage = () => {
   const [profileImage, setProfileImage] = useState(fallbackImageBase64);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  // Inicializar imagen desde localStorage
+
+  // Cargar la imagen al montar el componente
   useEffect(() => {
-    const loadImageFromStorage = () => {
-      try {
-        // Buscar imagen en varios lugares posibles en localStorage
-        const storedImage = localStorage.getItem('profilePic') || 
-                           localStorage.getItem('profilePic_backup');
-        
-        if (storedImage && 
-            storedImage !== 'undefined' && 
-            storedImage !== 'null' && 
-            typeof storedImage === 'string') {
-          console.log("🖼️ Cargando imagen de perfil desde localStorage");
-          setProfileImage(storedImage);
-          
-          // Asegurar backup
-          if (!localStorage.getItem('profilePic_backup')) {
-            localStorage.setItem('profilePic_backup', storedImage);
-          }
-        } else {
-          // Si no hay imagen válida, establecer la de respaldo y guardarla
-          console.log("⚠️ No hay imagen válida en localStorage, usando fallback");
-          localStorage.setItem('profilePic', fallbackImageBase64);
-          localStorage.setItem('profilePic_backup', fallbackImageBase64);
-          setProfileImage(fallbackImageBase64);
-        }
-      } catch (err) {
-        console.error("Error al cargar imagen inicial:", err);
-        setProfileImage(fallbackImageBase64);
-      }
-    };
-    
-    loadImageFromStorage();
-    
-    // Escuchar eventos de cambio de imagen
-    const handleStorageChange = (event) => {
-      if (event.key === 'profilePic' && event.newValue) {
-        console.log("📣 Cambio detectado en localStorage:", event.key);
-        setProfileImage(event.newValue);
-      }
-    };
-    
-    // Agregar escuchador para storage (útil en múltiples pestañas)
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Agregar escuchador para eventos personalizados
-    const handleImageUpdate = (event) => {
-      const newImage = event.detail?.profileImage;
-      if (newImage && typeof newImage === 'string') {
-        console.log("📣 Evento de actualización de imagen recibido");
-        setProfileImage(newImage);
-      }
-    };
-    
-    window.addEventListener('profileImageUpdated', handleImageUpdate);
-    
-    // Limpiar escuchadores al desmontar
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('profileImageUpdated', handleImageUpdate);
-    };
-  }, []);
-  
-  // Manejar error de carga de imagen
-  const handleImageError = useCallback(() => {
-    console.log("❌ Error al cargar imagen, usando fallback");
-    setProfileImage(fallbackImageBase64);
-    
-    // También actualizar en localStorage
-    try {
-      localStorage.setItem('profilePic', fallbackImageBase64);
-      localStorage.setItem('profilePic_backup', fallbackImageBase64);
-    } catch (err) {
-      console.error("Error al guardar imagen fallback:", err);
-    }
-  }, []);
-  
-  // Función para notificar a toda la aplicación sobre cambios de imagen
-  const notifyImageUpdate = useCallback((imageData) => {
-    console.log("🔄 Notificando cambio de imagen a toda la aplicación");
-    
-    // 1. Guardar en localStorage (disponible para todas las partes de la app)
-    try {
-      localStorage.setItem('profilePic', imageData);
-      localStorage.setItem('profilePic_backup', imageData);
-      localStorage.setItem('profilePic_lastUpdate', Date.now().toString());
-    } catch (err) {
-      console.error("Error al guardar imagen en localStorage:", err);
-    }
-    
-    // 2. Emitir evento personalizado (para componentes activos)
-    try {
-      window.dispatchEvent(new CustomEvent('profileImageUpdated', {
-        detail: { profileImage: imageData, timestamp: Date.now() }
-      }));
-    } catch (err) {
-      console.error("Error al emitir evento de actualización:", err);
-    }
-  }, []);
-  
-  // Función para verificar si la imagen es válida antes de procesarla
-  const validateImage = useCallback((imageData) => {
-    // Debe ser una cadena de texto
-    if (typeof imageData !== 'string') return false;
-    
-    // Verificaciones básicas
-    if (!imageData || imageData === 'undefined' || imageData === 'null') return false;
-    
-    // Si es base64, debe comenzar con el formato adecuado
-    if (imageData.startsWith('data:')) {
-      // Verificar que tenga un formato válido (data:image/...)
-      return imageData.includes('data:image/');
-    }
-    
-    // Si es una URL, debe tener un protocolo válido
-    return imageData.startsWith('http://') || imageData.startsWith('https://');
-  }, []);
-  
-  // Actualizar imagen de perfil (función principal)
-  const updateProfileImage = useCallback(async (newImage) => {
-    if (!validateImage(newImage)) {
-      console.error("🚫 Imagen inválida proporcionada");
-      setError("La imagen proporcionada no es válida");
-      return false;
-    }
-    
+    let isMounted = true;
     setIsLoading(true);
-    setError(null);
     
     try {
-      console.log("🔄 Actualizando imagen de perfil...");
-      
-      // 1. Actualizar el estado local
-      setProfileImage(newImage);
-      
-      // 2. Guardar en localStorage para asegurar persistencia
-      try {
-        localStorage.setItem('profilePic', newImage);
-        localStorage.setItem('profilePic_backup', newImage);
-        localStorage.setItem('profilePic_lastUpdate', Date.now().toString());
-      } catch (storageError) {
-        console.error("Error al guardar en localStorage:", storageError);
-      }
-      
-      // 3. Notificar a toda la aplicación
-      try {
-        // Usamos setTimeout para asegurar que el evento se dispare después de que la imagen se guarde
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('profileImageUpdated', {
-            detail: { profileImage: newImage, timestamp: Date.now() }
-          }));
-          console.log("✅ Evento profileImageUpdated emitido globalmente");
-        }, 50);
-      } catch (eventError) {
-        console.error("Error al emitir evento:", eventError);
-      }
-      
-      // 4. Verificar que se haya almacenado correctamente
+      // Primero intentar cargar de localStorage principal
       const storedImage = localStorage.getItem('profilePic');
       
-      if (storedImage !== newImage) {
-        console.warn("⚠️ Posible problema al almacenar la imagen. Reintentando...");
-        try {
-          localStorage.setItem('profilePic', newImage);
-          localStorage.setItem('profilePic_backup', newImage);
-        } catch (retryError) {
-          console.error("Error al reintentar guardar en localStorage:", retryError);
+      if (storedImage && 
+          storedImage !== 'undefined' && 
+          storedImage !== 'null' && 
+          typeof storedImage === 'string') {
+        
+        console.log("useProfileImage: Cargando imagen de localStorage");
+        
+        // Asegurar que también esté en backup
+        localStorage.setItem('profilePic_backup', storedImage);
+        
+        if (isMounted) {
+          setProfileImage(storedImage);
+          setIsLoading(false);
+        }
+      } 
+      // Si no hay imagen principal, intentar cargar del backup
+      else {
+        console.log("useProfileImage: No se encontró imagen en localStorage principal, buscando en backup");
+        const backupImage = localStorage.getItem('profilePic_backup');
+        
+        if (backupImage && 
+            backupImage !== 'undefined' && 
+            backupImage !== 'null' && 
+            typeof backupImage === 'string') {
+          
+          console.log("useProfileImage: Recuperando imagen desde backup");
+          
+          // Restaurar en localStorage principal
+          localStorage.setItem('profilePic', backupImage);
+          
+          if (isMounted) {
+            setProfileImage(backupImage);
+            setIsLoading(false);
+          }
+        } else {
+          // No hay imagen disponible, usar fallback
+          console.log("useProfileImage: No se encontró imagen en ningún almacenamiento");
+          if (isMounted) {
+            setProfileImage(fallbackImageBase64);
+            setIsLoading(false);
+          }
         }
       }
+    } catch (err) {
+      console.error("useProfileImage: Error al cargar imagen:", err);
+      if (isMounted) {
+        setError({
+          message: 'Error al cargar la imagen de perfil',
+          original: err
+        });
+        setProfileImage(fallbackImageBase64);
+        setIsLoading(false);
+      }
+    }
+    
+    // Escuchar actualizaciones en tiempo real
+    const handleProfileUpdate = (event) => {
+      try {
+        if (event.detail?.profileImage && 
+            typeof event.detail.profileImage === 'string' &&
+            isMounted) {
+          
+          console.log("useProfileImage: Actualizando imagen por evento");
+          
+          setProfileImage(event.detail.profileImage);
+          
+          // También guardar en localStorage como respaldo
+          localStorage.setItem('profilePic', event.detail.profileImage);
+          localStorage.setItem('profilePic_backup', event.detail.profileImage);
+        }
+      } catch (err) {
+        console.error("useProfileImage: Error al procesar evento de actualización:", err);
+      }
+    };
+    
+    // Registrar listener para actualización en tiempo real
+    window.addEventListener('profileImageUpdated', handleProfileUpdate);
+    
+    // Limpiar al desmontar
+    return () => {
+      isMounted = false;
+      window.removeEventListener('profileImageUpdated', handleProfileUpdate);
+    };
+  }, []);
+
+  // Función para manejar errores de carga de imagen
+  const handleImageError = () => {
+    console.warn("useProfileImage: Error al cargar imagen, usando fallback");
+    setProfileImage(fallbackImageBase64);
+    setError({
+      message: 'No se pudo cargar la imagen de perfil'
+    });
+  };
+
+  // Función para actualizar la imagen de perfil
+  const updateProfileImage = async (newImage) => {
+    if (!newImage) return false;
+    
+    try {
+      // Verificar que la imagen sea válida
+      if (typeof newImage !== 'string' || 
+          newImage === 'undefined' || 
+          newImage === 'null') {
+        console.warn('updateProfileImage: Imagen inválida proporcionada');
+        return false;
+      }
       
-      setIsLoading(false);
-      console.log("✅ Imagen actualizada correctamente");
+      console.log("useProfileImage: Actualizando imagen manualmente");
+      
+      // Actualizar estado
+      setProfileImage(newImage);
+      
+      // Guardar en localStorage para persistencia
+      localStorage.setItem('profilePic', newImage);
+      localStorage.setItem('profilePic_backup', newImage);
+      localStorage.setItem('profilePic_lastUpdate', Date.now().toString());
+      
+      // Emitir evento para otros componentes
+      window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+        detail: { 
+          profileImage: newImage, 
+          timestamp: Date.now(),
+          source: 'useProfileImage'
+        }
+      }));
+      
       return true;
     } catch (err) {
-      console.error("❌ Error al actualizar imagen:", err);
-      setError("Error al actualizar la imagen de perfil");
-      setIsLoading(false);
+      console.error("useProfileImage: Error al actualizar imagen:", err);
+      setError({
+        message: 'Error al actualizar la imagen de perfil',
+        original: err
+      });
       return false;
     }
-  }, [notifyImageUpdate, validateImage]);
-  
+  };
+
   return {
-    profileImage: profileImage || fallbackImageBase64,
+    profileImage,
     isLoading,
     error,
     handleImageError,
     updateProfileImage,
-    notifyImageUpdate,
     fallbackImageBase64
   };
 };

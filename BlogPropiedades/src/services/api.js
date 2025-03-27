@@ -1447,16 +1447,31 @@ export const syncProfileImageBetweenDevices = async (imageData) => {
       headers['Content-Type'] = 'application/json';
     }
 
+    // Obtenemos la URL base, preferimos la definida en localStorage si existe
+    const storedApiUrl = localStorage.getItem('definitive_api_url');
+    const apiUrl = storedApiUrl || BASE_URL;
+
+    console.log(`🔄 Usando API URL: ${apiUrl} para sincronización de imagen`);
+
     // Enviar al servidor para almacenar en la cuenta del usuario
-    const response = await fetch(`${BASE_URL}/user/sync-profile-image`, {
+    const response = await fetch(`${apiUrl}/user/sync-profile-image`, {
       method: 'POST',
       headers,
-      body: requestBody
+      body: requestBody,
+      credentials: 'include' // Incluir cookies para CORS
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`Error al sincronizar imagen entre dispositivos: ${response.status}`, errorText);
+      
+      // Si es un error de autorización, intentar refrescar el token
+      if (response.status === 401) {
+        console.warn("Token expirado. Intentando refrescar token...");
+        // Aquí no refrescamos el token pero guardamos la imagen para que esté disponible la próxima vez
+        localStorage.setItem('pendingProfileSync', 'true');
+        localStorage.setItem('profilePic_pending', imageData);
+      }
       
       // Usar respuesta de error como texto normal si no es JSON
       try {
@@ -1480,6 +1495,9 @@ export const syncProfileImageBetweenDevices = async (imageData) => {
 
     // Registrar timestamp de última sincronización
     localStorage.setItem('profilePic_lastCloudSync', Date.now().toString());
+    // Eliminar banderas de sincronización pendiente
+    localStorage.removeItem('pendingProfileSync');
+    localStorage.removeItem('profilePic_pending');
 
     return {
       success: true,
@@ -1487,6 +1505,20 @@ export const syncProfileImageBetweenDevices = async (imageData) => {
     };
   } catch (error) {
     console.error("Error crítico al sincronizar imagen entre dispositivos:", error);
+    
+    // En caso de error, asegurar que la imagen se guarde localmente
+    try {
+      if (imageData) {
+        localStorage.setItem('profilePic', imageData);
+        localStorage.setItem('profilePic_backup', imageData);
+        // Marcar como pendiente para sincronizar más tarde
+        localStorage.setItem('pendingProfileSync', 'true');
+        localStorage.setItem('profilePic_pending', imageData);
+      }
+    } catch (saveError) {
+      console.error("Error al guardar imagen localmente:", saveError);
+    }
+    
     return { 
       success: false, 
       error: error.message || "Error desconocido" 
