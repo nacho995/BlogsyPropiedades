@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useRef, Suspense, lazy } from "rea
 import { Link, useNavigate } from "react-router-dom"; // Replace useHistory with useNavigate
 import { useUser } from "../context/UserContext";
 import { motion } from "framer-motion";
-import useProfileImage from "../hooks/useProfileImage";
 
 // Definimos las constantes y funciones que antes estaban en utils/imageUtils
 const fallbackImageBase64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNlMWUxZTEiLz48dGV4dCB4PSI1MCIgeT0iNTAiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGFsaWdubWVudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZmlsbD0iIzg4OCI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4=';
@@ -78,9 +77,6 @@ function Principal() {
   // Estado para controlar la visibilidad del menú de perfil
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef(null);
-  
-  // Usar el hook de imagen directamente - esto asegura que siempre tengamos una imagen válida
-  const { profileImage, handleImageError } = useProfileImage();
   
   // Obtener datos del usuario
   const { user, isAuthenticated: userAuthenticated, logout } = useUser();
@@ -171,24 +167,6 @@ function Principal() {
     return () => {
       clearTimeout(timer);
       isMounted = false;
-    };
-  }, []);
-
-  // Cargar datos del usuario
-  useEffect(() => {
-    // El hook useProfileImage ya se encarga de cargar la imagen desde localStorage
-    
-    // Agregar detector de eventos para cambios en la imagen de perfil
-    const handleProfileImageUpdate = () => {
-      console.log("Principal: Evento de actualización de imagen de perfil recibido");
-      // No es necesario hacer nada aquí, el hook useProfileImage maneja esto
-    };
-    
-    window.addEventListener('profileImageUpdated', handleProfileImageUpdate);
-    
-    // Limpiar al desmontar
-    return () => {
-      window.removeEventListener('profileImageUpdated', handleProfileImageUpdate);
     };
   }, []);
 
@@ -398,10 +376,9 @@ function Principal() {
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full opacity-50 blur-md animate-pulse"></div>
                 <div className="relative z-10">
                   <img 
-                    src={profileImage} 
+                    src={user?.profileImage || fallbackImageBase64} 
                     alt="Perfil"
                     className="h-28 w-28 md:h-36 md:w-36 rounded-full border-4 border-white object-cover shadow-lg"
-                    onError={handleImageError}
                   />
                 </div>
                 <Link 
@@ -424,7 +401,7 @@ function Principal() {
                 >
                   <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-white mb-2">
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200">¡Bienvenido</span>
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-100">, {name || 'Usuario'}!</span>
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-100">, {user?.name || name || 'Usuario'}!</span>
                   </h1>
                   <p className="mt-4 text-lg md:text-xl text-blue-100">
                     ¿Qué te gustaría hacer hoy? Explora o crea nuevo contenido y administra tus publicaciones
@@ -551,7 +528,6 @@ function Principal() {
                       src={getImageUrl(blog)}
                       alt={blog.title}
                       className="w-full h-full object-cover transform hover:scale-105 transition duration-500"
-                      onError={(e) => { e.target.src = defaultProfilePic }}
                     />
                   </div>
                   <div className="p-6">
@@ -630,7 +606,6 @@ function Principal() {
                       src={getPropertyImageUrl(property)}
                       alt={property.title}
                       className="w-full h-full object-cover transform hover:scale-105 transition duration-500"
-                      onError={(e) => { e.target.src = defaultProfilePic }}
                     />
                     <div className="absolute top-0 right-0 bg-yellow-400 text-blue-900 font-bold text-sm px-3 py-1 m-3 rounded-md">
                       {property.status || "En venta"}

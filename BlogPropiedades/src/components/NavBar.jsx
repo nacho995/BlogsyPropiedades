@@ -3,7 +3,6 @@ import { Disclosure, Menu, Transition } from '@headlessui/react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import useProfileImage from '../hooks/useProfileImage';
 
 // Variables requeridas para evitar errores TDZ en producción - NO ELIMINAR
 window.y = window.y || {};
@@ -17,6 +16,9 @@ const wi = {};
 const Fp = {};
 const Nc = {};
 
+// Definir fallback image localmente
+const fallbackImageBase64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNlMWUxZTEiLz48dGV4dCB4PSI1MCIgeT0iNTAiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGFsaWdubWVudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZmlsbD0iIzg4OCI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4=';
+
 // Función de utilidad para combinar clases CSS
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
@@ -28,46 +30,18 @@ export default function Navbar({ showOnlyAuth = false }) {
   
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated, user, logout } = useUser();
+  const { isAuthenticated, user, logout, loading: userLoading } = useUser();
   
-  // Usar el hook de imagen directamente, pasando el usuario
-  const { profileImage, handleImageError, fallbackImageBase64, profileLoading } = useProfileImage(user);
-  
-  // Forzar la actualización de la imagen cuando cambia el usuario
-  useEffect(() => {
-    // Si no hay usuario, no hacemos nada
-    if (!user) return;
-    
-    // Intentar cargar la imagen del localStorage cuando hay usuario
-    try {
-      const storedImage = localStorage.getItem('profilePic');
-      if (storedImage && storedImage !== 'undefined' && storedImage !== 'null') {
-        // No necesitamos hacer nada, el hook se encargará de esto
-        console.log("NavBar: Imagen de perfil disponible para", user.name || user.email);
-      } else {
-        console.log("NavBar: No hay imagen de perfil para el usuario actual");
-      }
-    } catch (error) {
-      console.error("Error al verificar imagen en NavBar:", error);
+  // Definir la imagen a mostrar usando el contexto y el fallback
+  const displayProfileImage = user?.profileImage || fallbackImageBase64;
+
+  // Manejador de error simple para la imagen
+  const handleImageError = (e) => {
+    if (e.target.src !== fallbackImageBase64) {
+      console.warn(`NavBar: Error al cargar ${e.target.src}, usando fallback.`);
+      e.target.src = fallbackImageBase64;
     }
-    
-    // Escuchar eventos de actualización de imagen
-    const handleProfileImageUpdate = (event) => {
-      // El componente se actualizará automáticamente gracias al hook useProfileImage
-      console.log("NavBar: Evento de actualización de imagen recibido");
-      
-      // Forzar rerenderizado del componente
-      // No es necesario ya que el hook useProfileImage maneja esto
-    };
-    
-    // Agregar escuchador para eventos de actualización de imagen
-    window.addEventListener('profileImageUpdated', handleProfileImageUpdate);
-    
-    // Limpiar escuchador al desmontar
-    return () => {
-      window.removeEventListener('profileImageUpdated', handleProfileImageUpdate);
-    };
-  }, [user]);
+  };
   
   // Verificar token expirado
   useEffect(() => {
@@ -198,14 +172,14 @@ export default function Navbar({ showOnlyAuth = false }) {
                       <div>
                         <Menu.Button className="flex rounded-full bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-800">
                           <span className="sr-only">Abrir menú de usuario</span>
-                          {profileLoading ? (
+                          {userLoading ? (
                             <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
                               <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
                             </div>
                           ) : (
                             <img
                               className="h-8 w-8 rounded-full object-cover"
-                              src={profileImage}
+                              src={displayProfileImage}
                               alt="Foto de perfil"
                               onError={handleImageError}
                             />
@@ -308,12 +282,18 @@ export default function Navbar({ showOnlyAuth = false }) {
                     <Menu as="div" className="relative">
                       <Menu.Button className="flex rounded-full bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 ring-offset-2 ring-offset-black">
                         <span className="sr-only">Abrir menú de usuario</span>
-                        <img
-                          className="h-8 w-8 lg:h-9 lg:w-9 rounded-full object-cover border-2 border-gray-700"
-                          src={profileImage}
-                          alt="Perfil"
-                          onError={handleImageError}
-                        />
+                        {userLoading ? (
+                           <div className="w-8 h-8 lg:h-9 lg:w-9 rounded-full bg-gray-600 flex items-center justify-center border-2 border-gray-700">
+                              <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                           </div>
+                        ) : (
+                          <img
+                            className="h-8 w-8 lg:h-9 lg:w-9 rounded-full object-cover border-2 border-gray-700"
+                            src={displayProfileImage}
+                            alt="Perfil"
+                            onError={handleImageError}
+                          />
+                        )}
                       </Menu.Button>
                       
                       <Transition
@@ -370,12 +350,18 @@ export default function Navbar({ showOnlyAuth = false }) {
               <div className="flex items-center md:hidden">
                 {isAuthenticated && (
                   <div className="flex items-center mr-2">
-                    <img
-                      className="h-7 w-7 rounded-full object-cover border border-gray-700"
-                      src={profileImage}
-                      alt="Perfil"
-                      onError={handleImageError}
-                    />
+                     {userLoading ? (
+                        <div className="w-7 h-7 rounded-full bg-gray-600 flex items-center justify-center border border-gray-700">
+                           <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-white"></div>
+                        </div>
+                      ) : (
+                       <img
+                         className="h-7 w-7 rounded-full object-cover border border-gray-700"
+                         src={displayProfileImage}
+                         alt="Perfil"
+                         onError={handleImageError}
+                       />
+                     )}
                   </div>
                 )}
                 <Disclosure.Button className="inline-flex items-center justify-center p-2 rounded-md text-gray-300 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-400">
@@ -412,12 +398,18 @@ export default function Navbar({ showOnlyAuth = false }) {
               {isAuthenticated && (
                 <div className="border-t border-gray-700 pt-2 mt-2">
                   <div className="flex items-center px-3 py-2">
-                    <img
-                      className="h-8 w-8 rounded-full mr-2 object-cover"
-                      src={profileImage}
-                      alt="Perfil"
-                      onError={handleImageError}
-                    />
+                    {userLoading ? (
+                      <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center mr-2">
+                         <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                      </div>
+                     ) : (
+                      <img
+                        className="h-8 w-8 rounded-full mr-2 object-cover"
+                        src={displayProfileImage}
+                        alt="Perfil"
+                        onError={handleImageError}
+                      />
+                    )}
                     <span className="text-gray-300 text-sm font-medium">{user?.name || "Usuario"}</span>
                   </div>
                   <div className="mt-1">
