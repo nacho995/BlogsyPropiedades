@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { createPropertyPost, uploadImageProperty, getPropertyById, updatePropertyPost } from '../services/api';
+import { createPropertyPost, uploadImageProperty, getPropertyById, updatePropertyPost, getCloudinarySignature } from '../services/api';
 import { useUser } from '../context/UserContext';
 import { motion } from 'framer-motion';
 import { FiUpload, FiHome, FiDollarSign, FiMapPin, FiUser, FiDroplet, FiSquare, FiTag, FiList, FiX, FiPlus, FiEdit } from 'react-icons/fi';
@@ -331,19 +331,20 @@ export default function PropertyCreation() {
     });
   };
   
-  // Manejar la subida de imágenes
+  // Manejar la subida de imágenes (MODIFICADO)
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
-    
+
     setUploadingImages(true);
     setError(null);
-    
+
     try {
-        // Filtrar y validar archivos
+        // Filtrar y validar archivos (igual que antes, pero podrías aumentar el límite aquí también)
         const validFiles = files.filter(file => {
-            if (file.size > 10 * 1024 * 1024) {
-                toast.warning(`La imagen ${file.name} es demasiado grande (máx. 10MB)`);
+            // Aumentamos el límite aquí también para consistencia, aunque Nginx/Multer ahora permitan más
+            if (file.size > 250 * 1024 * 1024) { 
+                toast.warning(`La imagen ${file.name} es demasiado grande (máx. 250MB)`);
                 return false;
             }
             if (!file.type.startsWith('image/')) {
@@ -354,59 +355,98 @@ export default function PropertyCreation() {
         });
 
         if (validFiles.length === 0) {
-            throw new Error('No hay imágenes válidas para subir');
+            // Lanzamos un error más informativo si ningún archivo pasa la validación
+             throw new Error('Ningún archivo seleccionado es válido (verifica tamaño y tipo).');
         }
 
-        // Subir cada imagen individualmente
+        // Subir cada imagen directamente a Cloudinary
         const uploadPromises = validFiles.map(async (file) => {
-            const formData = new FormData();
-            formData.append('image', file);
-            
-            // Agregar campos adicionales que pueda requerir el backend
-            formData.append('title', 'Imagen de propiedad');
-            formData.append('description', 'Imagen subida desde el formulario de propiedades');
-            
             try {
-                console.log(`Subiendo archivo: ${file.name}`);
-                const result = await uploadImageProperty(formData);
-                console.log('Resultado de subida de imagen:', result);
-                return result;
-            } catch (error) {
-                console.error(`Error al subir imagen ${file.name}:`, error);
-                toast.error(`Error al subir ${file.name}`);
-                throw error;
+                // 1. Obtener firma del backend
+                console.log(`Obteniendo firma para: ${file.name}`);
+                const signatureData = await getCloudinarySignature(); 
+                // TODO: Asegúrate de que getCloudinarySignature exista en api.js y maneje errores
+
+                if (!signatureData || !signatureData.success) {
+                    throw new Error(signatureData.message || 'No se pudo obtener la firma para la subida.');
+                }
+                
+                // 2. Preparar FormData para Cloudinary
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('api_key', signatureData.apiKey);
+                formData.append('timestamp', signatureData.timestamp);
+                formData.append('signature', signatureData.signature);
+                formData.append('folder', signatureData.folder);
+                if (signatureData.transformation) { // Enviar transformación si el backend la proporcionó
+                  formData.append('transformation', signatureData.transformation);
+                }
+                // Cloudinary generará un public_id si no lo enviamos
+
+                // 3. Subir a Cloudinary
+                console.log(`Subiendo a Cloudinary: ${file.name}`);
+                const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/image/upload`;
+                
+                const response = await fetch(cloudinaryUrl, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const result = await response.json();
+
+                if (!response.ok || result.error) {
+                    throw new Error(result.error?.message || `Error de Cloudinary al subir ${file.name}`);
+                }
+                
+                console.log(`Cloudinary upload success for ${file.name}:`, result);
+
+                // Devolver un objeto compatible con el estado actual (con src y alt)
+                return {
+                  src: result.secure_url, 
+                  alt: file.name || 'Imagen de propiedad',
+                  // Podrías querer guardar el public_id también si lo necesitas para futuras gestiones
+                  // publicId: result.public_id 
+                };
+
+            } catch (uploadError) {
+                console.error(`Error procesando imagen ${file.name}:`, uploadError);
+                toast.error(`Error al subir ${file.name}: ${uploadError.message}`);
+                return null; // Devolver null para poder filtrar errores después
             }
         });
 
+        // Esperar a que todas las promesas de subida se resuelvan
         const results = await Promise.all(uploadPromises);
-        console.log('Resultados de subida de imágenes:', results);
-        
-        // Filtrar resultados válidos
-        const validResults = results.filter(result => result && result.src);
-        
+        console.log('Resultados de subida directa a Cloudinary:', results);
+
+        // Filtrar resultados válidos (los que no devolvieron null)
+        const validResults = results.filter(result => result !== null);
+
         if (validResults.length === 0) {
-            throw new Error('No se pudo subir ninguna imagen correctamente');
+            throw new Error('No se pudo subir ninguna imagen correctamente a Cloudinary.');
         }
-        
-        // Actualizar el estado con las nuevas imágenes
+
+        // Actualizar el estado con las nuevas imágenes (igual que antes)
         setUploadedImages(prev => [...prev, ...validResults]);
         setPreviewImages(prev => [...prev, ...validResults]);
-        
-        // Actualizar formData con las nuevas imágenes
+
+        // Actualizar formData con las nuevas imágenes (igual que antes)
         setFormData(prev => ({
             ...prev,
             images: [...(prev.images || []), ...validResults]
         }));
 
-        toast.success(`${validResults.length} ${validResults.length === 1 ? 'imagen subida' : 'imágenes subidas'} correctamente`);
+        toast.success(`${validResults.length} ${validResults.length === 1 ? 'imagen subida' : 'imágenes subidas'} a Cloudinary`);
+
     } catch (error) {
-        console.error('Error al subir imágenes:', error);
+        console.error('Error en el proceso de subida de imágenes:', error);
         setError(`Error al subir las imágenes: ${error.message}`);
-        toast.error('Error al subir las imágenes');
+        // Usar toast aquí también para dar feedback al usuario
+        toast.error(error.message || 'Ocurrió un error al subir las imágenes.'); 
     } finally {
         setUploadingImages(false);
         if (fileInputRef.current) {
-            fileInputRef.current.value = '';
+            fileInputRef.current.value = ''; // Limpiar el input para permitir seleccionar los mismos archivos de nuevo
         }
     }
   };

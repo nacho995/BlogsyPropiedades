@@ -245,6 +245,36 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
 };
 
 /**
+ * Obtiene la firma segura de Cloudinary desde el backend.
+ * @returns {Promise<Object>} - Promise que se resuelve con los datos de la firma (signature, timestamp, apiKey, etc.)
+ */
+export const getCloudinarySignature = async () => {
+  console.log('Solicitando firma de Cloudinary...');
+  try {
+    // No necesitamos enviar nada en el body para GET
+    const signatureData = await fetchAPI('/api/cloudinary/signature', { method: 'GET' });
+    
+    if (signatureData.error) {
+      console.error('Error al obtener la firma desde la API:', signatureData.message);
+      throw new Error(signatureData.message || 'Error del servidor al obtener la firma');
+    }
+    
+    if (!signatureData.success || !signatureData.signature) {
+      console.error('Respuesta inválida del endpoint de firma:', signatureData);
+      throw new Error('Respuesta inválida del servidor al obtener la firma');
+    }
+    
+    console.log('Firma de Cloudinary obtenida con éxito.');
+    return signatureData; // Devolvemos el objeto completo { success, signature, timestamp, apiKey, ... }
+
+  } catch (error) {
+    console.error('Error en getCloudinarySignature:', error);
+    // Re-lanzamos el error para que la función que llama (handleImageUpload) pueda manejarlo
+    throw error; 
+  }
+};
+
+/**
  * Crea un nuevo blog post.
  * @param {Object} data - Datos del blog post.
  * @returns {Promise<Object>}
