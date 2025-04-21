@@ -30,8 +30,8 @@ export default function Navbar({ showOnlyAuth = false }) {
   const navigate = useNavigate();
   const { isAuthenticated, user, logout } = useUser();
   
-  // Usar el hook de imagen directamente - esto asegura que siempre tengamos una imagen válida
-  const { profileImage, handleImageError, fallbackImageBase64 } = useProfileImage();
+  // Usar el hook de imagen directamente, pasando el usuario
+  const { profileImage, handleImageError, fallbackImageBase64, profileLoading } = useProfileImage(user);
   
   // Forzar la actualización de la imagen cuando cambia el usuario
   useEffect(() => {
@@ -198,12 +198,18 @@ export default function Navbar({ showOnlyAuth = false }) {
                       <div>
                         <Menu.Button className="flex rounded-full bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-800">
                           <span className="sr-only">Abrir menú de usuario</span>
-                          <img
-                            className="h-8 w-8 rounded-full object-cover"
-                            src={profileImage}
-                            alt="Foto de perfil"
-                            onError={handleImageError}
-                          />
+                          {profileLoading ? (
+                            <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
+                              <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                            </div>
+                          ) : (
+                            <img
+                              className="h-8 w-8 rounded-full object-cover"
+                              src={profileImage}
+                              alt="Foto de perfil"
+                              onError={handleImageError}
+                            />
+                          )}
                         </Menu.Button>
                       </div>
                       <Transition

@@ -66,7 +66,7 @@ const ensureHttps = (url) => {
 // URL base de la API
 // Modificar la URL base para asegurar que sea correcta
 const API_DOMAIN = 'api.realestategozamadrid.com';
-const BASE_URL = `https://${API_DOMAIN}`;
+export const BASE_URL = `https://${API_DOMAIN}`;
 
 // Determinar si estamos usando HTTPS
 const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
@@ -994,9 +994,7 @@ export const getCurrentUser = async (tokenParam) => {
 // Función para obtener el perfil del usuario
 export async function getUserProfile(token) {
   try {
-    // Usar el token proporcionado o el almacenado en localStorage
     const authToken = token || localStorage.getItem('token');
-    
     if (!authToken) {
       throw new Error('No hay token de autenticación');
     }
@@ -1038,39 +1036,45 @@ export async function getUserProfile(token) {
     veryRecentAttempts.push(now);
     localStorage.setItem(profileAttemptsKey, JSON.stringify(veryRecentAttempts));
     
-    // Intentar obtener el perfil del usuario - ÚNICO INTENTO
-    try {
-      const userData = await fetchAPI('/user/me', {
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
-      });
-      
-      // Asegurar que la respuesta tenga un formato consistente
-      return {
-        ...userData,
-        // Asegurar que profilePic sea una cadena o null
-        profilePic: typeof userData.profilePic === 'string' ? userData.profilePic : null
+    // Intentar obtener el perfil del usuario
+    const userDataFromApi = await fetchAPI('/user/me', {
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
+
+    // Verificar si la llamada a fetchAPI fue exitosa y devolvió datos
+    if (userDataFromApi && !userDataFromApi.error && (userDataFromApi.id || userDataFromApi._id)) {
+      // Asegurar que el campo 'id' esté presente, copiándolo de '_id' si es necesario
+      const finalUserData = {
+        ...userDataFromApi,
+        id: userDataFromApi.id || userDataFromApi._id, // Asegura que 'id' exista
+        // Opcional: asegurar consistencia de profilePic/profileImage si es necesario
+        profileImage: userDataFromApi.profileImage || userDataFromApi.profilePic || null 
       };
-    } catch (error) {
-      // Si falla, no intentar con ruta alternativa para evitar bucles
-      console.error("Error al obtener perfil:", error.message);
-      
-      // Usar datos locales como respaldo
-      const email = localStorage.getItem('email');
-      const name = localStorage.getItem('name') || (email ? email.split('@')[0] : 'Usuario');
-      
-      return {
-        email,
-        name,
-        role: localStorage.getItem('role') || 'user',
-        profilePic: localStorage.getItem('profilePic'),
-        _recovered: true
-      };
+      // Eliminar _id si existe para evitar confusión
+      delete finalUserData._id; 
+      delete finalUserData.profilePic; // Eliminar profilePic si usamos solo profileImage
+
+      console.log("getUserProfile: Success - Returning:", finalUserData);
+      return finalUserData; 
+    } else {
+      // Si fetchAPI indicó un error, devolvió datos inválidos (sin id), o vacío
+      const errorMessage = userDataFromApi?.message || 'Failed to fetch valid user profile from API (missing id?)';
+      console.error("getUserProfile: fetchAPI('/user/me') failed or returned invalid data:", userDataFromApi);
+      throw new Error(errorMessage);
     }
-  } catch (outerError) {
-    console.error('Error en getUserProfile:', outerError);
-    throw outerError;
+
+  } catch (error) {
+    // Si fetchAPI lanzó una excepción o la verificación anterior falló
+    console.error('getUserProfile: Error fetching profile from API. NO fallback to localStorage. Error:', error);
+    // **NO DEVOLVER DATOS DE LOCALSTORAGE AQUÍ**
+    // Re-lanzar el error para que el llamador (refreshUserData) lo maneje.
+    throw error; 
+    
+    /* // Lógica de fallback eliminada
+    const email = localStorage.getItem('email'); ... 
+    */
   }
 }
 
@@ -1594,5 +1598,49 @@ export const fetchProfileImageFromServer = async () => {
       success: false, 
       error: error.message || "Error desconocido" 
     };
+  }
+};
+
+// Nueva función para subir imagen de perfil y actualizar usuario
+export const uploadProfileImageAndUpdate = async (userId, file) => {
+  const formData = new FormData();
+  formData.append('profileImage', file);
+
+  // Obtener token
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return { error: true, message: 'No autenticado' };
+  }
+
+  // Construir URL
+  let url = combineUrls(BASE_URL, `/user/profile-image/${userId}`);
+  url = ensureHttps(url);
+  
+  console.log(`🔄 Subiendo imagen de perfil a: ${url}`);
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        // NO establecer Content-Type, el navegador lo hará con FormData
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'
+      },
+      body: formData
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error(`❌ Error HTTP ${response.status} al subir imagen perfil:`, data);
+      return { error: true, status: response.status, message: data.message || 'Error del servidor' };
+    }
+
+    console.log("✅ Imagen de perfil subida y usuario actualizado:", data);
+    return data; // Contiene { success: true, message: '...', user: { ... } }
+
+  } catch (error) {
+    console.error('❌ Error en uploadProfileImageAndUpdate:', error);
+    return { error: true, message: error.message || 'Error de red o desconocido' };
   }
 };

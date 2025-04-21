@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { deletePropertyPost, getPropertyPosts } from '../services/api';
 import { FiHome, FiMapPin, FiDollarSign, FiMaximize, FiEye, FiEdit, FiTrash2 } from 'react-icons/fi';
 import { UserContext } from '../context/UserContext';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 export default function SeeProperties() {
     const [property, setProperty] = useState([]);

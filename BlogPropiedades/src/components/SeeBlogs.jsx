@@ -1,10 +1,10 @@
 import React, { Fragment, useEffect, useState, useContext } from 'react';
 import { Dialog, Transition } from "@headlessui/react";
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { deleteBlogPost, getBlogPosts } from '../services/api';
 import { FiCalendar, FiClock, FiUser, FiTag, FiTrash2, FiEdit } from 'react-icons/fi';
 import { UserContext } from '../context/UserContext';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 // Componente simple para mostrar imágenes con manejo de errores
 const DirectImage = ({ src, alt, className }) => {

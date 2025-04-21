@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { loginUser, createUser, fetchProfileImageFromServer } from "../services/api";
 import { useUser } from "../context/UserContext";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { UserContext } from '../context/UserContext';
 import PropTypes from 'prop-types';
 

@@ -4,71 +4,82 @@ const fallbackImageBase64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL
 
 /**
  * Hook para gestionar la imagen de perfil del usuario con persistencia
+ * @param {object | null} user - El objeto de usuario del contexto useUser
  */
-const useProfileImage = () => {
+const useProfileImage = (user) => {
   const [profileImage, setProfileImage] = useState(fallbackImageBase64);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Cargar la imagen al montar el componente
+  // Cargar la imagen al montar el componente o cuando cambie la URL en el user
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
+    setError(null); 
     
+    const userImageUrl = user?.profileImage?.url;
+    console.log("useProfileImage: Iniciando carga/actualización. userImageUrl:", userImageUrl);
+
     try {
-      // Primero intentar cargar de localStorage principal
-      const storedImage = localStorage.getItem('profilePic');
+      let imageToLoad = fallbackImageBase64;
+      let foundImage = false;
+
+      // 1. Usar la URL del objeto user si existe y es válida
+      if (userImageUrl && typeof userImageUrl === 'string' && userImageUrl.startsWith('http')) {
+        console.log("useProfileImage: Usando imagen desde el objeto user.");
+        imageToLoad = userImageUrl;
+        foundImage = true;
+        // Actualizar localStorage para consistencia
+        localStorage.setItem('profilePic', userImageUrl);
+        localStorage.setItem('profilePic_backup', userImageUrl);
+      }
       
-      if (storedImage && 
-          storedImage !== 'undefined' && 
-          storedImage !== 'null' && 
-          typeof storedImage === 'string') {
-        
-        console.log("useProfileImage: Cargando imagen de localStorage");
-        
-        // Asegurar que también esté en backup
-        localStorage.setItem('profilePic_backup', storedImage);
-        
-        if (isMounted) {
-          setProfileImage(storedImage);
-          setIsLoading(false);
-        }
-      } 
-      // Si no hay imagen principal, intentar cargar del backup
-      else {
-        console.log("useProfileImage: No se encontró imagen en localStorage principal, buscando en backup");
+      // 2. Si no hay imagen en user, intentar cargar de localStorage 
+      if (!foundImage) {
+        console.log("useProfileImage: No hay imagen en user, buscando en localStorage...");
+        const storedImage = localStorage.getItem('profilePic');
+        if (storedImage && 
+            storedImage !== 'undefined' && 
+            storedImage !== 'null' && 
+            typeof storedImage === 'string') {
+          
+          console.log("useProfileImage: Usando imagen de localStorage principal");
+          imageToLoad = storedImage;
+          foundImage = true;
+          localStorage.setItem('profilePic_backup', storedImage);
+        } 
+      }
+
+      // 3. Si aún no hay imagen, intentar cargar del backup
+      if (!foundImage) {
         const backupImage = localStorage.getItem('profilePic_backup');
-        
         if (backupImage && 
             backupImage !== 'undefined' && 
             backupImage !== 'null' && 
             typeof backupImage === 'string') {
           
           console.log("useProfileImage: Recuperando imagen desde backup");
-          
-          // Restaurar en localStorage principal
+          imageToLoad = backupImage;
+          foundImage = true;
           localStorage.setItem('profilePic', backupImage);
-          
-          if (isMounted) {
-            setProfileImage(backupImage);
-            setIsLoading(false);
-          }
-        } else {
-          // No hay imagen disponible, usar fallback
-          console.log("useProfileImage: No se encontró imagen en ningún almacenamiento");
-          if (isMounted) {
-            setProfileImage(fallbackImageBase64);
-            setIsLoading(false);
-          }
         }
       }
-    } catch (err) {
-      console.error("useProfileImage: Error al cargar imagen:", err);
+      
+      // 4. Si no se encontró ninguna imagen válida, usar fallback
+      if (!foundImage) {
+          console.log("useProfileImage: No se encontró imagen válida, usando fallback.");
+      }
+
+      // Establecer la imagen final y estado de carga
       if (isMounted) {
-        setError({
-          message: 'Error al cargar la imagen de perfil',
-          original: err
-        });
+        setProfileImage(imageToLoad); // Establecer la imagen encontrada o el fallback
+        setIsLoading(false);
+      }
+
+    } catch (err) {
+      console.error("useProfileImage: Error al cargar imagen inicial:", err);
+      if (isMounted) {
+        setError({ message: 'Error al cargar la imagen de perfil', original: err });
         setProfileImage(fallbackImageBase64);
         setIsLoading(false);
       }
@@ -102,7 +113,7 @@ const useProfileImage = () => {
       isMounted = false;
       window.removeEventListener('profileImageUpdated', handleProfileUpdate);
     };
-  }, []);
+  }, [user?.profileImage?.url]);
 
   // Función para manejar errores de carga de imagen
   const handleImageError = () => {

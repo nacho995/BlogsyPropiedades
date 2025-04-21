@@ -5,7 +5,7 @@ import { Dialog } from "@headlessui/react";
 import { getPropertyById, updatePropertyPost, uploadFile } from "../services/api";
 import { useUser } from "../context/UserContext";
 import { FiMapPin, FiMaximize, FiDollarSign, FiHome, FiLayers, FiDroplet } from 'react-icons/fi';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 export default function PropertyDetail() {
   const { id } = useParams();

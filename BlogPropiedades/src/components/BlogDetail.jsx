@@ -1,11 +1,11 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { Dialog } from "@headlessui/react";
 import { getBlogById, updateBlogPost, deleteBlogPost, uploadImageBlog } from "../services/api";
 import { useUser } from "../context/UserContext";
 import { FiCalendar, FiClock, FiUser, FiTag, FiX, FiUpload } from 'react-icons/fi';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 export default function BlogDetail() {
   const { id } = useParams();

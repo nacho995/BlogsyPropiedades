@@ -371,111 +371,54 @@ export function UserProvider({ children }) {
       try {
         const userData = await getUserProfile(storedToken);
         
-        // Verificar que los datos del usuario son válidos
-        if (!userData || !userData.email) {
-          console.error("⚠️ API devolvió datos de usuario inválidos:", userData);
-          
-          // Intentar recuperar con datos locales
-          await recuperateSession();
-          setLoading(false);
-          return;
+        // Verificar que los datos del usuario son válidos y tienen id
+        if (!userData || !userData.id) {
+          console.error("⚠️ refreshUserData: getUserProfile falló o devolvió datos inválidos (sin id).", userData);
+          logout(true, 'profile_fetch_invalid'); // Cerrar sesión si falla
+          setLoading(false); // Asegurar que loading se ponga a false
+          return; // Detener ejecución
         }
         
-        // Actualizar localStorage con datos básicos
+        // Log éxito obtención de datos
+        console.log("✅ refreshUserData: Datos de usuario obtenidos correctamente:", {
+           id: userData.id, 
+           name: userData.name, 
+           email: userData.email, 
+           role: userData.role, 
+           profileImageExists: !!userData.profileImage 
+        });
+        
+        // Actualizar localStorage con datos básicos (opcional pero puede ser útil)
         if (userData.name) localStorage.setItem("name", userData.name);
         if (userData.email) localStorage.setItem("email", userData.email);
         if (userData.role) localStorage.setItem("role", userData.role);
         
-        // Sincronizar la imagen de perfil con el servidor
-        try {
-          console.log("Sincronizando imagen de perfil durante refreshUserData");
-          await syncProfileImage();
-        } catch (imageError) {
-          console.error("Error al sincronizar imagen de perfil:", imageError);
-          // Continuar con el proceso a pesar del error
-        }
+        // Determinar la imagen final a usar: Priorizar la del userData si existe
+        const finalProfileImage = userData.profileImage || 
+                               localStorage.getItem("profilePic") || // Fallback a localStorage si no hay en user
+                               fallbackImageBase4;
         
-        // Obtener la imagen actualizada de localStorage
-        const updatedImage = localStorage.getItem("profilePic") || 
-                            localStorage.getItem("profilePic_local") || 
-                            localStorage.getItem("profilePic_base64") || 
-                            fallbackImageBase64;
-        
-        // Actualizar estado con los datos del usuario
+        // Actualizar estado con los datos validados del usuario
         setUser({
-          ...userData,
-          profileImage: updatedImage
+          ...userData, // Ya contiene id, name, email, role...
+          profileImage: finalProfileImage // Usar la imagen determinada
         });
         setIsAuthenticated(true);
-        setLoading(false);
+        
       } catch (error) {
-        console.error("Error al obtener perfil de usuario:", error);
-        
-        // Si falla la petición al servidor pero tenemos un token, intentar recuperar 
-        // la sesión con los datos almacenados en localStorage
-        if (storedToken) {
-          console.log("Intentando recuperar sesión desde localStorage tras fallo de API");
-          const recovered = await recuperateSession();
-          
-          if (!recovered) {
-            // Si no podemos recuperar la sesión, redirigir al login
-            console.error("No se pudo recuperar sesión, redirigiendo a login");
-            setUser(null);
-            setIsAuthenticated(false);
-          }
-        } else {
-          setUser(null);
-          setIsAuthenticated(false);
-        }
-        
+        // Captura errores lanzados por getUserProfile o validaciones previas
+        console.error("Error en refreshUserData al obtener/validar perfil:", error);
+        logout(true, 'profile_refresh_error'); // Cerrar sesión en caso de error
+      } finally {
+        // Asegurar que setLoading SIEMPRE se ponga a false al final
         setLoading(false);
+        console.log("🏁 refreshUserData: Proceso finalizado.");
       }
     } catch (outerError) {
-      console.error("Error crítico en refreshUserData:", outerError);
-      setUser(null);
-      setIsAuthenticated(false);
-      setLoading(false);
+      console.error("Error crítico inicial en refreshUserData:", outerError);
+      logout(true, 'critical_refresh_error'); // Asegurar logout en errores críticos
     }
   };
-
-  // Sincronizar imagen al iniciar sesión o recargar
-  useEffect(() => {
-    // Sincronizar imagen al iniciar sesión o recargar
-    const syncProfileFromLocalStorage = async () => {
-      try {
-        console.log("🔄 Cargando imagen de perfil desde localStorage...");
-        
-        // Verificar si hay token válido
-        const token = localStorage.getItem('token');
-        if (!token) {
-          console.warn("No hay token disponible");
-          return;
-        }
-        
-        // Usar datos de localStorage
-        const storedImage = localStorage.getItem('profilePic') || 
-                           localStorage.getItem('profilePic_backup');
-        
-        if (storedImage) {
-          // Actualizar la imagen en el estado del usuario
-          setUser(prevUser => {
-            if (!prevUser) return prevUser;
-            return {
-              ...prevUser,
-              profileImage: storedImage,
-              profilePic: storedImage
-            };
-          });
-        }
-      } catch (error) {
-        console.error("Error al sincronizar imagen:", error);
-      }
-    };
-    
-    if (isAuthenticated) {
-      syncProfileFromLocalStorage();
-    }
-  }, [isAuthenticated]);
 
   // Función de logout
   const logout = (shouldRedirect = true, reason = 'user_action') => {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 const DiagnosticPage = () => {
   const { user } = useUser();

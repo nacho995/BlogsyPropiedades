@@ -5,7 +5,7 @@ import { useUser } from '../context/UserContext';
 import { motion } from 'framer-motion';
 import { FiUpload, FiHome, FiDollarSign, FiMapPin, FiUser, FiDroplet, FiSquare, FiTag, FiList, FiX, FiPlus, FiEdit } from 'react-icons/fi';
 import { BiBed, BiBath } from 'react-icons/bi';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
@@ -431,6 +431,18 @@ export default function PropertyCreation() {
     } catch (error) {
         console.error('Error al eliminar la imagen:', error);
         toast.error('Error al eliminar la imagen');
+    }
+  };
+  
+  // Nueva función para manejar el drop
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length) {
+      // Llamar a handleImageUpload con un objeto evento simulado
+      handleImageUpload({ target: { files: files } });
     }
   };
   
@@ -869,6 +881,11 @@ export default function PropertyCreation() {
               <div
                 className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition"
                 onClick={() => fileInputRef.current.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onDrop={handleDrop}
               >
                 <FiUpload className="mx-auto text-blue-500 mb-4" size={48} />
                 <p className="text-lg text-blue-800 font-medium mb-2">

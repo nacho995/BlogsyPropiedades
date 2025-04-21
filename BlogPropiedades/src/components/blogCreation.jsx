@@ -5,7 +5,7 @@ import { useUser } from '../context/UserContext';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { FiUpload, FiEdit, FiType, FiFileText, FiUser, FiTag, FiList, FiX, FiPlus } from 'react-icons/fi';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 // Animaciones básicas
 const fadeIn = {
@@ -1200,8 +1200,15 @@ export default function BlogCreation() {
                     <div className="bg-white p-6 rounded-lg shadow-lg">
                         <h3 className="text-xl font-semibold mb-4">Imágenes del Blog</h3>
                         
-                        {/* Input para subir imágenes */}
-                        <div className="mb-6">
+                        {/* Input y zona de drop para subir imágenes */}
+                        <div 
+                          className="mb-6 border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors" // Estilos añadidos al div contenedor
+                          onDragOver={(e) => { // <-- Añadido onDragOver al div
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
+                          onDrop={handleDrop} // <-- Añadido onDrop al div
+                        >
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Subir Imágenes
                             </label>
@@ -1217,7 +1224,7 @@ export default function BlogCreation() {
                             <button
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
-                                className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-center hover:border-blue-500 hover:text-blue-500 transition-colors"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-center bg-white hover:bg-gray-50 transition-colors"
                                 disabled={uploadingImage}
                             >
                                 {uploadingImage ? (
@@ -1235,6 +1242,7 @@ export default function BlogCreation() {
                                     </span>
                                 )}
                             </button>
+                            <p className="text-xs text-gray-500 mt-2">o arrastra y suelta los archivos aquí</p> {/* Texto añadido */}
                         </div>
 
                         {/* Previsualización de imágenes */}
@@ -1640,6 +1648,19 @@ export default function BlogCreation() {
           console.error('Error al eliminar la imagen:', error);
           toast.error(error.message || 'Error al eliminar la imagen');
       }
+  };
+  
+  // Nueva función para manejar el drop en blogs
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (uploadingImage) return; // No hacer nada si ya se está subiendo
+    
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length) {
+      // Llamar a handleMultipleImageUpload con un objeto evento simulado
+      handleMultipleImageUpload({ target: { files: files } });
+    }
   };
   
   return (

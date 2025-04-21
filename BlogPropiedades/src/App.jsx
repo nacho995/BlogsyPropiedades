@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { UserProvider, useUser } from './context/UserContext';
-import { Toaster } from 'react-hot-toast';
-import toast from 'react-hot-toast';
+import { Toaster } from 'sonner';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // Primero cargar componentes básicos y utilidades
 import Navbar from './components/NavBar';
@@ -23,7 +24,6 @@ import SubirPage from './components/SubirPage';
 import DiagnosticPage from './components/DiagnosticPage';
 import NotFound from './components/NotFound';
 import TestImagePage from './pages/testImagePage';
-import ImageSynchronizer from './components/ImageSynchronizer';
 
 // Detección de ciclos de renderizado
 const RENDER_CYCLE_THRESHOLD = 10; // Número máximo de renderizados en un corto período de tiempo
@@ -800,22 +800,10 @@ function App() {
             <SafeAppContainer>
                 <UserProvider>
                     <div className="min-h-screen bg-gray-100">
-                        <Toaster 
-                            position="top-center"
-                            reverseOrder={false}
-                            gutter={8}
-                            toastOptions={{
-                                duration: 4000,
-                                style: {
-                                    background: '#363636',
-                                    color: '#fff',
-                                },
-                            }}
-                        />
+                        <Toaster position="top-right" richColors />
                         <BrowserRouter>
                             <ImageLoader />
                             <Navbar />
-                            <ImageSynchronizer />
                             <Routes>
                                 <Route path="/" element={<SafeRender><HomeRoute /></SafeRender>} />
                                 <Route path="/login" element={<SafeRender><SignIn /></SafeRender>} />
