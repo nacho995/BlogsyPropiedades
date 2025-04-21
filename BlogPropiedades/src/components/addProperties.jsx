@@ -331,126 +331,6 @@ export default function PropertyCreation() {
     });
   };
   
-  // Manejar la subida de imágenes (MODIFICADO)
-  const handleImageUpload = async (e) => {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-
-    setUploadingImages(true);
-    setError(null);
-
-    try {
-        // Filtrar y validar archivos (igual que antes, pero podrías aumentar el límite aquí también)
-        const validFiles = files.filter(file => {
-            // Aumentamos el límite aquí también para consistencia, aunque Nginx/Multer ahora permitan más
-            if (file.size > 250 * 1024 * 1024) { 
-                toast.warning(`La imagen ${file.name} es demasiado grande (máx. 250MB)`);
-                return false;
-            }
-            if (!file.type.startsWith('image/')) {
-                toast.warning(`El archivo ${file.name} no es una imagen válida`);
-                return false;
-            }
-            return true;
-        });
-
-        if (validFiles.length === 0) {
-            // Lanzamos un error más informativo si ningún archivo pasa la validación
-             throw new Error('Ningún archivo seleccionado es válido (verifica tamaño y tipo).');
-        }
-
-        // Subir cada imagen directamente a Cloudinary
-        const uploadPromises = validFiles.map(async (file) => {
-            try {
-                // 1. Obtener firma del backend
-                console.log(`Obteniendo firma para: ${file.name}`);
-                const signatureData = await getCloudinarySignature(); 
-                // TODO: Asegúrate de que getCloudinarySignature exista en api.js y maneje errores
-
-                if (!signatureData || !signatureData.success) {
-                    throw new Error(signatureData.message || 'No se pudo obtener la firma para la subida.');
-                }
-                
-                // 2. Preparar FormData para Cloudinary
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('api_key', signatureData.apiKey);
-                formData.append('timestamp', signatureData.timestamp);
-                formData.append('signature', signatureData.signature);
-                formData.append('folder', signatureData.folder);
-                if (signatureData.transformation) { // Enviar transformación si el backend la proporcionó
-                  formData.append('transformation', signatureData.transformation);
-                }
-                // Cloudinary generará un public_id si no lo enviamos
-
-                // 3. Subir a Cloudinary
-                console.log(`Subiendo a Cloudinary: ${file.name}`);
-                const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/image/upload`;
-                
-                const response = await fetch(cloudinaryUrl, {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                const result = await response.json();
-
-                if (!response.ok || result.error) {
-                    throw new Error(result.error?.message || `Error de Cloudinary al subir ${file.name}`);
-                }
-                
-                console.log(`Cloudinary upload success for ${file.name}:`, result);
-
-                // Devolver un objeto compatible con el estado actual (con src y alt)
-                return {
-                  src: result.secure_url, 
-                  alt: file.name || 'Imagen de propiedad',
-                  // Podrías querer guardar el public_id también si lo necesitas para futuras gestiones
-                  // publicId: result.public_id 
-                };
-
-            } catch (uploadError) {
-                console.error(`Error procesando imagen ${file.name}:`, uploadError);
-                toast.error(`Error al subir ${file.name}: ${uploadError.message}`);
-                return null; // Devolver null para poder filtrar errores después
-            }
-        });
-
-        // Esperar a que todas las promesas de subida se resuelvan
-        const results = await Promise.all(uploadPromises);
-        console.log('Resultados de subida directa a Cloudinary:', results);
-
-        // Filtrar resultados válidos (los que no devolvieron null)
-        const validResults = results.filter(result => result !== null);
-
-        if (validResults.length === 0) {
-            throw new Error('No se pudo subir ninguna imagen correctamente a Cloudinary.');
-        }
-
-        // Actualizar el estado con las nuevas imágenes (igual que antes)
-        setUploadedImages(prev => [...prev, ...validResults]);
-        setPreviewImages(prev => [...prev, ...validResults]);
-
-        // Actualizar formData con las nuevas imágenes (igual que antes)
-        setFormData(prev => ({
-            ...prev,
-            images: [...(prev.images || []), ...validResults]
-        }));
-
-        toast.success(`${validResults.length} ${validResults.length === 1 ? 'imagen subida' : 'imágenes subidas'} a Cloudinary`);
-
-    } catch (error) {
-        console.error('Error en el proceso de subida de imágenes:', error);
-        setError(`Error al subir las imágenes: ${error.message}`);
-        // Usar toast aquí también para dar feedback al usuario
-        toast.error(error.message || 'Ocurrió un error al subir las imágenes.'); 
-    } finally {
-        setUploadingImages(false);
-        if (fileInputRef.current) {
-            fileInputRef.current.value = ''; // Limpiar el input para permitir seleccionar los mismos archivos de nuevo
-        }
-    }
-  };
-  
   // Eliminar una imagen específica
   const removeImage = (index) => {
     try {
@@ -471,6 +351,130 @@ export default function PropertyCreation() {
     } catch (error) {
         console.error('Error al eliminar la imagen:', error);
         toast.error('Error al eliminar la imagen');
+    }
+  };
+  
+  // Modificada para procesar imágenes secuencialmente
+  const handleImageUpload = async (e) => {
+    if (!e.target.files || e.target.files.length === 0) {
+        toast.info("No se seleccionaron archivos."); // Informar si no hay archivos
+        return;
+    }
+
+    setUploadingImages(true);
+    setError(null); // Limpiar errores previos al iniciar nueva subida
+
+    const files = Array.from(e.target.files);
+    const maxFileSize = 5 * 1024 * 1024; // 5MB (ajustar si es necesario)
+
+    try {
+        const uploadedUrls = []; // Array para guardar las URLs subidas exitosamente
+
+        for (const file of files) {
+            // Validar archivo individualmente dentro del bucle
+            if (file.size > maxFileSize) {
+                toast.warning(`El archivo ${file.name} excede el tamaño máximo de 5MB y será omitido.`);
+                continue; // Saltar este archivo y continuar con el siguiente
+            }
+            if (!file.type.startsWith('image/')) {
+                toast.warning(`El archivo ${file.name} no es una imagen válida y será omitido.`);
+                continue; // Saltar este archivo
+            }
+
+            // Procesar un archivo a la vez
+            try {
+                // 1. Obtener firma del backend PARA ESTE ARCHIVO
+                console.log(`Obteniendo firma para: ${file.name}`);
+                const signatureData = await getCloudinarySignature(); // Llamada secuencial
+
+                if (!signatureData || !signatureData.success) {
+                    // Usar el mensaje de error de la API si está disponible
+                    const errorMessage = signatureData?.message || `No se pudo obtener la firma para ${file.name}.`;
+                    throw new Error(errorMessage);
+                }
+
+                // 2. Preparar FormData para Cloudinary
+                const formDataCloudinary = new FormData();
+                formDataCloudinary.append('file', file);
+                formDataCloudinary.append('api_key', signatureData.apiKey);
+                formDataCloudinary.append('timestamp', signatureData.timestamp);
+                formDataCloudinary.append('signature', signatureData.signature);
+                formDataCloudinary.append('folder', signatureData.folder);
+                 if (signatureData.transformation) {
+                    formDataCloudinary.append('transformation', signatureData.transformation);
+                 }
+
+                // 3. Subir a Cloudinary
+                console.log(`Subiendo a Cloudinary: ${file.name}`);
+                const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/image/upload`;
+
+                const response = await fetch(cloudinaryUrl, {
+                    method: 'POST',
+                    body: formDataCloudinary,
+                });
+
+                const result = await response.json();
+
+                if (!response.ok || result.error) {
+                    throw new Error(result.error?.message || `Error de Cloudinary al subir ${file.name}`);
+                }
+
+                console.log(`Cloudinary upload success for ${file.name}:`, { url: result.secure_url, public_id: result.public_id });
+
+                // Guardar el resultado válido
+                 uploadedUrls.push({
+                    src: result.secure_url, // Usar secure_url que es HTTPS
+                    alt: file.name || 'Imagen de propiedad',
+                    // publicId: result.public_id // Guardar si necesitas gestionar/borrar desde Cloudinary
+                 });
+                 toast.success(`${file.name} subido correctamente.`); // Feedback positivo por cada imagen
+
+            } catch (uploadError) {
+                console.error(`Error procesando imagen ${file.name}:`, uploadError);
+                toast.error(`Error al subir ${file.name}: ${uploadError.message}`);
+                // Continuar con las siguientes imágenes aunque una falle
+                continue;
+            }
+        } // Fin del bucle for...of
+
+        // Si después del bucle, hemos subido alguna imagen nueva
+        if (uploadedUrls.length > 0) {
+            console.log('URLs subidas exitosamente:', uploadedUrls);
+
+             // Actualizar el estado con las nuevas imágenes
+            setUploadedImages(prev => [...prev, ...uploadedUrls]);
+            setPreviewImages(prev => [...prev, ...uploadedUrls]);
+
+            // Actualizar formData del estado principal
+            setFormData(prev => ({
+                ...prev,
+                images: [...(prev.images || []), ...uploadedUrls] // Añadir a las existentes
+            }));
+
+            toast.info(`${uploadedUrls.length} ${uploadedUrls.length === 1 ? 'imagen nueva añadida' : 'imágenes nuevas añadidas'} a la propiedad.`);
+
+        } else {
+             // Si no se subió ninguna imagen nueva (todas fallaron o no había válidas/nuevas)
+             const initialFileCount = files.length;
+             const validFileCount = files.filter(f => f.size <= maxFileSize && f.type.startsWith('image/')).length;
+             if (initialFileCount > 0 && validFileCount === 0) {
+                toast.error("Ninguno de los archivos seleccionados era válido para subir.");
+             } else if (initialFileCount > 0 && uploadedUrls.length === 0) {
+                 toast.warning("No se pudo subir ninguna de las imágenes seleccionadas debido a errores.");
+             }
+             // Si no había archivos iniciales, ya se informó al principio.
+             console.warn("No se añadieron imágenes nuevas en este lote.");
+        }
+
+    } catch (error) { // Error general (ej. error al leer e.target.files)
+        console.error('Error general en el proceso de subida de imágenes:', error);
+        setError(`Error general al procesar imágenes: ${error.message}`);
+        toast.error(error.message || 'Ocurrió un error inesperado al procesar las imágenes.');
+    } finally {
+        setUploadingImages(false);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''; // Limpiar el input para permitir seleccionar mismos archivos
+        }
     }
   };
   
