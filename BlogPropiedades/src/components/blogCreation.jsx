@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { createBlogPost, uploadImageBlog, getBlogById, updateBlogPost } from '../services/api';
+import { createBlogPost, uploadImageBlog, getBlogById, updateBlogPost, getCloudinarySignature } from '../services/api';
 import { useUser } from '../context/UserContext';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
@@ -1476,79 +1476,83 @@ export default function BlogCreation() {
   // Puedes llamar a esta función después de una publicación exitosa o cuando un usuario inicie un nuevo blog
   
   const handleMultipleImageUpload = async (e) => {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-    
+    // Validar selección
+    if (!e.target.files || e.target.files.length === 0) {
+      toast.info('No se seleccionaron archivos.');
+      return;
+    }
     setUploadingImage(true);
     setError(null);
-    
+    const files = Array.from(e.target.files);
+    const maxFileSize = 5 * 1024 * 1024; // 5MB
+    const uploadedUrls = [];
+
+    // Obtener firma una vez para todo el lote
+    console.log('Obteniendo firma de Cloudinary UNA VEZ para todo el lote...');
+    let signatureData;
     try {
-        // Filtrar y validar archivos
-        const validFiles = files.filter(file => {
-            if (file.size > 10 * 1024 * 1024) {
-                toast.warning(`La imagen ${file.name} es demasiado grande (máx. 10MB)`);
-                return false;
-            }
-            if (!file.type.startsWith('image/')) {
-                toast.warning(`El archivo ${file.name} no es una imagen válida`);
-                return false;
-            }
-            return true;
-        });
-
-        if (validFiles.length === 0) {
-            throw new Error('No hay imágenes válidas para subir');
-        }
-
-        // Subir cada imagen individualmente
-        const uploadPromises = validFiles.map(async (file) => {
-            const formData = new FormData();
-            formData.append('image', file);
-            formData.append('title', 'Imagen de blog');
-            formData.append('description', 'Imagen subida desde el formulario de blog');
-            
-            try {
-                console.log(`Subiendo archivo: ${file.name}`);
-                const result = await uploadImageBlog(formData);
-                console.log('Resultado de subida de imagen:', result);
-                return result;
-            } catch (error) {
-                console.error(`Error al subir imagen ${file.name}:`, error);
-                toast.error(`Error al subir ${file.name}`);
-                throw error;
-            }
-        });
-
-        const results = await Promise.all(uploadPromises);
-        console.log('Resultados de subida de imágenes:', results);
-        
-        // Filtrar resultados válidos
-        const validResults = results.filter(result => result && result.src);
-        
-        if (validResults.length === 0) {
-            throw new Error('No se pudo subir ninguna imagen correctamente');
-        }
-        
-        // Actualizar el estado con las nuevas imágenes
-        setFormData(prev => ({
-            ...prev,
-            images: [...(prev.images || []), ...validResults],
-            // Si no hay imagen principal, usar la primera imagen subida
-            image: prev.image?.src ? prev.image : validResults[0]
-        }));
-
-        toast.success(`${validResults.length} ${validResults.length === 1 ? 'imagen subida' : 'imágenes subidas'} correctamente`);
-    } catch (error) {
-        console.error('Error al subir imágenes:', error);
-        setError(`Error al subir las imágenes: ${error.message}`);
-        toast.error('Error al subir las imágenes');
-    } finally {
-        setUploadingImage(false);
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
+      signatureData = await getCloudinarySignature();
+      if (!signatureData || !signatureData.success) {
+        const msg = signatureData?.message || 'No se pudo obtener la firma para la subida';
+        throw new Error(msg);
+      }
+      console.log('Firma obtenida con éxito para el lote.');
+    } catch (sigError) {
+      console.error('Error al obtener firma de Cloudinary:', sigError);
+      toast.error(`Error al configurar subida: ${sigError.message}`);
+      setUploadingImage(false);
+      return;
     }
-};
+
+    // Procesar cada archivo
+    for (const file of files) {
+      if (file.size > maxFileSize) {
+        toast.warning(`El archivo ${file.name} excede 5MB y será omitido.`);
+        continue;
+      }
+      if (!file.type.startsWith('image/')) {
+        toast.warning(`El archivo ${file.name} no es una imagen válida y será omitido.`);
+        continue;
+      }
+      try {
+        const formDataCloudinary = new FormData();
+        formDataCloudinary.append('file', file);
+        formDataCloudinary.append('api_key', signatureData.apiKey);
+        formDataCloudinary.append('timestamp', signatureData.timestamp);
+        formDataCloudinary.append('signature', signatureData.signature);
+        formDataCloudinary.append('folder', signatureData.folder);
+        if (signatureData.transformation) {
+          formDataCloudinary.append('transformation', signatureData.transformation);
+        }
+        console.log(`Subiendo a Cloudinary: ${file.name}`);
+        const uploadUrl = `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/image/upload`;
+        const resp = await fetch(uploadUrl, { method: 'POST', body: formDataCloudinary });
+        const result = await resp.json();
+        if (!resp.ok || result.error) {
+          throw new Error(result.error?.message || `Error al subir ${file.name}`);
+        }
+        uploadedUrls.push({ src: result.secure_url, alt: file.name, publicId: result.public_id });
+        toast.success(`${file.name} subido correctamente.`);
+      } catch (upErr) {
+        console.error(`Error procesando ${file.name}:`, upErr);
+        toast.error(`Error al subir ${file.name}: ${upErr.message}`);
+        continue;
+      }
+    }
+
+    // Actualizar estado de forma asíncrona para evitar conflictos con DnD
+    if (uploadedUrls.length > 0) {
+      setTimeout(() => {
+        setFormData(prev => ({
+          ...prev,
+          images: [...(prev.images || []), ...uploadedUrls]
+        }));
+        setPreviewImages(prev => [...prev, ...uploadedUrls.map(u => u.src)]);
+      }, 0);
+    }
+    setUploadingImage(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
   
   // Función auxiliar para asegurar el formato correcto de una imagen
   const formatImageObject = (img, altText = '') => {

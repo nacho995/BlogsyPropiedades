@@ -64,18 +64,32 @@ const ensureHttps = (url) => {
 };
 
 // URL base de la API
-// Modificar la URL base para asegurar que sea correcta
-const API_DOMAIN = 'api.realestategozamadrid.com';
-export const BASE_URL = `https://${API_DOMAIN}`;
+// Detectar entorno de desarrollo y cambiar la URL base si es necesario
+const isLocalDevelopment = typeof window !== 'undefined' && (
+  window.location.hostname === 'localhost' || 
+  window.location.hostname === '127.0.0.1'
+);
+
+// Modificar la URL base para usar el servidor local en desarrollo
+const API_DOMAIN = isLocalDevelopment 
+  ? 'localhost:8081'  // Servidor de desarrollo local
+  : 'api.realestategozamadrid.com';  // Servidor de producción
+
+// Usar HTTP para localhost, HTTPS para producción
+export const BASE_URL = isLocalDevelopment 
+  ? `http://${API_DOMAIN}`  // Desarrollo local: HTTP
+  : `https://${API_DOMAIN}`; // Producción: HTTPS
 
 // Determinar si estamos usando HTTPS
 const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
-// Usar la API con HTTPS
+// Usar la API directamente sin proxies
 const API_BASE_URL = BASE_URL;
 
-// Registrar la URL de la API usada
-console.log(`🌐 Usando API en: ${BASE_URL} - Acceso directo sin proxies`);
+// Registrar la URL de la API usada con mensaje más claro sobre el entorno
+console.log(
+  `🌐 Usando API en: ${BASE_URL}${isLocalDevelopment ? ' - MODO DESARROLLO LOCAL' : ' - MODO PRODUCCIÓN'}`
+);
 console.log(`🔒 Frontend en: ${isHttps ? 'HTTPS' : 'HTTP'} - ${window.location.origin}`);
 
 // Desactivar explícitamente cualquier proxy CORS
@@ -106,8 +120,9 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
     // Construir la URL completa - Siempre en HTTPS
     let url = combineUrls(BASE_URL, endpoint.startsWith('/') ? endpoint : `/${endpoint}`);
     
-    // Asegurar que siempre sea HTTPS para el backend
-    if (url.startsWith('http://')) {
+    // Asegurar que sea HTTPS para el backend de producción, pero mantener HTTP para desarrollo local
+    if (url.startsWith('http://') && !url.includes('localhost') && !url.includes('127.0.0.1')) {
+      // Solo convertir a HTTPS si NO es localhost o IP local
       url = url.replace('http://', 'https://');
     }
     

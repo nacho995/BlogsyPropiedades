@@ -1,13 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { createPropertyPost, uploadImageProperty, getPropertyById, updatePropertyPost, getCloudinarySignature } from '../services/api';
+import { createPropertyPost, uploadImageProperty, getPropertyById, updatePropertyPost, getCloudinarySignature, uploadFile } from '../services/api';
 import { useUser } from '../context/UserContext';
 import { motion } from 'framer-motion';
-import { FiUpload, FiHome, FiDollarSign, FiMapPin, FiUser, FiDroplet, FiSquare, FiTag, FiList, FiX, FiPlus, FiEdit } from 'react-icons/fi';
+import { FiUpload, FiHome, FiDollarSign, FiMapPin, FiUser, FiDroplet, FiSquare, FiTag, FiList, FiX, FiPlus, FiEdit, FiVideo, FiCamera } from 'react-icons/fi';
 import { BiBed, BiBath } from 'react-icons/bi';
 import { toast } from 'sonner';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 // Inyecta global CSS para la animación de shake (puedes moverlo a tu archivo global si lo prefieres)
 const globalStyles = `
@@ -76,6 +77,14 @@ const globalStyles = `
   padding: 10px 15px;
   margin: 10px 0;
   border-radius: 4px;
+}
+
+/* Estilos adicionales para drag & drop */
+.dragging-over {
+  background-color: #e0f2fe; /* Light blue background when dragging over */
+}
+.image-preview-item {
+  transition: background-color 0.2s ease;
 }
 `;
 
@@ -150,7 +159,9 @@ export default function PropertyCreation() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useUser();
-  const fileInputRef = useRef(null);
+  const imageInputRef = useRef(null);
+  const videoInputRef = useRef(null);
+  const video360InputRef = useRef(null);
   const quillRef = useRef(null);
   
   // Estado para controlar si estamos en modo edición
@@ -178,13 +189,18 @@ export default function PropertyCreation() {
     propertyType: 'Venta',
     features: [],
     status: 'Disponible',
-    featured: false
+    featured: false,
+    videos: [],
+    videos360: []
   });
   
   const [uploadedImages, setUploadedImages] = useState([]);
-  const [previewImages, setPreviewImages] = useState([]);
+  const [previewVideos, setPreviewVideos] = useState([]);
+  const [previewVideos360, setPreviewVideos360] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [uploadingVideos, setUploadingVideos] = useState(false);
+  const [uploadingVideos360, setUploadingVideos360] = useState(false);
   const [error, setError] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [featureInput, setFeatureInput] = useState('');
@@ -247,6 +263,10 @@ export default function PropertyCreation() {
         propertyImages = [...propertyImages, ...additionalImages];
       }
       
+      // Procesar videos (si existen en la API)
+      const propertyVideos = Array.isArray(propertyData.videos) ? propertyData.videos : [];
+      const propertyVideos360 = Array.isArray(propertyData.videos360) ? propertyData.videos360 : [];
+      
       // Actualizar el estado del formulario con los datos de la propiedad
       setFormData({
         title: propertyData.title || '',
@@ -268,12 +288,15 @@ export default function PropertyCreation() {
         propertyType: propertyData.propertyType || 'Venta',
         features: propertyData.features || [],
         status: propertyData.status || 'Disponible',
-        featured: propertyData.featured || false
+        featured: propertyData.featured || false,
+        videos: propertyVideos,
+        videos360: propertyVideos360
       });
       
       // Actualizar previewImages
-      setPreviewImages(propertyImages);
       setUploadedImages(propertyImages);
+      setPreviewVideos(propertyVideos.map(v => ({ name: v.name || v.url || 'Video', url: v.url })));
+      setPreviewVideos360(propertyVideos360.map(v => ({ name: v.name || v.url || 'Video 360', url: v.url })));
       
       toast.success('Datos de la propiedad cargados correctamente');
     } catch (error) {
@@ -323,38 +346,85 @@ export default function PropertyCreation() {
   
   // Eliminar una característica
   const removeFeature = (index) => {
-    const newFeatures = [...formData.features];
-    newFeatures.splice(index, 1);
-    setFormData({
-      ...formData,
-      features: newFeatures
-    });
+    setFormData(prevData => ({
+      ...prevData,
+      features: prevData.features.filter((_, i) => i !== index)
+    }));
   };
   
   // Eliminar una imagen específica
   const removeImage = (index) => {
-    try {
-        // No permitir eliminar la última imagen si es la única
-        if (formData.images.length <= 1) {
-            toast.warning('No se puede eliminar la única imagen disponible');
-            return;
-        }
+    setPreviewImages(prev => prev.filter((_, i) => i !== index));
+    setFormData(prevData => ({
+      ...prevData,
+      images: prevData.images.filter((_, i) => i !== index)
+    }));
+  };
+  
+  // Crear la función para manejar la subida de videos
+  const handleVideoUpload = async (e, type) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
 
-        setUploadedImages(prev => prev.filter((_, i) => i !== index));
-        setPreviewImages(prev => prev.filter((_, i) => i !== index));
-        setFormData(prev => ({
-            ...prev,
-            images: prev.images.filter((_, i) => i !== index)
-        }));
+    if (type === 'standard') {
+      setUploadingVideos(true);
+      setPreviewVideos(prev => [...prev, ...files.map(f => ({ name: f.name, loading: true }))]);
+    } else {
+      setUploadingVideos360(true);
+      setPreviewVideos360(prev => [...prev, ...files.map(f => ({ name: f.name, loading: true }))]);
+    }
 
-        toast.success('Imagen eliminada');
-    } catch (error) {
-        console.error('Error al eliminar la imagen:', error);
-        toast.error('Error al eliminar la imagen');
+    // Aquí iría la lógica para subir los videos a Cloudinary o similar
+    // Por ahora, simularemos la subida y actualizaremos la preview
+    console.log(`Simulando subida de ${files.length} video(s) de tipo ${type}`);
+    
+    // Placeholder: Simular subida y obtener URLs (esto debe reemplazarse con la subida real)
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Simular espera
+    
+    const uploadedVideoUrls = files.map(file => ({ 
+        src: URL.createObjectURL(file), // URL temporal local para preview
+        alt: file.name, 
+        type: type // 'standard' o '360'
+    }));
+
+    // Actualizar formData y previews
+    setFormData(prevData => ({
+      ...prevData,
+      videos: [...(prevData.videos || []), ...uploadedVideoUrls]
+    }));
+
+    if (type === 'standard') {
+      setPreviewVideos(prev => prev.map(p => p.loading ? { ...p, loading: false } : p));
+      setUploadingVideos(false);
+    } else {
+      setPreviewVideos360(prev => prev.map(p => p.loading ? { ...p, loading: false } : p));
+      setUploadingVideos360(false);
+    }
+
+    toast.success(`${files.length} video(s) ${type === 'standard' ? 'estándar' : '360'} cargado(s) para previsualización.`);
+    // Limpiar el input para permitir subir el mismo archivo de nuevo si se elimina
+    if (type === 'standard' && videoInputRef.current) videoInputRef.current.value = null;
+    if (type === '360' && video360InputRef.current) video360InputRef.current.value = null;
+  };
+
+  // Añadir función para eliminar videos
+  const removeVideo = (index, type) => {
+    if (type === 'standard') {
+      setPreviewVideos(prev => prev.filter((_, i) => i !== index));
+      setFormData(prevData => ({
+        ...prevData,
+        videos: (prevData.videos || []).filter(v => v.type !== 'standard' || v !== (prevData.videos || []).filter(vid => vid.type === 'standard')[index])
+      }));
+    } else {
+      setPreviewVideos360(prev => prev.filter((_, i) => i !== index));
+      setFormData(prevData => ({
+        ...prevData,
+        videos: (prevData.videos || []).filter(v => v.type !== '360' || v !== (prevData.videos || []).filter(vid => vid.type === '360')[index])
+      }));
     }
   };
   
-  // Modificada para procesar imágenes secuencialmente
+  // Modificado para procesar imágenes secuencialmente
   const handleImageUpload = async (e) => {
     if (!e.target.files || e.target.files.length === 0) {
         toast.info("No se seleccionaron archivos."); // Informar si no hay archivos
@@ -442,7 +512,7 @@ export default function PropertyCreation() {
                  uploadedUrls.push({
                     src: result.secure_url, // Usar secure_url que es HTTPS
                     alt: file.name || 'Imagen de propiedad',
-                    // publicId: result.public_id // Guardar si necesitas gestionar/borrar desde Cloudinary
+                    publicId: result.public_id // Guardamos el publicId para tener una key estable
                  });
                  toast.success(`${file.name} subido correctamente.`); // Feedback positivo por cada imagen
 
@@ -455,33 +525,25 @@ export default function PropertyCreation() {
         } // Fin del bucle for...of
 
         // Si después del bucle, hemos subido alguna imagen nueva
-        if (uploadedUrls.length > 0) {
-            console.log('URLs subidas exitosamente:', uploadedUrls);
-
-             // Actualizar el estado con las nuevas imágenes
-            setUploadedImages(prev => [...prev, ...uploadedUrls]);
-            setPreviewImages(prev => [...prev, ...uploadedUrls]);
-
-            // Actualizar formData del estado principal
-            setFormData(prev => ({
-                ...prev,
-                images: [...(prev.images || []), ...uploadedUrls] // Añadir a las existentes
-            }));
-
-            toast.info(`${uploadedUrls.length} ${uploadedUrls.length === 1 ? 'imagen nueva añadida' : 'imágenes nuevas añadidas'} a la propiedad.`);
-
-        } else {
-             // Si no se subió ninguna imagen nueva (todas fallaron o no había válidas/nuevas)
-             const initialFileCount = files.length;
-             const validFileCount = files.filter(f => f.size <= maxFileSize && f.type.startsWith('image/')).length;
-             if (initialFileCount > 0 && validFileCount === 0) {
-                toast.error("Ninguno de los archivos seleccionados era válido para subir.");
-             } else if (initialFileCount > 0 && uploadedUrls.length === 0) {
-                 toast.warning("No se pudo subir ninguna de las imágenes seleccionadas debido a errores.");
-             }
-             // Si no había archivos iniciales, ya se informó al principio.
-             console.warn("No se añadieron imágenes nuevas en este lote.");
+        const initialFileCount = files.length;
+        const validFileCount = files.filter(f => f.size <= maxFileSize && f.type.startsWith('image/')).length;
+        if (initialFileCount > 0 && validFileCount === 0) {
+            toast.error("Ninguno de los archivos seleccionados era válido para subir.");
+        } else if (initialFileCount > 0 && uploadedUrls.length === 0) {
+            toast.warning("No se pudo subir ninguna de las imágenes seleccionadas debido a errores.");
         }
+        console.warn("No se añadieron imágenes nuevas en este lote.");
+        
+        // Introducir un pequeño delay antes de actualizar el estado
+        // Esto puede ayudar a evitar conflictos con react-beautiful-dnd
+        setTimeout(() => {
+            if (uploadedUrls.length > 0) {
+                setFormData(prev => ({
+                    ...prev,
+                    images: [...prev.images, ...uploadedUrls] // Añadimos las nuevas imágenes a formData
+                }));
+            }
+        }, 0); // Un delay de 0ms es suficiente para aplazar la ejecución al siguiente ciclo de eventos
 
     } catch (error) { // Error general (ej. error al leer e.target.files)
         console.error('Error general en el proceso de subida de imágenes:', error);
@@ -489,21 +551,26 @@ export default function PropertyCreation() {
         toast.error(error.message || 'Ocurrió un error inesperado al procesar las imágenes.');
     } finally {
         setUploadingImages(false);
-        if (fileInputRef.current) {
-            fileInputRef.current.value = ''; // Limpiar el input para permitir seleccionar mismos archivos
+        if (imageInputRef.current) {
+            imageInputRef.current.value = ''; // Limpiar el input para permitir seleccionar mismos archivos
         }
     }
   };
   
   // Nueva función para manejar el drop
-  const handleDrop = (e) => {
+  const handleDrop = (e, inputType) => {
     e.preventDefault();
     e.stopPropagation();
     
     const files = Array.from(e.dataTransfer.files);
     if (files.length) {
-      // Llamar a handleImageUpload con un objeto evento simulado
-      handleImageUpload({ target: { files: files } });
+      if (inputType === 'image') {
+        handleImageUpload({ target: { files: files } });
+      } else if (inputType === 'video') {
+        handleVideoUpload({ target: { files: files } }, 'standard');
+      } else if (inputType === 'video360') {
+         handleVideoUpload({ target: { files: files } }, '360');
+      }
     }
   };
   
@@ -517,7 +584,32 @@ export default function PropertyCreation() {
     setCurrentStep(currentStep - 1);
   };
   
-  // Enviar el formulario
+  // --- REINSERTAR FUNCION PARA REORDENAR IMAGENES ---
+  const onDragEnd = (result) => {
+    const { source, destination } = result;
+
+    // Si no hay destino o es el mismo sitio, no hacer nada
+    if (!destination || 
+        (destination.droppableId === source.droppableId && destination.index === source.index)) {
+      return;
+    }
+
+    // Reordenar el array de formData.images
+    const items = Array.from(formData.images);
+    const [reorderedItem] = items.splice(source.index, 1);
+    items.splice(destination.index, 0, reorderedItem);
+
+    // Actualizar el estado de forma asíncrona
+    setTimeout(() => {
+      setFormData(prev => ({
+          ...prev,
+          images: items
+      }));
+    }, 0); // Delay de 0ms para pasar al siguiente ciclo de eventos
+  };
+  // --- FIN FUNCION REORDENAR ---
+  
+  // Modificado para incluir videos y orden de imágenes
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -926,124 +1018,193 @@ export default function PropertyCreation() {
           </motion.div>
         );
         
-      case 3:
+      case 3: // Paso de Medios (Imágenes y Videos)
         return (
           <motion.div
             variants={staggerContainer}
             initial="hidden"
             animate="visible"
-            className="space-y-6"
+            className="space-y-8" // Aumentar espacio
           >
-            <motion.h2 variants={fadeIn} className="text-2xl font-bold text-blue-800">
-              Imágenes
-            </motion.h2>
-            
-            <motion.div variants={fadeIn} className="mb-6">
+             {/* --- Sección Imágenes --- */}
+            <motion.div variants={fadeIn}>
+              <h3 className="text-xl font-semibold text-blue-800 mb-4 flex items-center">
+                <FiCamera className="mr-2"/>Imágenes (Arrastra para reordenar)
+              </h3>
               <div
-                className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition"
-                onClick={() => fileInputRef.current.click()}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-                onDrop={handleDrop}
+                className="border-2 border-dashed border-blue-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-500 transition mb-4"
+                onClick={() => imageInputRef.current.click()}
+                 onDragOver={(e) => e.preventDefault()}
+                 onDrop={(e) => handleDrop(e, 'image')}
               >
-                <FiUpload className="mx-auto text-blue-500 mb-4" size={48} />
-                <p className="text-lg text-blue-800 font-medium mb-2">
-                  Arrastra y suelta tus imágenes aquí
-                </p>
-                <p className="text-gray-500">
-                  o haz clic para seleccionar archivos
-                </p>
-                <input
-                  type="file"
-                  multiple
-                  ref={fileInputRef}
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  accept="image/*"
-                />
+                <FiUpload className="mx-auto text-blue-500 mb-3" size={40} />
+                <p className="text-md text-blue-800 font-medium">Arrastra imágenes o haz clic</p>
+                <input type="file" multiple ref={imageInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
               </div>
-              
+
               {uploadingImages && (
-                <div className="mt-4 text-center">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-                  <p className="mt-2 text-blue-600">Subiendo imágenes...</p>
-                </div>
+                <div className="text-center text-blue-600">Subiendo imágenes...</div>
               )}
+
+              <DragDropContext onDragEnd={onDragEnd}>
+                <Droppable droppableId="imageList">
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-4 p-2 rounded-lg ${snapshot.isDraggingOver ? 'bg-blue-50' : ''}`}
+                    >
+                      {formData.images.map((preview, index) => (
+                        <Draggable key={preview.publicId || preview.src + index} draggableId={preview.publicId || preview.src + index} index={index}>
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              className={`relative group rounded-lg overflow-hidden shadow border ${snapshot.isDragging ? 'shadow-lg scale-105' : ''} image-preview-item`}
+                              style={{...provided.draggableProps.style}}
+                            >
+                              {index === 0 && (
+                                <span className="absolute top-1 left-1 bg-blue-600 text-white px-1.5 py-0.5 rounded text-xs z-10">
+                                  Principal
+                                </span>
+                              )}
+                              <img
+                                src={preview.src}
+                                alt={preview.alt || `Imagen ${index + 1}`}
+                                className="w-full h-32 object-cover"
+                                onError={(e) => { e.target.src = "https://via.placeholder.com/400x300?text=Error"; }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeImage(index)}
+                                className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-700"
+                                title="Eliminar imagen"
+                              >
+                                <FiX size={14} />
+                              </button>
+                              {snapshot.isDragging && (
+                                <div className="absolute inset-0 bg-blue-100 opacity-50"></div>
+                              )}
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
               
-              {previewImages.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="text-lg font-semibold mb-3">Imágenes subidas ({previewImages.length})</h3>
-                  <div className="grid grid-cols-3 gap-4">
-                    {previewImages.map((preview, index) => (
-                      <div key={index} className="relative group">
-                        {index === 0 && (
-                          <span className="absolute top-2 left-2 bg-blue-500 text-white px-2 py-1 rounded text-sm">
-                            Principal
-                          </span>
-                        )}
-                        <img
-                          src={preview.src}
-                          alt={preview.alt}
-                          className="w-full h-40 object-cover rounded-lg shadow-md"
-                          onError={(e) => {
-                            e.target.src = "https://via.placeholder.com/400x300?text=Error+al+cargar+imagen";
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeImage(index)}
-                          className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"
-                        >
-                          <FiX size={16} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+              {formData.images.length === 0 && !uploadingImages && (
+                <p className="text-center text-gray-500 mt-4">No hay imágenes añadidas.</p>
+              )}
+            </motion.div>
+
+            {/* --- Sección Videos Estándar --- */}
+            <motion.div variants={fadeIn}>
+              <h3 className="text-xl font-semibold text-blue-800 mb-4 flex items-center">
+                <FiVideo className="mr-2"/>Videos Estándar
+              </h3>
+              <div
+                className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-gray-500 transition mb-4"
+                onClick={() => videoInputRef.current.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => handleDrop(e, 'video')}
+              >
+                <FiUpload className="mx-auto text-gray-500 mb-3" size={40} />
+                <p className="text-md text-gray-800 font-medium">Arrastra videos estándar o haz clic</p>
+                <input type="file" multiple ref={videoInputRef} onChange={(e) => handleVideoUpload(e, 'standard')} className="hidden" accept="video/*" />
+              </div>
+              {uploadingVideos && (
+                <div className="text-center text-blue-600">Subiendo videos...</div>
+              )}
+              {previewVideos.length > 0 && (
+                <div className="mt-4 space-y-2">
+                   <h4 className="text-md font-semibold mb-2">Videos subidos:</h4>
+                   {previewVideos.map((video, index) => (
+                    <div key={index} className="flex items-center justify-between bg-gray-100 p-2 rounded">
+                      <span className="text-sm text-gray-700 truncate">{video.name}</span>
+                      <button type="button" onClick={() => removeVideo(index, 'standard')} className="text-red-500 hover:text-red-700 ml-2">
+                        <FiX size={16}/>
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </motion.div>
-            
-            <motion.div variants={fadeIn} className="flex justify-between">
+
+            {/* --- Sección Videos 360 --- */}
+            <motion.div variants={fadeIn}>
+              <h3 className="text-xl font-semibold text-blue-800 mb-4 flex items-center">
+                <FiVideo className="mr-2"/>Videos 360º (Para Tour Virtual)
+              </h3>
+               <div
+                className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-gray-500 transition mb-4"
+                onClick={() => video360InputRef.current.click()}
+                 onDragOver={(e) => e.preventDefault()}
+                 onDrop={(e) => handleDrop(e, 'video360')}
+              >
+                <FiUpload className="mx-auto text-gray-500 mb-3" size={40} />
+                <p className="text-md text-gray-800 font-medium">Arrastra videos 360º o haz clic</p>
+                <input type="file" multiple ref={video360InputRef} onChange={(e) => handleVideoUpload(e, '360')} className="hidden" accept="video/*" />
+              </div>
+               {uploadingVideos360 && (
+                <div className="text-center text-blue-600">Subiendo videos 360...</div>
+              )}
+               {previewVideos360.length > 0 && (
+                 <div className="mt-4 space-y-2">
+                  <h4 className="text-md font-semibold mb-2">Videos 360 subidos:</h4>
+                  {previewVideos360.map((video, index) => (
+                    <div key={index} className="flex items-center justify-between bg-gray-100 p-2 rounded">
+                      <span className="text-sm text-gray-700 truncate">{video.name}</span>
+                      <button type="button" onClick={() => removeVideo(index, '360')} className="text-red-500 hover:text-red-700 ml-2">
+                         <FiX size={16}/>
+                      </button>
+                    </div>
+                  ))}
+                 </div>
+               )}
+            </motion.div>
+
+            {/* Botones de Navegación/Envío */}
+            <motion.div variants={fadeIn} className="flex justify-between pt-4">
               <button
                 type="button"
-                onClick={prevStep}
+                onClick={prevStep} // Usa la función prevStep definida fuera del switch
                 className="bg-gray-300 text-gray-800 px-6 py-3 rounded-lg font-bold hover:bg-gray-400 transition focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50"
               >
                 Anterior
               </button>
-              
+
               <button
-                type="submit"
-                onClick={handleSubmit}
-                disabled={loading || uploadingImages}
+                type="submit" // Cambiado a submit para que funcione el form
+                disabled={loading || uploadingImages || uploadingVideos || uploadingVideos360}
                 className={`px-6 py-3 rounded-lg font-bold transform transition hover:scale-105 focus:outline-none focus:ring-2 focus:ring-opacity-50 ${
-                  loading || uploadingImages
+                  loading || uploadingImages || uploadingVideos || uploadingVideos360
                     ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500'
                 }`}
               >
-                {loading ? 'Creando...' : 'Publicar propiedad'}
+                {loading ? (isEditMode ? 'Actualizando...' : 'Publicando...') : (isEditMode ? 'Actualizar Propiedad' : 'Publicar Propiedad')}
               </button>
             </motion.div>
           </motion.div>
         );
-        
+
       default:
         return null;
     }
   };
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="max-w-3xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden"
+        className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden"
       >
-        {/* Encabezado */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 py-6 px-8">
           <h1 className="text-3xl font-bold text-white">
             {isEditMode ? 'Editar Propiedad' : 'Añadir Nueva Propiedad'}
@@ -1055,39 +1216,35 @@ export default function PropertyCreation() {
           </p>
         </div>
         
-        {/* Indicador de progreso */}
         <div className="px-8 pt-6">
           <div className="flex items-center justify-between mb-8 relative">
             {[1, 2, 3].map((step) => (
-              <div key={step} className="flex flex-col items-center">
-                <div 
+              <div key={step} className="flex flex-col items-center z-10">
+                <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
                     currentStep === step
                       ? 'bg-blue-600 text-white'
-                      : currentStep > step
-                        ? 'bg-green-500 text-white'
-                        : 'bg-gray-200 text-gray-600'
+                      : 'bg-gray-200 text-gray-600'
                   }`}
                 >
                   {currentStep > step ? '✓' : step}
                 </div>
                 <span className={`text-sm mt-2 ${currentStep >= step ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
-                  {step === 1 ? 'Información' : step === 2 ? 'Características' : 'Imágenes'}
+                  {step === 1 ? 'Información' : step === 2 ? 'Características' : 'Medios'}
                 </span>
               </div>
             ))}
             
             <div className="absolute left-0 right-0 top-5 h-0.5 bg-gray-200 -z-10">
-              <div 
+              <div
                 className="h-full bg-blue-600 transition-all duration-300"
-                style={{ width: `${(currentStep - 1) * 50}%` }}
+                style={{ width: `${((currentStep - 1) / 2) * 100}%` }}
               ></div>
             </div>
           </div>
         </div>
         
-        {/* Contenido del formulario */}
-        <form className="px-8 pb-8">
+        <form onSubmit={handleSubmit} className="px-8 pb-8">
           {error && (
             <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded">
               <p className="font-medium">Error</p>
