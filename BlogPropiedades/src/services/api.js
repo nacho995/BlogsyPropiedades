@@ -854,55 +854,32 @@ export const uploadFile = async (file, token) => {
  * @returns {Promise<Object>}
  */
 export const createPropertyPost = async (data) => {
-  try {
-    // Validar que todos los campos requeridos estén presentes
-    const requiredFields = ['title', 'description', 'price', 'location', 'bedrooms', 'bathrooms', 'area'];
-    const missingFields = requiredFields.filter(field => !data[field]);
-    
-    if (missingFields.length > 0) {
-      throw new Error(`Faltan campos requeridos: ${missingFields.join(', ')}`);
-    }
-    
-    // Asegurarse de que los campos numéricos sean números
-    const propertyData = {
-      ...data,
-      price: parseFloat(data.price) || 0,
-      bedrooms: parseInt(data.bedrooms) || 0,
-      bathrooms: parseInt(data.bathrooms) || 0,
-      area: parseFloat(data.area) || 0
-    };
-    
-    // Asegurarse de que las imágenes estén en el formato correcto
-    if (propertyData.images && Array.isArray(propertyData.images)) {
-      propertyData.images = propertyData.images.map(img => {
-        if (typeof img === 'string') {
-          return { src: img, alt: 'Imagen de propiedad' };
-        }
-        if (typeof img === 'object' && img !== null) {
-          return {
-            src: img.src || img.url || img.secure_url || img.imageUrl,
-            alt: img.alt || 'Imagen de propiedad'
-          };
-        }
-        return null;
-      }).filter(img => img !== null);
-    }
-    
-    console.log('Enviando datos de propiedad al servidor:', propertyData);
-    
-    const response = await fetchAPI('/property', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(propertyData)
-    });
+  console.log('Creando propiedad con datos:', data);
+  if (!data) {
+    console.error('No data provided for createPropertyPost');
+    throw new Error('No se proporcionaron datos para crear la propiedad.');
+  }
 
-    console.log('Respuesta del servidor:', response);
+  // Asegurarse de que las imágenes sean solo un array de URLs (o el formato esperado)
+  if (data.images && Array.isArray(data.images)) {
+     // Puede que necesitemos ajustar esto según lo que realmente espera el backend
+    // Si el backend espera objetos { src, alt }, esto ya está bien.
+    // Si espera solo strings (URLs), necesitaríamos: data.images = data.images.map(img => img.src);
+    console.log('Enviando imágenes:', data.images); 
+  }
+
+  try {
+    // ***** CORRECCIÓN AQUÍ *****
+    const response = await postData('/api/properties', data); // Usar /api/properties
+    // **************************
+
+    console.log('Respuesta de createPropertyPost:', response);
+    if (response && response.error) {
+      throw new Error(response.message || 'Error al crear la propiedad');
+    }
     return response;
-    
   } catch (error) {
-    console.error('Error detallado al crear propiedad:', error);
+    console.error('Error detallado en createPropertyPost:', error);
     throw error;
   }
 };
@@ -982,13 +959,28 @@ export const deletePropertyPost = async (id) => {
  * @returns {Promise<Object>}
  */
 export const updatePropertyPost = async (id, data) => {
+  console.log(`Actualizando propiedad ${id} con datos:`, data);
+  if (!id || !data) {
+    throw new Error('ID o datos faltantes para actualizar la propiedad.');
+  }
+
+  // Similar a create, verificar/ajustar el formato de las imágenes si es necesario
+  if (data.images && Array.isArray(data.images)) {
+    console.log('Enviando imágenes actualizadas:', data.images);
+  }
+
   try {
-    return await fetchAPI(`/api/properties/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
+    // ***** CORRECCIÓN AQUÍ *****
+    const response = await updateData(`/api/properties/${id}`, data); // Usar /api/properties/:id
+    // ***********************
+
+    console.log('Respuesta de updatePropertyPost:', response);
+    if (response && response.error) {
+      throw new Error(response.message || 'Error al actualizar la propiedad');
+    }
+    return response;
   } catch (error) {
-    console.error(`Error al actualizar propiedad ${id}:`, error);
+    console.error('Error detallado en updatePropertyPost:', error);
     throw error;
   }
 };
