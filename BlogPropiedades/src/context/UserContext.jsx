@@ -613,6 +613,105 @@ export function UserProvider({ children }) {
     }
   };
   
+  // Función para sincronizar la imagen de perfil de forma segura
+  const safeProfileSync = async (imageFile) => {
+    console.log("🔄 Iniciando sincronización de imagen de perfil...");
+    logAuthEvent('profile_sync_attempt');
+
+    // 1. Obtener token actual
+    const currentToken = localStorage.getItem('token');
+    if (!currentToken || !isValidToken(currentToken)) {
+      console.error("❌ No hay token válido para sincronizar la imagen.");
+      logAuthEvent('profile_sync_failed_no_token');
+      // Podríamos intentar logout o recuperación aquí si fuese necesario
+      return { success: false, error: 'Token inválido o ausente' };
+    }
+
+    try {
+      // 2. Validación básica del archivo (aunque validateAndProcessImage no se usa aquí directamente)
+      // La API syncProfileImage probablemente espera el objeto File directamente
+      if (!imageFile) {
+        throw new Error('No se proporcionó ninguna imagen');
+      }
+      if (!imageFile.type.match('image.*')) {
+        throw new Error('El archivo seleccionado no es una imagen válida');
+      }
+      if (imageFile.size > 2 * 1024 * 1024) { // 2MB limit
+        throw new Error('La imagen es demasiado grande (máximo 2MB)');
+      }
+
+      console.log(`📤 Subiendo imagen: ${imageFile.name} (${(imageFile.size / 1024).toFixed(1)} KB)`);
+
+      // 3. Llamar a la API para subir la imagen
+      // Asumimos que syncProfileImage toma (token, file) y devuelve { success: true, profileImageUrl: '...' } o { success: false, error: '...' }
+      const response = await syncProfileImage(currentToken, imageFile);
+
+      if (response && response.success && response.profileImageUrl) {
+        const newImageUrl = ensureHttps(response.profileImageUrl); // Asegurar HTTPS
+        console.log("✅ Imagen subida y URL obtenida:", newImageUrl.substring(0, 50) + "...");
+        logAuthEvent('profile_sync_successful', { imageUrl: newImageUrl.substring(0, 30) + "..." });
+
+        // 4. Actualizar estado local del usuario
+        setUser(prevUser => {
+          if (!prevUser) return null; // Si no hay usuario, no actualizar
+          const updatedUser = {
+            ...prevUser,
+            profileImage: newImageUrl,
+            profilePic: newImageUrl // Actualizar ambos por consistencia
+          };
+          // Actualizar también userData en localStorage si existe
+          try {
+            const storedUserData = localStorage.getItem('userData');
+            if (storedUserData) {
+              const parsedData = JSON.parse(storedUserData);
+              parsedData.profileImage = newImageUrl;
+              parsedData.profilePic = newImageUrl;
+              localStorage.setItem('userData', JSON.stringify(parsedData));
+            }
+             // Actualizar userResponse también si existe (similar a login)
+             const userResponse = localStorage.getItem('userResponse');
+             if (userResponse) {
+               const responseData = JSON.parse(userResponse);
+               responseData.profilePic = newImageUrl;
+               responseData.profileImage = newImageUrl;
+               localStorage.setItem('userResponse', JSON.stringify(responseData));
+             }
+          } catch (e) {
+            console.warn("Error al actualizar userData/userResponse en localStorage tras sync:", e);
+          }
+          return updatedUser;
+        });
+
+        // 5. Actualizar localStorage directamente (clave principal para imagen)
+        // Esto también disparará el evento 'storage' para otras pestañas
+        localStorage.setItem('profilePic', newImageUrl);
+        localStorage.setItem('profilePic_backup', newImageUrl); // Actualizar backups
+        localStorage.setItem('profilePic_temp', newImageUrl);
+        sessionStorage.setItem('profilePic_temp', newImageUrl); // Y sessionStorage
+
+        // Opcional: disparar un evento personalizado si otros componentes necesitan reaccionar específicamente a esto
+        window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+          detail: { newImageUrl }
+        }));
+
+        return { success: true, imageUrl: newImageUrl };
+
+      } else {
+        // Manejar fallo en la API
+        const errorMessage = response?.error || 'Error desconocido al subir imagen';
+        console.error("❌ Fallo al sincronizar imagen:", errorMessage);
+        logAuthEvent('profile_sync_failed_api', { error: errorMessage });
+        return { success: false, error: errorMessage };
+      }
+
+    } catch (error) {
+      // Manejar errores generales (validación, red, etc.)
+      console.error("❌ Error crítico durante la sincronización de imagen:", error);
+      logAuthEvent('profile_sync_critical_error', { error: error.message });
+      return { success: false, error: error.message || 'Error inesperado' };
+    }
+  };
+
   // Inicializar datos de usuario al cargar la aplicación
   useEffect(() => {
     const initializeUser = async () => {
@@ -794,20 +893,12 @@ export function UserProvider({ children }) {
     login,
     logout,
     refreshUserData,
-    safeProfileSync: () => {}
+    safeProfileSync
   };
   
   return (
     <UserContext.Provider
-      value={{
-        user,
-        isAuthenticated,
-        loading,
-        login,
-        logout,
-        refreshUserData,
-        safeProfileSync: () => {}
-      }}
+      value={contextValue}
     >
       {children}
     </UserContext.Provider>
