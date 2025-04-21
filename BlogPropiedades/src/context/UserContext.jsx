@@ -175,6 +175,7 @@ export function UserProvider({ children }) {
 
   // Función para intentar recuperar la sesión cuando hay problemas
   const recuperateSession = async () => {
+    console.log("🌀 [RECUPERATE_SESSION] Attempting session recovery..."); // LOG INICIO
     if (recoveryAttempted) {
       console.log("🛑 Ya se intentó recuperar la sesión anteriormente, evitando bucle");
       return false;
@@ -316,7 +317,7 @@ export function UserProvider({ children }) {
       setLoading(false);
       return false;
     } catch (error) {
-      console.error("❌ Error crítico al recuperar sesión:", error);
+      console.error("❌ [RECUPERATE_SESSION] Critical error:", error);
       logAuthEvent('critical_recovery_error', { error: error.message });
       
       // Último intento - crear un usuario anónimo
@@ -336,12 +337,16 @@ export function UserProvider({ children }) {
       } catch (e) {
         console.error("❌ Error fatal durante la creación de usuario anónimo:", e);
         return false;
+      } finally {
+        console.log("🌀 [RECUPERATE_SESSION] Finished."); // LOG FIN
       }
     }
   };
 
   // Función para actualizar la información del usuario
   const refreshUserData = async () => {
+    console.log("🔄 [REFRESH_USER_DATA] Starting user data refresh..."); // LOG INICIO
+    let success = false;
     try {
       const storedToken = localStorage.getItem('token');
       
@@ -354,18 +359,17 @@ export function UserProvider({ children }) {
       
       // Validación extra del token antes de usarlo
       if (!isValidToken(storedToken)) {
-        console.warn("Token inválido o expirado. Intentando recuperar sesión.");
-        
-        // Intentar recuperar sesión con datos almacenados
-        const recovered = await recuperateSession();
-        
+        console.warn("[REFRESH_USER_DATA] Invalid/Expired token. Attempting recovery...");
+        const recovered = await recuperateSession(); // Esperar recuperación
         if (!recovered) {
+          console.log("[REFRESH_USER_DATA] Recovery failed, setting user to null.");
           setUser(null);
           setIsAuthenticated(false);
+        } else {
+          console.log("[REFRESH_USER_DATA] Recovery successful.");
+          success = true; // Marcar éxito si se recuperó
         }
-        
-        setLoading(false);
-        return;
+        return; // Salir si el token era inválido
       }
       
       try {
@@ -404,24 +408,24 @@ export function UserProvider({ children }) {
           profileImage: finalProfileImage // Usar la imagen determinada
         });
         setIsAuthenticated(true);
+        success = true; // Marcar éxito
         
       } catch (error) {
-        // Captura errores lanzados por getUserProfile o validaciones previas
-        console.error("Error en refreshUserData al obtener/validar perfil:", error);
-        logout(true, 'profile_refresh_error'); // Cerrar sesión en caso de error
-      } finally {
-        // Asegurar que setLoading SIEMPRE se ponga a false al final
-        setLoading(false);
-        console.log("🏁 refreshUserData: Proceso finalizado.");
+        console.error("[REFRESH_USER_DATA] Error getting/validating profile, calling logout:", error);
+        await logout(true, 'profile_refresh_error'); // Asegurarse de esperar logout
       }
     } catch (outerError) {
-      console.error("Error crítico inicial en refreshUserData:", outerError);
-      logout(true, 'critical_refresh_error'); // Asegurar logout en errores críticos
+      console.error("[REFRESH_USER_DATA] Initial critical error, calling logout:", outerError);
+      await logout(true, 'critical_refresh_error'); // Asegurarse de esperar logout
+    } finally {
+      setLoading(false); // Asegurar que setLoading siempre se ponga a false
+      console.log(`🔄 [REFRESH_USER_DATA] Finished. Success: ${success}`); // LOG FIN
     }
   };
 
   // Función de logout
   const logout = (shouldRedirect = true, reason = 'user_action') => {
+    console.log(`🔒 [LOGOUT] Initiating logout. Reason: ${reason}`); // LOG INICIO
     // Guardar una copia de la imagen de perfil temporalmente si existe
     try {
       const profileImage = localStorage.getItem('profilePic') || 
@@ -472,7 +476,7 @@ export function UserProvider({ children }) {
         detail: { reason }
       }));
       
-      console.log(`🔒 Sesión cerrada. Razón: ${reason}`);
+      console.log(`🔒 [LOGOUT] State cleared. Dispatching event...`);
     } catch (e) {
       console.error("❌ Error al eliminar token:", e);
     }
@@ -492,6 +496,7 @@ export function UserProvider({ children }) {
       // Plan B: usar href directo
       window.location.href = "/login";
     }
+    console.log(`🔒 [LOGOUT] Finished.`); // LOG FIN
   };
   
   // Función para iniciar sesión
@@ -715,138 +720,154 @@ export function UserProvider({ children }) {
   // Inicializar datos de usuario al cargar la aplicación
   useEffect(() => {
     const initializeUser = async () => {
+      console.log("🚀 [INITIALIZE_USER] Starting user initialization..."); // LOG INICIO
       try {
         setLoading(true);
-        console.log("🔄 Iniciando carga de usuario...");
-        
         const storedToken = localStorage.getItem('token');
-        console.log("🔑 Token en localStorage:", storedToken ? `${storedToken.substring(0, 10)}...` : 'No disponible');
-        
+        console.log(`[INITIALIZE_USER] Token in localStorage: ${storedToken ? 'Exists' : 'Not available'}`);
+
         if (storedToken) {
-          console.log("🔍 Token encontrado, intentando obtener datos de usuario...");
-          
-          // Validar el token antes de usarlo
           if (!isValidToken(storedToken)) {
-            console.warn("⚠️ Token inválido o expirado en localStorage");
-            
-            // Intentar recuperar la sesión con datos locales
-            const recovered = await recuperateSession();
-            
-            if (recovered) {
-              console.log("✅ Sesión recuperada con datos locales");
-            } else {
-              console.log("❌ No se pudo recuperar la sesión, redirigiendo a login");
-              setUser(null);
-              setIsAuthenticated(false);
-            }
-            
-            setLoading(false);
-            return;
-          }
-          
-          // Intentar refrescar los datos del usuario
-          try {
-            console.log("🔄 Intentando refrescar datos del usuario...");
-            await refreshUserData();
-            console.log("✅ Datos de usuario actualizados correctamente");
-          } catch (refreshError) {
-            console.error("❌ Error al refrescar datos:", refreshError);
-            
-            // Intentar recuperar la sesión como último recurso
-            const recovered = await recuperateSession();
-            
-            if (!recovered) {
-              setUser(null);
-              setIsAuthenticated(false);
-              console.log("❌ No se pudo recuperar la sesión, usuario desconectado");
-            }
+            console.warn("[INITIALIZE_USER] Invalid/Expired token. Attempting recovery...");
+            await recuperateSession(); // Esperar recuperación
+          } else {
+            console.log("[INITIALIZE_USER] Valid token found. Refreshing user data...");
+            await refreshUserData(); // Esperar refresh
           }
         } else {
-          console.log("ℹ️ No hay token guardado, estableciendo estado como no autenticado");
-          
-          // Aún así, comprobamos si hay datos en localStorage para ofrecer una experiencia mejorada
+          console.log("[INITIALIZE_USER] No token found. Checking for minimal data...");
           const hasMinimalData = localStorage.getItem('email');
           if (hasMinimalData) {
-            console.log("ℹ️ Se encontró email en localStorage, intentando recuperación parcial");
-            await recuperateSession();
+            console.log("[INITIALIZE_USER] Minimal data found. Attempting partial recovery...");
+            await recuperateSession(); // Esperar recuperación parcial
           } else {
+            console.log("[INITIALIZE_USER] No data for recovery. Setting user to null.");
             setUser(null);
             setIsAuthenticated(false);
           }
         }
       } catch (error) {
-        console.error("❌ Error crítico al inicializar usuario:", error);
-        
-        // Intentar recuperar la sesión como último recurso
+        console.error("❌ [INITIALIZE_USER] Critical error during initialization. Attempting emergency recovery:", error);
         try {
-          const recovered = await recuperateSession();
-          
-          if (!recovered) {
-            console.log("❌ No se pudo recuperar la sesión después del error crítico");
-            setUser(null);
-            setIsAuthenticated(false);
-          } else {
-            console.log("✅ Sesión recuperada después del error crítico");
-          }
+          await recuperateSession(); // Esperar recuperación de emergencia
         } catch (e) {
-          console.error("❌ Error fatal durante la recuperación de emergencia:", e);
+          console.error("❌ [INITIALIZE_USER] Fatal error during emergency recovery:", e);
           setUser(null);
           setIsAuthenticated(false);
         }
       } finally {
-        // Garantizar que loading se desactive siempre
-        setLoading(false);
-        console.log("🏁 Inicialización de usuario completada, estado:", { 
-          autenticado: isAuthenticated, 
-          usuario: user ? "Disponible" : "No disponible", 
-          cargando: false 
-        });
+        setLoading(false); // Asegurar setLoading false
+        console.log("🚀 [INITIALIZE_USER] Finished."); // LOG FIN
       }
     };
-    
-    // Sistema de reintento en caso de errores de red
+
+    // Sistema de reintento
     let initAttempts = 0;
     const maxAttempts = 3;
-    
     const attemptInitialization = () => {
       initAttempts++;
-      console.log(`🔄 Intento de inicialización #${initAttempts}`);
-      
+      console.log(`[INITIALIZE_USER] Attempt #${initAttempts}`);
       initializeUser().catch(error => {
-        console.error(`❌ Error en intento #${initAttempts}:`, error);
-        
+        console.error(`[INITIALIZE_USER] Error in attempt #${initAttempts}:`, error);
         if (initAttempts < maxAttempts) {
-          console.log(`🔄 Reintentando inicialización #${initAttempts + 1}`);
-          attemptInitialization();
+          const delay = initAttempts * 1000;
+          console.log(`[INITIALIZE_USER] Retrying in ${delay}ms...`);
+          setTimeout(attemptInitialization, delay);
         } else {
-          console.error("❌ Error al inicializar usuario: Se alcanzó el máximo de intentos");
+          console.error("[INITIALIZE_USER] Max initialization attempts reached. Stopping.");
+          setLoading(false); // Asegurar loading false si se agotan reintentos
         }
       });
     };
-    
+
     attemptInitialization();
-  }, []);
+  }, []); // Dependencias vacías, se ejecuta solo al montar
+
+  // Refrescar datos del usuario cada 15 minutos (Asegurar que refreshUserData sea estable)
+  useEffect(() => {
+    let intervalId = null;
+    if (isAuthenticated) {
+      console.log("⏰ [PERIODIC_REFRESH] Setting up periodic refresh (15 min).");
+      intervalId = setInterval(() => {
+        console.log("⏰ [PERIODIC_REFRESH] Triggering periodic refresh...");
+        refreshUserData().catch(error => {
+          console.error("⏰ [PERIODIC_REFRESH] Error during periodic refresh:", error);
+        });
+      }, 15 * 60 * 1000); 
+    }
+    return () => {
+      if (intervalId) {
+        console.log("⏰ [PERIODIC_REFRESH] Clearing periodic refresh interval.");
+        clearInterval(intervalId);
+      }
+    };
+  }, [isAuthenticated]); // Dependencia de isAuthenticated es correcta
+
+  // Escuchar cambios en localStorage (Revisar dependencias y lógica)
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      console.log(`🔔 [STORAGE_CHANGE] Event detected: key='${e.key}'`); // LOG EVENTO
+
+      if (e.key === 'token') {
+        const newToken = e.newValue;
+        if (newToken && isValidToken(newToken)) {
+          console.log("🔔 [STORAGE_CHANGE] Token changed/added. Calling refreshUserData...");
+          refreshUserData().catch(err => console.error("🔔 [STORAGE_CHANGE] Error refreshing after token change:", err));
+        } else {
+          console.log("🔔 [STORAGE_CHANGE] Token removed or invalid. Calling logout...");
+          logout(false, 'token_removed_or_invalid_external');
+        }
+      } else if (e.key === 'profilePic') {
+        console.log("🔔 [STORAGE_CHANGE] Profile pic changed. Calling refreshUserData (if authenticated)...");
+        if (isAuthenticated) {
+          refreshUserData().catch(err => {
+            console.error("🔔 [STORAGE_CHANGE] Error refreshing after pic change:", err);
+            // Fallback: actualizar directamente
+            setUser(prevUser => prevUser ? { ...prevUser, profileImage: e.newValue || fallbackImageBase64 } : null);
+          });
+        } else {
+             // Actualizar si hay usuario temporal
+             setUser(prevUser => {
+               if (!prevUser || !(prevUser._recovered || prevUser._anonymous || prevUser._minimal)) return prevUser;
+               return { ...prevUser, profileImage: e.newValue || fallbackImageBase64 };
+             });
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    console.log("🔔 [STORAGE_CHANGE] Event listener added.");
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      console.log("🔔 [STORAGE_CHANGE] Event listener removed.");
+    };
+    // Asegurarse de que las dependencias sean estables. isValidToken, refreshUserData, logout podrían necesitar useCallback si no lo usan ya.
+  }, [isAuthenticated, logout, refreshUserData]); // Dependencias OK si las funciones son estables (useCallback)
+
+  // Valor del contexto
+  const contextValue = {
+    user,
+    isAuthenticated,
+    loading,
+    recoveryAttempted,
+    logAuthEvent,
+    isValidToken,
+    recuperateSession,
+    refreshUserData,
+    logout,
+    login,
+    safeProfileSync
+  };
 
   return (
-    <UserContext.Provider value={{
-      user,
-      isAuthenticated,
-      loading,
-      recoveryAttempted,
-      logAuthEvent,
-      isValidToken,
-      recuperateSession,
-      refreshUserData,
-      logout,
-      login,
-      safeProfileSync
-    }}>
+    <UserContext.Provider value={contextValue}>
       {children}
     </UserContext.Provider>
   );
 }
 
-// Hook personalizado para usar el contexto (AÑADIDO)
+// Hook personalizado para usar el contexto
 export function useUser() {
   return useContext(UserContext);
 }

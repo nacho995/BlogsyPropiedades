@@ -203,7 +203,10 @@ export default function SeeProperties() {
                                 {/* Información de la propiedad */}
                                 <div className="p-4 sm:p-5">
                                     <h2 className="text-lg sm:text-xl font-semibold mb-2 line-clamp-1">{prop.typeProperty}</h2>
-                                    <p className="text-gray-600 mb-4 text-sm sm:text-base line-clamp-2">{prop.description}</p>
+                                    <div 
+                                      className="text-gray-600 mb-4 text-sm sm:text-base line-clamp-2 property-description-preview" 
+                                      dangerouslySetInnerHTML={{ __html: prop.description || '' }} 
+                                    />
                                     
                                     <div className="space-y-2 text-xs sm:text-sm text-gray-600 mb-3">
                                         <div className="flex items-center">

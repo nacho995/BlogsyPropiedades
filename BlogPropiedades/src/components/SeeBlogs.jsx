@@ -6,6 +6,13 @@ import { FiCalendar, FiClock, FiUser, FiTag, FiTrash2, FiEdit } from 'react-icon
 import { UserContext } from '../context/UserContext';
 import { toast } from 'sonner';
 
+// Función para eliminar etiquetas HTML
+const stripHtml = (html) => {
+  if (!html) return '';
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.body.textContent || "";
+};
+
 // Componente simple para mostrar imágenes con manejo de errores
 const DirectImage = ({ src, alt, className }) => {
   const [error, setError] = useState(false);
@@ -253,7 +260,9 @@ export default function SeeBlogs() {
                   </div>
 
                   <h2 className="text-lg sm:text-xl font-semibold mb-2 text-gray-800 line-clamp-2">{blog.title}</h2>
-                  <p className="text-gray-600 mb-4 text-sm sm:text-base line-clamp-3">{blog.description}</p>
+                  <p className="text-gray-600 mb-4 text-sm sm:text-base line-clamp-3">
+                    {stripHtml(blog.description || '')}
+                  </p>
 
                   <div className="flex items-center gap-2 mb-3 sm:mb-4">
                     <FiUser className="text-gray-500" />

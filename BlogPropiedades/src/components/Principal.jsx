@@ -11,6 +11,13 @@ const ensureHttps = (url) => {
   return url.replace(/^http:\/\//i, 'https://');
 };
 
+// Función para eliminar etiquetas HTML
+const stripHtml = (html) => {
+  if (!html) return '';
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.body.textContent || "";
+};
+
 // Importar funciones de API usando lazy loading para evitar problemas de inicialización
 const ApiService = lazy(() => import("../services/api").then(module => ({
   default: {
@@ -517,48 +524,53 @@ function Principal() {
             />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {topBlogs.map((blog) => (
-                <motion.div
-                  key={blog.id || blog._id}
-                  whileHover={{ y: -5 }}
-                  className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100"
-                >
-                  <div className="h-48 overflow-hidden">
-                    <img
-                      src={getImageUrl(blog)}
-                      alt={blog.title}
-                      className="w-full h-full object-cover transform hover:scale-105 transition duration-500"
-                    />
-                  </div>
-                  <div className="p-6">
-                    <div className="mb-3">
-                      <span className="inline-block px-3 py-1 text-xs font-semibold text-white bg-blue-600 rounded-full">
-                        {blog.category || "General"}
-                      </span>
-                      <span className="inline-block px-3 py-1 ml-2 text-xs font-semibold text-blue-800 bg-yellow-300 rounded-full">
-                        {blog.readTime || "5"} min lectura
-                      </span>
+              {topBlogs.map((blog) => {
+                console.log(`[Principal Debug] Blog ID: ${blog._id}, Raw Description:`, blog.description);
+                return (
+                  <motion.div
+                    key={blog.id || blog._id}
+                    whileHover={{ y: -5 }}
+                    className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100"
+                  >
+                    <div className="h-48 overflow-hidden">
+                      <img
+                        src={getImageUrl(blog)}
+                        alt={blog.title}
+                        className="w-full h-full object-cover transform hover:scale-105 transition duration-500"
+                      />
                     </div>
-                    <h3 className="text-xl font-bold text-blue-900 mb-2 line-clamp-2">
-                      {blog.title}
-                    </h3>
-                    <p className="text-gray-600 mb-4 line-clamp-3">
-                      {blog.description}
-                    </p>
-                    <div className="flex justify-between items-center">
-                      <span className="text-blue-700 font-medium text-sm">
-                        Por {blog.author || "Admin"}
-                      </span>
-                      <Link
-                        to={`/blog/${blog.id || blog._id}`}
-                        className="px-3 py-1 text-blue-700 border border-blue-700 rounded hover:bg-blue-700 hover:text-white transition-colors duration-300 text-sm font-medium"
+                    <div className="p-6">
+                      <div className="mb-3">
+                        <span className="inline-block px-3 py-1 text-xs font-semibold text-white bg-blue-600 rounded-full">
+                          {blog.category || "General"}
+                        </span>
+                        <span className="inline-block px-3 py-1 ml-2 text-xs font-semibold text-blue-800 bg-yellow-300 rounded-full">
+                          {blog.readTime || "5"} min lectura
+                        </span>
+                      </div>
+                      <h3 className="text-xl font-bold text-blue-900 mb-2 line-clamp-2">
+                        {blog.title}
+                      </h3>
+                      <div 
+                        className="text-gray-600 mb-4 line-clamp-3 blog-description-preview" 
                       >
-                        Leer más
-                      </Link>
+                        {stripHtml(blog.description || '')}
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-blue-700 font-medium text-sm">
+                          Por {blog.author || "Admin"}
+                        </span>
+                        <Link
+                          to={`/blog/${blog.id || blog._id}`}
+                          className="px-3 py-1 text-blue-700 border border-blue-700 rounded hover:bg-blue-700 hover:text-white transition-colors duration-300 text-sm font-medium"
+                        >
+                          Leer más
+                        </Link>
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </div>
           )}
           
@@ -595,68 +607,71 @@ function Principal() {
             />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {topProperties.map((property) => (
-                <motion.div
-                  key={property.id || property._id}
-                  whileHover={{ y: -5 }}
-                  className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 h-full"
-                >
-                  <div className="h-56 overflow-hidden relative">
-                    <img
-                      src={getPropertyImageUrl(property)}
-                      alt={property.title}
-                      className="w-full h-full object-cover transform hover:scale-105 transition duration-500"
-                    />
-                    <div className="absolute top-0 right-0 bg-yellow-400 text-blue-900 font-bold text-sm px-3 py-1 m-3 rounded-md">
-                      {property.status || "En venta"}
-                    </div>
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-blue-900 to-transparent p-4">
-                      <div className="text-white font-bold text-xl">
-                        {new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(property.price || 0)}
+              {topProperties.map((property) => {
+                console.log(`[Principal Debug] Property ID: ${property._id}, Raw Description:`, property.description);
+                return (
+                  <motion.div
+                    key={property.id || property._id}
+                    whileHover={{ y: -5 }}
+                    className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 h-full"
+                  >
+                    <div className="h-56 overflow-hidden relative">
+                      <img
+                        src={getPropertyImageUrl(property)}
+                        alt={property.title}
+                        className="w-full h-full object-cover transform hover:scale-105 transition duration-500"
+                      />
+                      <div className="absolute top-0 right-0 bg-yellow-400 text-blue-900 font-bold text-sm px-3 py-1 m-3 rounded-md">
+                        {property.status || "En venta"}
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-blue-900 to-transparent p-4">
+                        <div className="text-white font-bold text-xl">
+                          {new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(property.price || 0)}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold text-blue-900 mb-2 line-clamp-2">
-                      {property.title}
-                    </h3>
-                    <p className="text-gray-600 mb-4 line-clamp-2">
-                      {property.description}
-                    </p>
-                    <div className="flex justify-between items-center text-blue-800 mb-4">
-                      <div className="flex items-center">
-                        <svg className="w-5 h-5 mr-1" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                          <path d="M21 9h-8V3H3v18h18V9zM5 19V5h6v14H5zm14 0h-6v-8h6v8z"></path>
-                        </svg>
-                        <span>{property.bedrooms || 0} hab.</span>
+                    <div className="p-6">
+                      <h3 className="text-xl font-bold text-blue-900 mb-2 line-clamp-2">
+                        {property.title}
+                      </h3>
+                      <p className="text-gray-600 mb-4 line-clamp-2">
+                        {stripHtml(property.description || '')}
+                      </p>
+                      <div className="flex justify-between items-center text-blue-800 mb-4">
+                        <div className="flex items-center">
+                          <svg className="w-5 h-5 mr-1" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M21 9h-8V3H3v18h18V9zM5 19V5h6v14H5zm14 0h-6v-8h6v8z"></path>
+                          </svg>
+                          <span>{property.bedrooms || 0} hab.</span>
+                        </div>
+                        <div className="flex items-center">
+                          <svg className="w-5 h-5 mr-1" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M21 10H7V7c0-1.103.897-2 2-2s2 .897 2 2h2c0-2.206-1.794-4-4-4S5 4.794 5 7v3H3a1 1 0 0 0-1 1v2c0 2.606 1.674 4.823 4 5.65V22h2v-3h8v3h2v-3.35c2.326-.827 4-3.044 4-5.65v-2a1 1 0 0 0-1-1zm-1 3c0 2.206-1.794 4-4 4H8c-2.206 0-4-1.794-4-4v-1h16v1z"></path>
+                          </svg>
+                          <span>{property.bathrooms || 0} baños</span>
+                        </div>
+                        <div className="flex items-center">
+                          <svg className="w-5 h-5 mr-1" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M12 2a9.5 9.5 0 0 0-9.5 9.5c0 5.095 7.91 11.86 8.26 12.17a1 1 0 0 0 1.48 0c.35-.31 8.26-7.075 8.26-12.17A9.5 9.5 0 0 0 12 2zm0 13.5a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"></path>
+                          </svg>
+                          <span>{property.area || 0} m²</span>
+                        </div>
                       </div>
-                      <div className="flex items-center">
-                        <svg className="w-5 h-5 mr-1" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                          <path d="M21 10H7V7c0-1.103.897-2 2-2s2 .897 2 2h2c0-2.206-1.794-4-4-4S5 4.794 5 7v3H3a1 1 0 0 0-1 1v2c0 2.606 1.674 4.823 4 5.65V22h2v-3h8v3h2v-3.35c2.326-.827 4-3.044 4-5.65v-2a1 1 0 0 0-1-1zm-1 3c0 2.206-1.794 4-4 4H8c-2.206 0-4-1.794-4-4v-1h16v1z"></path>
-                        </svg>
-                        <span>{property.bathrooms || 0} baños</span>
-                      </div>
-                      <div className="flex items-center">
-                        <svg className="w-5 h-5 mr-1" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                          <path d="M12 2a9.5 9.5 0 0 0-9.5 9.5c0 5.095 7.91 11.86 8.26 12.17a1 1 0 0 0 1.48 0c.35-.31 8.26-7.075 8.26-12.17A9.5 9.5 0 0 0 12 2zm0 13.5a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"></path>
-                        </svg>
-                        <span>{property.area || 0} m²</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-blue-700 font-medium truncate max-w-[150px]">
+                          {property.location || "Madrid"}
+                        </span>
+                        <Link
+                          to={`/property/${property.id || property._id}`}
+                          className="px-3 py-1 bg-yellow-400 hover:bg-yellow-500 text-blue-900 rounded font-medium transition-colors duration-300 text-sm"
+                        >
+                          Ver detalles
+                        </Link>
                       </div>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-blue-700 font-medium truncate max-w-[150px]">
-                        {property.location || "Madrid"}
-                      </span>
-                      <Link
-                        to={`/property/${property.id || property._id}`}
-                        className="px-3 py-1 bg-yellow-400 hover:bg-yellow-500 text-blue-900 rounded font-medium transition-colors duration-300 text-sm"
-                      >
-                        Ver detalles
-                      </Link>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </div>
           )}
           

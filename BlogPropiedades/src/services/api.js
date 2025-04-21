@@ -148,7 +148,13 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
       headers,
       signal: controller.signal
     };
-    
+
+    // *** LOG DE DEPURACIÓN ***
+    console.log(`[fetchAPI Debug] Endpoint: ${endpoint}`);
+    console.log(`[fetchAPI Debug] Token from localStorage: ${token ? token.substring(0, 15) + '...' : 'NULL'}`);
+    console.log('[fetchAPI Debug] Final Request Headers:', JSON.parse(JSON.stringify(requestOptions.headers))); // Clonar para evitar problemas de log
+    // ************************
+
     // Realizar la petición fetch
     const response = await fetch(url, requestOptions);
     
@@ -854,33 +860,36 @@ export const uploadFile = async (file, token) => {
  * @returns {Promise<Object>}
  */
 export const createPropertyPost = async (data) => {
-  console.log('Creando propiedad con datos:', data);
+  console.log('[createPropertyPost] Iniciando creación con datos:', data); // Log al inicio
   if (!data) {
-    console.error('No data provided for createPropertyPost');
+    console.error('[createPropertyPost] No data provided');
     throw new Error('No se proporcionaron datos para crear la propiedad.');
   }
 
   // Asegurarse de que las imágenes sean solo un array de URLs (o el formato esperado)
   if (data.images && Array.isArray(data.images)) {
-     // Puede que necesitemos ajustar esto según lo que realmente espera el backend
-    // Si el backend espera objetos { src, alt }, esto ya está bien.
-    // Si espera solo strings (URLs), necesitaríamos: data.images = data.images.map(img => img.src);
-    console.log('Enviando imágenes:', data.images); 
+    console.log('[createPropertyPost] Enviando imágenes:', data.images);
   }
 
   try {
-    // ***** CORRECCIÓN AQUÍ *****
-    const response = await postData('/api/properties', data); // Usar /api/properties
-    // **************************
+    // *** LOG JUSTO ANTES DE LA LLAMADA PROBLEMÁTICA ***
+    const tokenCheckMomentaneo = localStorage.getItem('token');
+    console.log(`[createPropertyPost] TOKEN JUSTO ANTES DE LLAMAR A postData('/api/properties'): ${tokenCheckMomentaneo ? 'EXISTE' : 'NULL'}`);
+    // ***************************************************
 
-    console.log('Respuesta de createPropertyPost:', response);
+    // Llamar a postData (Esta es la línea ~873 según la traza)
+    const response = await postData('/api/properties', data);
+
+    console.log('[createPropertyPost] Respuesta recibida de postData:', response);
     if (response && response.error) {
-      throw new Error(response.message || 'Error al crear la propiedad');
+      // Usar el mensaje de error de postData si existe
+      throw new Error(response.message || 'Error devuelto por postData al crear la propiedad');
     }
     return response;
   } catch (error) {
-    console.error('Error detallado en createPropertyPost:', error);
-    throw error;
+    console.error('[createPropertyPost] Error detallado:', error);
+    // Asegurarse de relanzar un objeto Error
+    throw new Error(error.message || 'Error desconocido en createPropertyPost');
   }
 };
 
@@ -1109,68 +1118,94 @@ export async function getUserProfile(token) {
 
 // Helper function to handle fetch responses
 const handleResponse = async (response) => {
+  // Esta función ya no es necesaria si fetchAPI maneja las respuestas
+  /*
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.message || `Error: ${response.status}`);
   }
   return response.json();
+  */
+ // Se puede mantener si fetchAPI devuelve el objeto response completo en algún caso
+ // o eliminarla si fetchAPI siempre devuelve el JSON parseado o un objeto de error.
+ // Por ahora, la comentamos ya que fetchAPI parece manejar los errores.
 };
 
-// GET request
+// GET request (Ya usa fetchAPI indirectamente o directamente)
 export const fetchData = async (endpoint) => {
   try {
-    const response = await fetch(`${BASE_URL}${endpoint}`);
-    return handleResponse(response);
+    // Asumiendo que fetchAPI se usa directamente donde se necesita GET
+    // O si queremos un wrapper específico para GET:
+    return await fetchAPI(endpoint, { method: 'GET' }); 
   } catch (error) {
     console.error('Error fetching data:', error);
-    throw error;
+    throw error; // Relanzar para que el componente maneje el error
   }
 };
 
-// POST request
+// POST request (Refactorizado para usar fetchAPI)
 export const postData = async (endpoint, data) => {
+  // *** LOG AL INICIO DE postData ***
+  console.log(`[postData] Iniciando POST a endpoint: ${endpoint}`);
+  // *******************************
   try {
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
+    console.log(`[postData] Datos para ${endpoint}:`, data);
+    const options = {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(data),
-    });
-    return handleResponse(response);
+    };
+    // Llamada a fetchAPI (aquí deberían aparecer los logs internos de fetchAPI si todo va bien)
+    const result = await fetchAPI(endpoint, options);
+    console.log(`[postData] Resultado de fetchAPI para ${endpoint}:`, result); // Log del resultado
+    
+    if (result?.error) {
+       // Lanzar error para que createPropertyPost lo capture
+      throw new Error(result.message || 'Error en la solicitud POST devuelto por fetchAPI');
+    }
+    return result;
   } catch (error) {
-    console.error('Error posting data:', error);
-    throw error;
+    console.error(`[postData] Error en POST a ${endpoint}:`, error);
+    // Relanzar el error para que createPropertyPost lo maneje
+    // Devolver un objeto de error consistente ya no es necesario aquí si relanzamos
+    throw error; 
   }
 };
 
-// PUT request
+// PUT request (Refactorizado para usar fetchAPI)
 export const updateData = async (endpoint, data) => {
   try {
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
+    console.log(`PUT ${endpoint} con datos:`, data);
+    const options = {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(data),
-    });
-    return handleResponse(response);
+    };
+    const result = await fetchAPI(endpoint, options);
+    if (result?.error) {
+      throw new Error(result.message || 'Error en la solicitud PUT');
+    }
+    return result;
   } catch (error) {
-    console.error('Error updating data:', error);
-    throw error;
+    console.error(`Error updating data at ${endpoint}:`, error);
+    return { error: true, message: error.message || 'Error desconocido en PUT' }; 
   }
 };
 
-// DELETE request
+// DELETE request (Refactorizado para usar fetchAPI)
 export const deleteData = async (endpoint) => {
   try {
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
+    console.log(`DELETE ${endpoint}`);
+    const options = {
       method: 'DELETE',
-    });
-    return handleResponse(response);
+    };
+    const result = await fetchAPI(endpoint, options);
+    // fetchAPI devuelve { success: true } para DELETE exitoso (204)
+    if (result?.error) {
+      throw new Error(result.message || 'Error en la solicitud DELETE');
+    }
+    return result; 
   } catch (error) {
-    console.error('Error deleting data:', error);
-    throw error;
+    console.error(`Error deleting data at ${endpoint}:`, error);
+    return { error: true, message: error.message || 'Error desconocido en DELETE' }; 
   }
 };
 
