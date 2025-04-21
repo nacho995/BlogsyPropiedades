@@ -849,33 +849,72 @@ export function UserProvider({ children }) {
     }
   }, [isAuthenticated]);
   
-  // Escuchar cambios en localStorage (por ejemplo, cuando se actualiza el token en otra pestaña)
+  // Escuchar cambios en localStorage (por ejemplo, cuando se actualiza el token o la imagen en otra pestaña)
   useEffect(() => {
     const handleStorageChange = (e) => {
+      console.log(`🔄 Storage event detectado: key='${e.key}', newValue=${e.newValue ? e.newValue.substring(0,20)+'...' : e.newValue}`);
+      
+      // Si cambia el token, refrescar datos o hacer logout
       if (e.key === 'token') {
         const newToken = e.newValue;
-        if (newToken) {
-          refreshUserData();
+        if (newToken && isValidToken(newToken)) { // Verificar validez del nuevo token
+          console.log("🔄 Token cambiado en otra pestaña, refrescando datos...");
+          refreshUserData().catch(err => console.error("Error refrescando datos tras cambio de token:", err));
         } else {
-          // Si se eliminó el token, cerrar sesión
-          setUser(null);
-          setIsAuthenticated(false);
+          // Si se eliminó el token o es inválido, cerrar sesión
+          console.log("🔒 Token eliminado o inválido en otra pestaña, cerrando sesión...");
+          // Pasar false para no redirigir inmediatamente si queremos que la UI actualice primero
+          logout(false, 'token_removed_or_invalid_external'); 
         }
-      } else if (e.key === 'profilePic' || e.key === 'profilePic_local' || e.key === 'profilePic_base64') {
-        // Si cambia la imagen de perfil, actualizar el estado
-        const newProfilePic = e.newValue || 
-                             localStorage.getItem("profilePic") || 
-                             localStorage.getItem("profilePic_local") || 
-                             localStorage.getItem("profilePic_base64") || 
-                             fallbackImageBase64;
-        setUser(prevUser => {
-          if (!prevUser) return null;
-          return {
-            ...prevUser,
-            profileImage: newProfilePic
-          };
-        });
-      }
+      } 
+      // Si cambia la imagen de perfil (clave principal 'profilePic')
+      else if (e.key === 'profilePic') { 
+        console.log("🖼️ Imagen de perfil cambiada en otra pestaña, actualizando estado...");
+        const newProfilePicUrl = e.newValue;
+        
+        // Opción 1: Actualizar directamente el estado (más rápido, asume que newValue es correcto)
+        // setUser(prevUser => {
+        //   if (!prevUser) return null;
+        //   return {
+        //     ...prevUser,
+        //     profileImage: newProfilePicUrl || fallbackImageBase64, // Usar fallback si newValue es null
+        //     profilePic: newProfilePicUrl || fallbackImageBase64
+        //   };
+        // });
+
+        // Opción 2: Llamar a refreshUserData (más robusto, verifica token y obtiene datos frescos si es posible)
+        // Esto es preferible si queremos asegurar consistencia con el backend
+        if (isAuthenticated) { // Solo refrescar si el usuario estaba autenticado
+           refreshUserData().catch(err => {
+             console.error("Error refrescando datos tras cambio de imagen:", err);
+             // Como fallback si refresh falla, intentar actualizar directamente
+             setUser(prevUser => {
+               if (!prevUser) return null;
+               return {
+                 ...prevUser,
+                 profileImage: newProfilePicUrl || localStorage.getItem('profilePic') || fallbackImageBase64, 
+                 profilePic: newProfilePicUrl || localStorage.getItem('profilePic') || fallbackImageBase64
+               };
+             });
+           });
+        } else {
+           // Si no estaba autenticado, quizás solo actualizar la imagen si hay un usuario temporal
+           setUser(prevUser => {
+             if (!prevUser) return null; // No hacer nada si no hay usuario
+             // Solo actualizar si es un usuario recuperado o anónimo que podría mostrar una imagen
+             if (prevUser._recovered || prevUser._anonymous || prevUser._minimal) {
+                return {
+                  ...prevUser,
+                  profileImage: newProfilePicUrl || fallbackImageBase64,
+                  profilePic: newProfilePicUrl || fallbackImageBase64
+                };
+             }
+             return prevUser; // Mantener usuario si no es de los casos anteriores
+           });
+        }
+      } 
+      // Podríamos añadir listeners para otras claves si fuera necesario (ej: 'name', 'role')
+      // else if (e.key === 'name') { ... }
     };
     
     window.addEventListener('storage', handleStorageChange);
@@ -883,7 +922,7 @@ export function UserProvider({ children }) {
     return () => {
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, []);
+  }, [isAuthenticated, logout, refreshUserData]); // Añadir dependencias usadas dentro del listener
   
   // Valor del contexto
   const contextValue = {
