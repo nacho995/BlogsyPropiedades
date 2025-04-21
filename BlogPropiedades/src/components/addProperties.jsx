@@ -370,6 +370,26 @@ export default function PropertyCreation() {
     try {
         const uploadedUrls = []; // Array para guardar las URLs subidas exitosamente
 
+        // *** Mover la obtención de la firma FUERA del bucle ***
+        console.log("Obteniendo firma de Cloudinary UNA VEZ para todo el lote...");
+        let signatureData = null;
+        try {
+            signatureData = await getCloudinarySignature();
+            if (!signatureData || !signatureData.success) {
+                 // Usar el mensaje de error de la API si está disponible
+                const errorMessage = signatureData?.message || "No se pudo obtener la firma necesaria para la subida.";
+                throw new Error(errorMessage);
+            }
+            console.log("Firma obtenida con éxito para el lote.");
+        } catch (signatureError) {
+            console.error("Error crítico al obtener la firma de Cloudinary:", signatureError);
+            toast.error(`Error al obtener configuración para subir: ${signatureError.message}. No se subirán imágenes.`);
+            // Detener el proceso si no podemos obtener la firma
+            throw new Error("Falla al obtener firma, subida cancelada."); 
+        }
+        // *** Fin de la obtención de la firma única ***
+
+        // Ahora iterar y subir cada archivo usando la firma obtenida
         for (const file of files) {
             // Validar archivo individualmente dentro del bucle
             if (file.size > maxFileSize) {
@@ -384,16 +404,13 @@ export default function PropertyCreation() {
             // Procesar un archivo a la vez
             try {
                 // 1. Obtener firma del backend PARA ESTE ARCHIVO
-                console.log(`Obteniendo firma para: ${file.name}`);
-                const signatureData = await getCloudinarySignature(); // Llamada secuencial
+                // console.log(`Obteniendo firma para: ${file.name}`);
+                // const signatureData = await getCloudinarySignature(); // <<-- YA NO SE LLAMA AQUÍ
 
-                if (!signatureData || !signatureData.success) {
-                    // Usar el mensaje de error de la API si está disponible
-                    const errorMessage = signatureData?.message || `No se pudo obtener la firma para ${file.name}.`;
-                    throw new Error(errorMessage);
-                }
+                // -- Ya no es necesario verificar signatureData aquí, se hizo antes del bucle --
+                // if (!signatureData || !signatureData.success) { ... }
 
-                // 2. Preparar FormData para Cloudinary
+                // 2. Preparar FormData para Cloudinary (usando la firma obtenida antes del bucle)
                 const formDataCloudinary = new FormData();
                 formDataCloudinary.append('file', file);
                 formDataCloudinary.append('api_key', signatureData.apiKey);

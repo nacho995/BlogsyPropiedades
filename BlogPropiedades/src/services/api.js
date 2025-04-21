@@ -84,6 +84,11 @@ window.useCorsProxy = false;
 // Función auxiliar para esperar un tiempo específico
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Función auxiliar para detectar y prevenir bucles de error
+const requestTimestamps = {};
+const MAX_REQUESTS_PER_INTERVAL = 10; // Aumentado de 3 a 10
+const INTERVAL_MS = 2000; // Intervalo de 2 segundos
+
 /**
  * Función genérica para realizar peticiones a la API
  * @param {string} endpoint - Endpoint de la API
