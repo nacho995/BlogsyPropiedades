@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from "../context/UserContext";
-import useProfileImage from "../hooks/useProfileImage";
-import { uploadProfileImageAndUpdate, BASE_URL } from "../services/api";
+import { BASE_URL } from "../services/api";
 
 // Definimos la constante que falta para el fallback de imagen
 const fallbackImageBase64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNlMWUxZTEiLz48dGV4dCB4PSI1MCIgeT0iNTAiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGFsaWdubWVudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZmlsbD0iIzg4OCI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4=';
@@ -40,26 +39,19 @@ const validateAndProcessImage = (imageFile) => {
 
 export default function CambiarPerfil() {
   const [name, setName] = useState("");
-  const [profilePic, setProfilePic] = useState(null);
+  const [localPreviewUrl, setLocalPreviewUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [initialName, setInitialName] = useState("");
   
   const navigate = useNavigate();
-  const { user, refreshUserData, loading: userLoading } = useUser();
+  const { user, refreshUserData, safeProfileSync, loading: userLoading } = useUser();
   
-  // Usar el hook simplificado con sincronización, pasando el usuario
-  const { 
-    profileImage, 
-    isLoading: profileLoading, 
-    error: profileError, 
-    handleImageError, 
-    updateProfileImage,
-    fallbackImageBase64
-  } = useProfileImage(user);
+  // Usar la imagen del contexto directamente para mostrarla
+  const currentProfileImage = user?.profileImage || fallbackImageBase64;
 
-  // Efecto para cargar el nombre inicial cuando el usuario esté disponible
+  // Efecto para cargar el nombre inicial
   useEffect(() => {
     if (user && user.name) {
       setName(user.name);
@@ -67,138 +59,64 @@ export default function CambiarPerfil() {
     }
   }, [user]);
 
-  // Limpiar recursos al desmontar
+  // Limpiar URL de vista previa al desmontar
   useEffect(() => {
     return () => {
-      if (profilePic?.localUrl) {
-        URL.revokeObjectURL(profilePic.localUrl);
+      if (localPreviewUrl) {
+        URL.revokeObjectURL(localPreviewUrl);
       }
     };
-  }, [profilePic]);
+  }, [localPreviewUrl]);
 
-  console.log(`🔄 CambiarPerfil usando API base: ${BASE_URL}`); // Log actualizado
+  console.log(`🔄 CambiarPerfil usando API base: ${BASE_URL}`);
 
-  // Manejar cambios en la imagen
+  // Manejar cambios en la imagen usando safeProfileSync
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     
-    // Obtener userId del contexto
-    if (!user || !user.id) {
-      setError("No se pudo obtener la información del usuario. Intenta iniciar sesión de nuevo.");
-      return;
-    }
-    const userId = user.id;
+    // Crear URL temporal para vista previa inmediata
+    const previewUrl = URL.createObjectURL(file);
+    setLocalPreviewUrl(previewUrl); // Mostrar vista previa local
+    
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
 
     try {
-      // Validaciones (puedes mantenerlas si quieres)
+      // Validar antes de llamar a safeProfileSync (opcional, ya que safeProfileSync también valida)
       if (!file.type.startsWith('image/')) {
         throw new Error("El archivo debe ser una imagen (jpg, png, etc.)");
       }
-      if (file.size > 5 * 1024 * 1024) { // Podríamos ajustar a 2MB como la validación antigua si se prefiere
-        throw new Error("La imagen no debe superar los 5MB");
+      if (file.size > 2 * 1024 * 1024) { // Usar el límite consistente de 2MB
+        throw new Error("La imagen no debe superar los 2MB");
       }
 
-      setLoading(true);
-      setError(null);
-      setSuccess(null);
+      console.log(`CambiarPerfil: Llamando a safeProfileSync para ${file.name}...`);
       
-      // Crear URL temporal para vista previa (opcional, pero útil)
-      const localUrl = URL.createObjectURL(file);
-      setProfilePic({ file, localUrl }); // Mantenemos la vista previa local
+      // Llamar a la función del contexto
+      const result = await safeProfileSync(file); 
 
-      // --- Inicio: Lógica Antigua Eliminada ---
-      /*
-      // Convertir a base64 para almacenamiento
-      const reader = new FileReader();
-      reader.onload = function(event) {
-        try {
-          const imageData = event.target.result;
-          if (!imageData || typeof imageData !== 'string') {
-            throw new Error("La imagen procesada no es válida");
-          }
-          localStorage.setItem('profilePic', imageData);
-          localStorage.setItem('profilePic_backup', imageData);
-          updateProfileImage(imageData)
-            .then(async (success) => {
-              if (success) {
-                setSuccess("Imagen actualizada correctamente");
-                window.dispatchEvent(new CustomEvent('profileImageUpdated', {
-                  detail: { profileImage: imageData, timestamp: Date.now() }
-                }));
-                if (user && refreshUserData) {
-                  refreshUserData().catch(err => console.warn("Error al actualizar datos de usuario:", err));
-                }
-                // Sincronizar con la nube para otros dispositivos
-                try {
-                  const syncResult = await syncProfileImageBetweenDevices(imageData);
-                  if (syncResult.success) {
-                    setSuccess(prev => prev + " (Sincronizada con todos tus dispositivos)");
-                  } else {
-                     console.warn("No se pudo sincronizar la imagen con la nube:", syncResult.error);
-                  }
-                } catch (syncError) {
-                   console.error("Error al sincronizar imagen con la nube:", syncError);
-                }
-              } else {
-                setError("No se pudo actualizar la imagen correctamente");
-              }
-              setLoading(false);
-            })
-            .catch(err => {
-              setError("Error al actualizar imagen. Inténtalo de nuevo.");
-              setLoading(false);
-            });
-        } catch (err) {
-          setError("Error al procesar la imagen. Inténtalo de nuevo.");
-          setLoading(false);
-        }
-      };
-      reader.onerror = function() {
-        setError("Error al leer el archivo. Inténtalo de nuevo.");
-        setLoading(false);
-      };
-      reader.readAsDataURL(file);
-      */
-      // --- Fin: Lógica Antigua Eliminada ---
-      
-      // --- Inicio: Nueva Lógica --- 
-      console.log(`CambiarPerfil: Subiendo imagen para usuario ${userId}...`);
-      const result = await uploadProfileImageAndUpdate(userId, file);
-
-      if (result.error) {
-        throw new Error(result.message || 'Error al subir la imagen al servidor');
-      }
-
-      if (result.success && result.user && result.user.profileImage && result.user.profileImage.url) {
-        const newImageUrl = result.user.profileImage.url;
-        console.log("CambiarPerfil: Imagen subida y perfil actualizado. Nueva URL:", newImageUrl);
+      if (result && result.success) {
+        console.log("CambiarPerfil: safeProfileSync exitoso. Nueva URL:", result.imageUrl);
+        setSuccess("Imagen de perfil actualizada correctamente.");
+        // Limpiar la vista previa local, ya que el contexto se habrá actualizado
+        setLocalPreviewUrl(null); 
+        URL.revokeObjectURL(previewUrl); 
         
-        // Actualizar el estado global/contexto con la URL real
-        updateProfileImage(newImageUrl);
-        
-        // Opcional: Limpiar la vista previa local si se actualizó bien globalmente
-        setProfilePic(null); 
-        URL.revokeObjectURL(localUrl); // Liberar memoria de la URL temporal
-
-        setSuccess("Imagen de perfil actualizada y guardada.");
-        
-        // Refrescar datos del usuario en el contexto (opcional si updateProfileImage ya lo hace)
-        if (refreshUserData) {
-           refreshUserData().catch(err => console.warn("Error al refrescar datos de usuario tras subida:", err));
-        }
+        // NO es necesario llamar a refreshUserData aquí, safeProfileSync ya actualizó el contexto
         
       } else {
-        throw new Error('La respuesta del servidor no contiene la URL de la imagen actualizada.');
+        // Usar el mensaje de error devuelto por safeProfileSync
+        throw new Error(result?.error || 'Error desconocido al sincronizar la imagen.');
       }
-      // --- Fin: Nueva Lógica ---
 
     } catch (err) {
       console.error("Error en handleFileChange:", err);
       setError(err.message || "Ocurrió un error inesperado al procesar la imagen.");
       // Limpiar vista previa si hubo error
-      setProfilePic(null);
-      if (localUrl) URL.revokeObjectURL(localUrl);
+      setLocalPreviewUrl(null);
+      URL.revokeObjectURL(previewUrl);
       
     } finally {
       setLoading(false);
@@ -303,45 +221,24 @@ export default function CambiarPerfil() {
     }
   };
 
-  // Obtener imagen actual
+  // Obtener imagen actual a mostrar (prioriza vista previa local, luego contexto)
   const getCurrentImage = useCallback(() => {
-    // Si hay una imagen en vista previa local, usarla
-    if (profilePic?.localUrl) return profilePic.localUrl;
-    
-    // Si hay una URL remota en profilePic, usarla
-    if (profilePic?.remoteUrl) return profilePic.remoteUrl;
-    
-    // Si hay una imagen en el hook useProfileImage, usarla
-    if (profileImage && profileImage !== fallbackImageBase64) return profileImage;
-    
-    // Buscar directamente en localStorage como último recurso
-    const storedImage = localStorage.getItem('profilePic');
-    if (storedImage && storedImage !== 'undefined' && storedImage !== 'null') {
-      return storedImage;
-    }
-    
-    // Usar la imagen de respaldo si no hay ninguna otra disponible
-    return fallbackImageBase64;
-  }, [profilePic, profileImage]);
+    if (localPreviewUrl) return localPreviewUrl; // Mostrar vista previa si existe
+    return currentProfileImage; // Si no, mostrar la imagen del contexto
+  }, [localPreviewUrl, currentProfileImage]);
   
-  // Función para manejar errores al cargar imágenes
+  // Función para manejar errores al cargar la imagen del contexto o fallback
   const onImageError = () => {
-    console.log("Error al cargar la imagen, usando fallback");
-    // Usar el manejador de errores del hook y también actualizar la vista previa local
-    handleImageError();
-    // Si hay una URL local, revocarla para liberar memoria
-    if (profilePic?.localUrl) {
-      URL.revokeObjectURL(profilePic.localUrl);
-    }
-    // Establecer la imagen de perfil como null para que use el fallback
-    setProfilePic(null);
+    console.warn("Error al cargar la imagen principal, usando fallback.");
+    // Aquí podríamos forzar el uso del fallback si es necesario, aunque getCurrentImage ya lo hace
+    // Si usamos un hook, llamaríamos a handleImageError()
   };
 
   // Log para depurar el estado de deshabilitación
   console.log('Estado CambiarPerfil Render:', { 
     userLoading, 
     userId: user?.id, 
-    isUserValid: !!user?.id, // Booleano para ver si user.id existe
+    isUserValid: !!user?.id, 
     localLoading: loading 
   });
 
@@ -353,9 +250,9 @@ export default function CambiarPerfil() {
           <p className="mt-2 text-blue-100">Cambia tu nombre o foto de perfil</p>
         </div>
         
-        {(error || profileError) && (
+        {error && (
           <div className="mb-4 p-3 bg-red-500/30 border border-red-500 rounded-lg text-white">
-            {error || profileError?.message || "Error al procesar la imagen"}
+            {error}
           </div>
         )}
         
@@ -368,13 +265,13 @@ export default function CambiarPerfil() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="flex justify-center mb-6">
             <div className="relative">
-              {(loading || profileLoading) ? (
+              {(loading || userLoading) ? (
                 <div className="w-32 h-32 rounded-full border-4 border-white/30 shadow-lg flex items-center justify-center bg-gray-200">
                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
               ) : (
                 <img 
-                  src={getCurrentImage()} 
+                  src={getCurrentImage()}
                   alt="Vista previa" 
                   className="w-32 h-32 rounded-full object-cover border-4 border-white/30 shadow-lg"
                   onError={onImageError}
@@ -422,7 +319,7 @@ export default function CambiarPerfil() {
           </div>
           
           <div className="flex space-x-4">
-            {!profilePic?.file ? (
+            {!localPreviewUrl ? (
               <button 
                 type="submit" 
                 disabled={loading || userLoading || !name || name === initialName}
@@ -440,16 +337,14 @@ export default function CambiarPerfil() {
             ) : (
               <button 
                 type="button" 
-                disabled={loading || userLoading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={() => navigate("/")}
+                disabled={true}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-500 cursor-wait"
               >
-                {(loading || userLoading) ? (
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                ) : "Actualizar Perfil"}
+                Subiendo Imagen...
               </button>
             )}
             
