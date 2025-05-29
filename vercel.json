@@ -1,7 +1,7 @@
 {
-  "buildCommand": "cd BlogPropiedades && npm install --include=dev && npm run build",
+  "buildCommand": "cd BlogPropiedades && npm run build",
   "outputDirectory": "BlogPropiedades/dist",
-  "installCommand": "npm install",
+  "installCommand": "cd BlogPropiedades && npm install",
   "routes": [
     {
       "src": "/api/user/login",
