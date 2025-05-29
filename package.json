@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "build": "cd BlogPropiedades && npm install && npm run build",
+    "build": "cd BlogPropiedades && npm install --include=dev && npm run build",
     "start": "cd BlogPropiedades && npm start"
   },
   "devDependencies": {
