@@ -903,11 +903,11 @@ export const createPropertyPost = async (data) => {
   try {
     // *** LOG JUSTO ANTES DE LA LLAMADA PROBLEMÁTICA ***
     const tokenCheckMomentaneo = localStorage.getItem('token');
-    console.log(`[createPropertyPost] TOKEN JUSTO ANTES DE LLAMAR A postData('/properties'): ${tokenCheckMomentaneo ? 'EXISTE' : 'NULL'}`);
+    console.log(`[createPropertyPost] TOKEN JUSTO ANTES DE LLAMAR A postData('/props'): ${tokenCheckMomentaneo ? 'EXISTE' : 'NULL'}`);
     // ***************************************************
 
-    // Llamar a postData (Esta es la línea ~873 según la traza)
-    const response = await postData('/properties', data);
+    // Llamar a postData con nueva ruta
+    const response = await postData('/props', data); // Cambio de /properties a /props
 
     console.log('[createPropertyPost] Respuesta recibida de postData:', response);
     if (response && response.error) {
@@ -922,10 +922,14 @@ export const createPropertyPost = async (data) => {
   }
 };
 
+/**
+ * Obtiene todas las propiedades.
+ * @returns {Promise<Array>}
+ */
 export const getPropertyPosts = async () => {
   try {
     console.log("Obteniendo propiedades del servidor...");
-    const properties = await fetchAPI('/properties');
+    const properties = await fetchAPI('/props'); // Cambio de /properties a /props
     console.log("Propiedades recibidas del servidor:", properties);
     
     // Verificar la estructura de cada propiedad y corregir las imágenes si es necesario
@@ -980,8 +984,8 @@ export const deletePropertyPost = async (id) => {
       throw new Error('No hay token de autenticación disponible');
     }
     
-    // Usar query parameter para evitar problemas con rutas dinámicas en Vercel
-    const result = await fetchAPI(`/properties?id=${id}`, {
+    // Usar nueva ruta fuera de /api/
+    const result = await fetchAPI(`/props?id=${id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -1015,8 +1019,8 @@ export const updatePropertyPost = async (id, data) => {
       console.log('[updatePropertyPost] Enviando imágenes actualizadas:', data.images.length, 'imágenes');
     }
 
-    // Usar query parameter para evitar problemas con rutas dinámicas en Vercel
-    const result = await fetchAPI(`/properties?id=${id}`, {
+    // Usar nueva ruta fuera de /api/
+    const result = await fetchAPI(`/props?id=${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
     });
@@ -1042,8 +1046,8 @@ export const updatePropertyPost = async (id, data) => {
 export const getPropertyById = async (id) => {
   try {
     console.log(`[getPropertyById] Obteniendo propiedad con ID: ${id}`);
-    // Usar el nuevo endpoint que evita problemas con rutas dinámicas en Vercel
-    const result = await fetchAPI(`/property-detail?id=${id}`);
+    // Usar nueva ruta fuera de /api/
+    const result = await fetchAPI(`/prop-detail?id=${id}`);
     console.log(`[getPropertyById] Resultado recibido:`, {
       id: result._id || result.id,
       title: result.title,
