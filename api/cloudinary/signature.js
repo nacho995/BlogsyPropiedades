@@ -44,13 +44,12 @@ module.exports = async function handler(req, res) {
     // Credenciales reales de Cloudinary
     const cloudName = 'dv31mt6pd';
     const apiKey = '915443216824292';
-    const apiSecret = 'FMDbe6eOaHniPHQnrn-qbd6EqW4';
+    const apiSecret = 'FMDbe6eOaHnlPHQnrn-qbd6EqW4';
 
     // Generar timestamp
     const timestamp = Math.round(Date.now() / 1000);
 
-    // Parámetros para la firma (según la documentación de Cloudinary)
-    // Solo incluir parámetros que modifican la subida, NO api_key, file, cloud_name
+    // Parámetros para la firma (con API secret correcto)
     const paramsToSign = {
       folder: 'blogsy-uploads',
       timestamp: timestamp
@@ -59,10 +58,7 @@ module.exports = async function handler(req, res) {
     // Generar la firma usando crypto
     const crypto = require('crypto');
     
-    // Crear string para firmar según documentación de Cloudinary
-    // 1. Ordenar parámetros alfabéticamente
-    // 2. Crear string key=value&key=value
-    // 3. Añadir api_secret al final
+    // Crear string para firmar
     const paramString = Object.keys(paramsToSign)
       .sort()
       .map(key => `${key}=${paramsToSign[key]}`)
