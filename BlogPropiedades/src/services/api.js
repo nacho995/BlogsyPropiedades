@@ -368,7 +368,7 @@ export const createBlogPost = async (data) => {
 
     console.log("Datos del blog preparados para enviar:", blogData);
 
-    const result = await fetchAPI('/blogs', {
+    const result = await fetchAPI('/api/blogs', {
       method: 'POST',
       body: JSON.stringify(blogData)
     });
@@ -393,7 +393,7 @@ export const createBlogPost = async (data) => {
 export const getBlogPosts = async () => {
   try {
     console.log("Obteniendo blogs del servidor...");
-    const blogs = await fetchAPI('/blogs');
+    const blogs = await fetchAPI('/api/blogs');
     console.log("Blogs recibidos del servidor:", blogs);
     
     // Verificar la estructura de cada blog y procesar las imágenes
@@ -1508,6 +1508,35 @@ export const getPropertyById = async (id) => {
     return result;
   } catch (error) {
     console.error(`Error al obtener propiedad ${id}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Sube una imagen para un blog.
+ * @param {FormData} formData - FormData que contiene la imagen y metadatos
+ * @returns {Promise<Object>} - Retorna un objeto con la URL de la imagen
+ */
+export const uploadImageBlog = async (formData) => {
+  try {
+    console.log('Subiendo imagen para blog...');
+    
+    const result = await fetchAPI('/api/blogs/upload', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!result || !result.imageUrl) {
+      throw new Error('No se recibió una URL de imagen válida del servidor');
+    }
+
+    // Normalizar el resultado para que coincida con el formato esperado
+    return {
+      src: result.imageUrl,
+      alt: formData.get('title') || 'Imagen del blog'
+    };
+  } catch (error) {
+    console.error('Error al subir imagen:', error);
     throw error;
   }
 };
