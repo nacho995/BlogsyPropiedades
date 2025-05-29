@@ -49,23 +49,29 @@ module.exports = async function handler(req, res) {
     // Generar timestamp
     const timestamp = Math.round(Date.now() / 1000);
 
-    // Parámetros para signed upload (SOLO los que se enviarán a Cloudinary)
-    const uploadParams = {
-      timestamp: timestamp,
-      folder: 'blogsy-uploads'
+    // Parámetros para la firma (según la documentación de Cloudinary)
+    // Solo incluir parámetros que modifican la subida, NO api_key, file, cloud_name
+    const paramsToSign = {
+      folder: 'blogsy-uploads',
+      timestamp: timestamp
     };
 
     // Generar la firma usando crypto
     const crypto = require('crypto');
     
-    // Crear string para firmar (parámetros ordenados alfabéticamente)
-    const sortedParams = Object.keys(uploadParams)
+    // Crear string para firmar según documentación de Cloudinary
+    // 1. Ordenar parámetros alfabéticamente
+    // 2. Crear string key=value&key=value
+    // 3. Añadir api_secret al final
+    const paramString = Object.keys(paramsToSign)
       .sort()
-      .map(key => `${key}=${uploadParams[key]}`)
+      .map(key => `${key}=${paramsToSign[key]}`)
       .join('&');
     
-    const stringToSign = `${sortedParams}${apiSecret}`;
+    const stringToSign = paramString + apiSecret;
     
+    console.log('Params to sign:', paramsToSign);
+    console.log('Param string:', paramString);
     console.log('String to sign:', stringToSign);
     
     // Generar firma SHA-1
@@ -82,8 +88,8 @@ module.exports = async function handler(req, res) {
       timestamp: timestamp,
       api_key: apiKey,
       cloud_name: cloudName,
-      folder: uploadParams.folder,
-      signed: true, // Indicar que es signed upload
+      folder: paramsToSign.folder,
+      signed: true,
       message: 'Firma de Cloudinary generada correctamente'
     });
 
