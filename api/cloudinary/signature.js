@@ -41,30 +41,46 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // Para testing/desarrollo, simular respuesta de Cloudinary
+    // Credenciales reales de Cloudinary
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME || 'dv31mt6pd';
+    const apiKey = process.env.CLOUDINARY_API_KEY || '915443216824292';
+    const apiSecret = process.env.CLOUDINARY_API_SECRET || 'FMDbe6eOaHniPHQnrn-qbd6EqW4';
+    
+    // Generar timestamp actual
     const timestamp = Math.floor(Date.now() / 1000);
     
-    // Simular parámetros de Cloudinary
-    const cloudinaryParams = {
+    // Parámetros para la subida
+    const uploadParams = {
       timestamp: timestamp,
-      upload_preset: 'blogsy_preset', // Preset simulado
-      api_key: 'your_api_key', // API key simulada
+      upload_preset: 'blogsy_preset', // Puedes crear este preset en Cloudinary
+      folder: 'blogsy-uploads'
     };
 
-    // Simular firma (en producción real usarías crypto y tu API secret)
-    const fakeSignature = Buffer.from(
-      `timestamp=${timestamp}&upload_preset=blogsy_preset`
-    ).toString('base64').substring(0, 40);
+    // Crear string para firma (ordenado alfabéticamente)
+    const paramsString = Object.keys(uploadParams)
+      .sort()
+      .map(key => `${key}=${uploadParams[key]}`)
+      .join('&');
+
+    // Generar firma real usando SHA-1
+    const crypto = require('crypto');
+    const signature = crypto
+      .createHash('sha1')
+      .update(paramsString + apiSecret)
+      .digest('hex');
 
     console.log('Cloudinary signature generada exitosamente');
+    console.log('Params string:', paramsString);
+    console.log('Signature:', signature);
 
     return res.status(200).json({
       success: true,
-      signature: fakeSignature,
+      signature: signature,
       timestamp: timestamp,
-      api_key: cloudinaryParams.api_key,
-      upload_preset: cloudinaryParams.upload_preset,
-      cloud_name: 'blogsy-cloud', // Cloud name simulado
+      api_key: apiKey,
+      cloud_name: cloudName,
+      upload_preset: uploadParams.upload_preset,
+      folder: uploadParams.folder,
       message: 'Firma de Cloudinary generada correctamente'
     });
 
