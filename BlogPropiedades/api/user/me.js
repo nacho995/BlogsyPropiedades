@@ -18,10 +18,6 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    console.log('=== USER ME ===');
-    console.log('Method:', req.method);
-    console.log('Headers:', req.headers.authorization ? 'Authorization provided' : 'No authorization');
-
     // Obtener token del header Authorization
     const authHeader = req.headers.authorization;
     
@@ -33,33 +29,21 @@ module.exports = async function handler(req, res) {
     }
 
     const token = authHeader.split(' ')[1];
-    console.log('Token received:', token.substring(0, 50) + '...');
 
     try {
-      // Verificar que el token tenga formato JWT (3 segmentos)
-      const tokenParts = token.split('.');
-      if (tokenParts.length !== 3) {
-        return res.status(401).json({
-          error: true,
-          message: 'Token formato inválido'
-        });
-      }
-
-      // Decodificar payload del JWT
-      const payload = tokenParts[1];
-      const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString());
+      // Decodificar token simple (en producción usar JWT real)
+      const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
       
-      console.log('Token decoded:', decoded);
-
       // Verificar expiración
-      if (decoded.exp < Math.floor(Date.now() / 1000)) {
+      if (decoded.exp < Date.now()) {
         return res.status(401).json({
           error: true,
           message: 'Token expirado'
         });
       }
 
-      // Simular datos de usuario
+      // TODO: Obtener datos del usuario desde base de datos
+      // Simulación de datos de usuario
       const userData = {
         id: decoded.userId,
         email: decoded.email,
@@ -69,15 +53,12 @@ module.exports = async function handler(req, res) {
         createdAt: '2024-01-01T00:00:00.000Z'
       };
 
-      console.log('Returning user data:', userData);
-
       return res.status(200).json({
         success: true,
         user: userData
       });
 
     } catch (decodeError) {
-      console.error('Error decoding token:', decodeError);
       return res.status(401).json({
         error: true,
         message: 'Token inválido'

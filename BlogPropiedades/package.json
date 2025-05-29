@@ -9,6 +9,7 @@
     "dev:client": "vite",
     "prebuild": "node scripts/generate-build-info.js",
     "build": "vite build",
+    "postbuild": "cp -r dist build",
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "node server.js"

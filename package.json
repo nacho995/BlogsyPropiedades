@@ -1,14 +1,7 @@
 {
-  "name": "blogsypropiedades",
+  "name": "blogsypropiedades-root",
   "private": true,
   "version": "1.0.0",
-  "scripts": {
-    "build": "cd BlogPropiedades && npm install --include=dev && npm run build && cp -r dist ../build",
-    "start": "cd BlogPropiedades && npm start"
-  },
-  "devDependencies": {
-    "terser": "^5.39.0"
-  },
   "engines": {
     "node": "18.x"
   }

@@ -1,35 +1,13 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": "build",
-  "routes": [
+  "buildCommand": "cd BlogPropiedades && npm run build",
+  "outputDirectory": "BlogPropiedades/build",
+  "installCommand": "cd BlogPropiedades && npm install --include=dev",
+  "framework": null,
+  "rewrites": [
     {
-      "src": "/api/user/login",
-      "dest": "/api/user/login"
-    },
-    {
-      "src": "/api/user/register",
-      "dest": "/api/user/register"
-    },
-    {
-      "src": "/api/user/me",
-      "dest": "/api/user/me"
-    },
-    {
-      "src": "/api/blogs",
-      "dest": "/api/blogs"
-    },
-    {
-      "src": "/api/properties",
-      "dest": "/api/properties"
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/proxy"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
-}
+} 

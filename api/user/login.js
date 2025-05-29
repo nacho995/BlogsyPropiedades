@@ -1,4 +1,14 @@
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
+  // Configurar headers CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  // Manejar preflight OPTIONS request
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   // Solo permitir métodos POST para login
   if (req.method !== 'POST') {
     return res.status(405).json({ 
@@ -7,69 +17,79 @@ export default async function handler(req, res) {
     });
   }
 
-  // Configurar headers CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
   try {
-    const { email, password } = req.body;
-
-    // Validar datos de entrada
-    if (!email || !password) {
+    console.log('=== DEBUG LOGIN ===');
+    console.log('Method:', req.method);
+    console.log('Content-Type:', req.headers['content-type']);
+    console.log('Body type:', typeof req.body);
+    console.log('Body:', req.body);
+    
+    // Si no hay body, devolver un mensaje de debug
+    if (!req.body) {
+      console.log('No body received');
       return res.status(400).json({
         error: true,
-        message: 'Email y contraseña son requeridos'
+        message: 'No se recibieron datos',
+        debug: {
+          bodyReceived: false,
+          contentType: req.headers['content-type'],
+          method: req.method
+        }
       });
     }
 
-    // TODO: Aquí deberías implementar la lógica real de autenticación
-    // Por ahora, crearemos una respuesta simulada para probar
+    const { email, password } = req.body;
     
-    // Simulación de usuarios para testing
-    const testUsers = [
-      {
-        id: 1,
-        email: 'ignaciodalesio1995@gmail.com',
-        password: 'test123', // En producción, esto estaría hasheado
-        name: 'Ignacio Dalesio',
-        role: 'admin'
-      },
-      {
-        id: 2,
-        email: 'test@example.com',
-        password: 'test123',
-        name: 'Usuario de Prueba',
-        role: 'user'
-      }
-    ];
+    console.log('Email received:', email);
+    console.log('Password received:', password ? 'YES' : 'NO');
 
-    // Buscar usuario
-    const user = testUsers.find(u => u.email === email && u.password === password);
+    // Para testing temporal: aceptar cualquier credencial
+    if (email && password) {
+      // Crear un JWT válido manualmente (header.payload.signature)
+      const header = {
+        "alg": "HS256",
+        "typ": "JWT"
+      };
+      
+      const payload = {
+        userId: 1,
+        email: email,
+        iat: Math.floor(Date.now() / 1000), // issued at
+        exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // expira en 24 horas
+      };
+      
+      // Codificar header y payload en base64
+      const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
+      const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+      
+      // Crear signature simple (en producción real usarías una librería como jsonwebtoken)
+      const signature = Buffer.from('fake-signature-for-testing').toString('base64url');
+      
+      // Construir JWT: header.payload.signature
+      const token = `${encodedHeader}.${encodedPayload}.${signature}`;
 
-    if (!user) {
-      return res.status(401).json({
-        error: true,
-        message: 'Credenciales inválidas'
+      console.log('Login success (debug mode)');
+      console.log('Generated JWT token:', token.substring(0, 50) + '...');
+      
+      return res.status(200).json({
+        success: true,
+        token,
+        user: {
+          id: 1,
+          email: email,
+          name: 'Usuario Debug',
+          role: 'user'
+        }
       });
     }
 
-    // Generar token JWT simple (en producción usar una biblioteca JWT real)
-    const token = Buffer.from(JSON.stringify({
-      userId: user.id,
-      email: user.email,
-      exp: Date.now() + (24 * 60 * 60 * 1000) // 24 horas
-    })).toString('base64');
-
-    // Respuesta exitosa
-    return res.status(200).json({
-      success: true,
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role
+    return res.status(400).json({
+      error: true,
+      message: 'Email y contraseña requeridos',
+      debug: {
+        emailReceived: !!email,
+        passwordReceived: !!password,
+        bodyData: req.body
       }
     });
 
@@ -77,7 +97,8 @@ export default async function handler(req, res) {
     console.error('Error en login:', error);
     return res.status(500).json({
       error: true,
-      message: 'Error interno del servidor'
+      message: 'Error interno del servidor',
+      debug: error.message
     });
   }
-} 
+}; 
