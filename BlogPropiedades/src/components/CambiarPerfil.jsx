@@ -46,7 +46,7 @@ export default function CambiarPerfil() {
   const [initialName, setInitialName] = useState("");
   
   const navigate = useNavigate();
-  const { user, refreshUserData, safeProfileSync, loading: userLoading } = useUser();
+  const { user, refreshUserData, safeProfileSync, loading: userLoading, setUser } = useUser();
   
   // Usar la imagen del contexto directamente para mostrarla
   const currentProfileImage = user?.profileImage || fallbackImageBase4;
@@ -201,13 +201,27 @@ export default function CambiarPerfil() {
       // No necesitamos procesar la respuesta para la imagen aquí
       console.log("Nombre actualizado correctamente en el servidor.");
       
-      // Actualizar datos de usuario
+      // NO llamar a refreshUserData para evitar problemas de token
+      // En su lugar, actualizar el nombre directamente en localStorage y contexto
+      if (name) {
+        localStorage.setItem('name', name);
+        console.log("Nombre actualizado en localStorage:", name);
+        
+        // También actualizar el usuario en el contexto directamente si existe
+        if (user) {
+          setUser(prevUser => ({ ...prevUser, name: name }));
+          console.log("Nombre actualizado en contexto de usuario:", name);
+        }
+      }
+      
+      /* Comentado para evitar problemas de token
       if (refreshUserData) {
         console.log("Refrescando datos de usuario después de actualizar perfil");
         await refreshUserData().catch(err => {
           console.warn("Error al actualizar datos de usuario:", err);
         });
       }
+      */
 
       setSuccess("¡Nombre actualizado correctamente!");
       setInitialName(name);

@@ -45,9 +45,12 @@ module.exports = async function handler(req, res) {
         });
       }
 
-      // Decodificar payload del JWT
+      // Decodificar payload del JWT (usar base64 en lugar de base64url)
       const payload = tokenParts[1];
-      const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString());
+      
+      // Añadir padding si es necesario para base64
+      const paddedPayload = payload + '='.repeat((4 - payload.length % 4) % 4);
+      const decoded = JSON.parse(Buffer.from(paddedPayload, 'base64').toString());
       
       console.log('Token decoded:', decoded);
 
@@ -59,22 +62,21 @@ module.exports = async function handler(req, res) {
         });
       }
 
-      // Simular datos de usuario
+      // Simular datos de usuario - DEVOLVER DIRECTAMENTE SIN WRAPPER
       const userData = {
         id: decoded.userId,
         email: decoded.email,
         name: decoded.email === 'ignaciodalesio1995@gmail.com' ? 'Ignacio Dalesio' : 'Usuario de Prueba',
         role: decoded.email === 'ignaciodalesio1995@gmail.com' ? 'admin' : 'user',
         avatar: null,
+        profileImage: null, // Agregar campo profileImage
         createdAt: '2024-01-01T00:00:00.000Z'
       };
 
-      console.log('Returning user data:', userData);
+      console.log('Returning user data directly:', userData);
 
-      return res.status(200).json({
-        success: true,
-        user: userData
-      });
+      // DEVOLVER DIRECTAMENTE LOS DATOS DEL USUARIO, NO COMO WRAPPER
+      return res.status(200).json(userData);
 
     } catch (decodeError) {
       console.error('Error decoding token:', decodeError);

@@ -848,6 +848,7 @@ export function UserProvider({ children }) {
   // Valor del contexto
   const contextValue = {
     user,
+    setUser,
     isAuthenticated,
     loading,
     recoveryAttempted,

@@ -58,12 +58,12 @@ module.exports = async function handler(req, res) {
         exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // expira en 24 horas
       };
       
-      // Codificar header y payload en base64
-      const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
-      const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+      // Codificar header y payload en base64 (no base64url)
+      const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64');
+      const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64');
       
       // Crear signature simple (en producción real usarías una librería como jsonwebtoken)
-      const signature = Buffer.from('fake-signature-for-testing').toString('base64url');
+      const signature = Buffer.from('fake-signature-for-testing').toString('base64');
       
       // Construir JWT: header.payload.signature
       const token = `${encodedHeader}.${encodedPayload}.${signature}`;
