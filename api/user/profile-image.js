@@ -20,7 +20,7 @@ module.exports = async function handler(req, res) {
   try {
     console.log('=== UPLOAD PROFILE IMAGE ===');
     console.log('Method:', req.method);
-    console.log('Query params:', req.query);
+    console.log('Headers:', Object.keys(req.headers));
 
     // Verificar autorización
     const authHeader = req.headers.authorization;
@@ -41,18 +41,7 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // Obtener userId de la URL
-    const { userId } = req.query;
-    console.log('User ID from URL:', userId);
-
-    if (!userId) {
-      return res.status(400).json({
-        error: true,
-        message: 'ID de usuario requerido'
-      });
-    }
-
-    // Decodificar token para verificar autorización
+    // Decodificar token para obtener el userId
     try {
       const payload = token.split('.')[1];
       const paddedPayload = payload + '='.repeat((4 - payload.length % 4) % 4);
@@ -65,22 +54,18 @@ module.exports = async function handler(req, res) {
         });
       }
 
-      // Verificar que el usuario tiene permiso para actualizar este perfil
-      if (decoded.userId != userId) {
-        return res.status(403).json({
-          error: true,
-          message: 'No tienes permiso para actualizar este perfil'
-        });
-      }
+      const userId = decoded.userId;
+      console.log('User ID from token:', userId);
 
-      // Simular la subida exitosa de imagen (en producción real se subiría a Cloudinary o similar)
-      const imageUrl = `https://picsum.photos/200/200?random=${Date.now()}`;
+      // Simular la subida exitosa de imagen con Cloudinary
+      // En un futuro, aquí procesarías el FormData y subirías a Cloudinary
+      const imageUrl = `https://res.cloudinary.com/dv31mt6pd/image/upload/v${Date.now()}/blogsy-uploads/profile_${userId}_${Date.now()}.jpg`;
       
       console.log('Imagen de perfil simulada generada:', imageUrl);
 
       // Simular actualización del usuario con nueva imagen
       const updatedUser = {
-        id: decoded.userId,
+        id: userId,
         email: decoded.email,
         name: decoded.email === 'ignaciodalesio1995@gmail.com' ? 'Ignacio Dalesio' : 'Usuario de Prueba',
         role: decoded.email === 'ignaciodalesio1995@gmail.com' ? 'admin' : 'user',

@@ -1703,8 +1703,8 @@ export const uploadProfileImageAndUpdate = async (userId, file) => {
     return { error: true, message: 'No autenticado' };
   }
 
-  // Construir URL
-  let url = combineUrls(BASE_URL, `/user/profile-image/${userId}`);
+  // Construir URL SIN el parámetro dinámico userId
+  let url = combineUrls(BASE_URL, '/user/profile-image');
   url = ensureHttps(url);
   
   console.log(`🔄 Subiendo imagen de perfil a: ${url}`);

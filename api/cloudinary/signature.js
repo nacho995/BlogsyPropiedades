@@ -41,10 +41,10 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // Credenciales reales de Cloudinary
-    const cloudName = process.env.CLOUDINARY_CLOUD_NAME || 'dv31mt6pd';
-    const apiKey = process.env.CLOUDINARY_API_KEY || '915443216824292';
-    const apiSecret = process.env.CLOUDINARY_API_SECRET || 'FMDbe6eOaHniPHQnrn-qbd6EqW4';
+    // Credenciales reales de Cloudinary - usar directamente
+    const cloudName = 'dv31mt6pd';
+    const apiKey = '915443216824292';
+    const apiSecret = 'FMDbe6eOaHniPHQnrn-qbd6EqW4';
     
     // Generar timestamp actual
     const timestamp = Math.floor(Date.now() / 1000);
