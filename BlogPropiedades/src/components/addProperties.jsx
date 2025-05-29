@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { createPropertyPost, uploadImageProperty, getPropertyById, updatePropertyPost, getCloudinarySignature, uploadFile } from '../services/api';
+import { createPropertyPost, uploadImageProperty, getPropertyById, updatePropertyPost, getCloudinarySignature } from '../services/api';
 import { useUser } from '../context/UserContext';
 import { motion } from 'framer-motion';
 import { FiUpload, FiHome, FiDollarSign, FiMapPin, FiUser, FiDroplet, FiSquare, FiTag, FiList, FiX, FiPlus, FiEdit, FiVideo, FiCamera } from 'react-icons/fi';

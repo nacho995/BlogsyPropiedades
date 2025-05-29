@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Blog y Propiedades - GozaMadrid</title>
+    <meta name="description" content="Portal para la publicación de blogs y propiedades de Madrid">
+    
+    <!-- Script básico de inicialización de entorno -->
+    <script>
+      // Variables de entorno predeterminadas
+      window.ENV_VARS = {
+        VITE_BACKEND_URL: 'https://api.realestategozamadrid.com',
+        VITE_API_URL: 'https://api.realestategozamadrid.com',
+        VITE_API_PUBLIC_API_URL: 'https://api.realestategozamadrid.com',
+        VITE_FALLBACK_API: 'https://api.realestategozamadrid.com'
+      };
+    </script>
+    
+    <!-- Protección TDZ mínima y necesaria -->
+    <script>
+      // Definir variables que podrían causar errores TDZ
+      window.y = window.y || {};
+      window.wi = window.wi || {};
+      window.Fp = window.Fp || {};
+      window.Nc = window.Nc || {};
+    </script>
+    
+    <!-- Estilo para pantalla de carga -->
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f5f5f5;
+      }
+      .initial-loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        text-align: center;
+        color: #3182ce;
+      }
+      .loading-icon {
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #3182ce;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    </style>
+    
+    <!-- Script para mostrar pantalla de carga si tarda demasiado -->
+    <script>
+      window.appLoadTimeout = setTimeout(function() {
+        if (document.getElementById('root') && document.getElementById('root').innerHTML === '') {
+          document.getElementById('root').innerHTML = `
+            <div class="initial-loading">
+              <div class="loading-icon"></div>
+              <h2>Cargando aplicación...</h2>
+              <p>Esto está tomando más tiempo del esperado.</p>
+              <p style="margin-top: 20px; font-size: 14px; color: #718096;">
+                Si el problema persiste, por favor contacte con soporte técnico.
+              </p>
+            </div>
+          `;
+        }
+      }, 10000);
+      
+      window.addEventListener('load', function() {
+        if (window.appLoadTimeout) {
+          clearTimeout(window.appLoadTimeout);
+        }
+      });
+    </script>
+    <script type="module" crossorigin src="/assets/index-31a719bc.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-9d2d50ea.js">
+    <link rel="modulepreload" crossorigin href="/assets/router-13631bdf.js">
+    <link rel="stylesheet" href="/assets/index-fe61398b.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    
+  </body>
+</html>

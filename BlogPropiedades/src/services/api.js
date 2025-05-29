@@ -1540,3 +1540,67 @@ export const uploadImageBlog = async (formData) => {
     throw error;
   }
 };
+
+/**
+ * Función genérica para subir archivos
+ * @param {File} file - Archivo a subir
+ * @returns {Promise<Object>} - Promise que se resuelve con la URL del archivo subido
+ */
+export const uploadFile = async (file) => {
+  try {
+    if (!file) {
+      throw new Error('No se proporcionó ningún archivo');
+    }
+
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    const token = localStorage.getItem('token');
+    const headers = {
+      'Authorization': `Bearer ${token}`
+    };
+    
+    console.log("Token de autorización:", token);
+    console.log("Subiendo archivo genérico a:", `${BASE_URL}/api/properties/upload-image`);
+    
+    const response = await fetch(`${BASE_URL}/api/properties/upload-image`, {
+      method: 'POST',
+      headers: headers,
+      body: formData,
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Respuesta de error del servidor:", errorText);
+      console.error("Status:", response.status);
+      console.error("StatusText:", response.statusText);
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log("Respuesta exitosa del servidor para uploadFile:", data);
+    
+    if (!data.imageUrl && !data.url && !data.secure_url) {
+      throw new Error('No se pudo obtener una URL válida del archivo');
+    }
+    
+    const fileUrl = data.imageUrl || data.url || data.secure_url;
+    
+    // Asegurar que la URL devuelta use el mismo protocolo que la página
+    let processedUrl = fileUrl;
+    if (isHttps && processedUrl.startsWith('http:')) {
+      processedUrl = processedUrl.replace('http://', 'https://');
+    }
+    
+    return {
+      secure_url: processedUrl,
+      url: processedUrl,
+      imageUrl: processedUrl
+    };
+    
+  } catch (error) {
+    console.error('Error al subir archivo genérico:', error);
+    throw error;
+  }
+};
