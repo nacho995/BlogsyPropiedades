@@ -31,8 +31,8 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // Construir URL del backend real
-    const backendUrl = `${API_BASE}/api/user/login`;
+    // Construir URL del backend real - RUTA CORREGIDA
+    const backendUrl = `${API_BASE}/user/login`;
     
     console.log(`Proxy login request to: ${backendUrl}`);
     

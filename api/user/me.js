@@ -33,8 +33,8 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // Construir URL del backend real
-    const backendUrl = `${API_BASE}/api/user/me`;
+    // Construir URL del backend real - RUTA CORREGIDA
+    const backendUrl = `${API_BASE}/user/me`;
     
     console.log(`Proxy user/me request to: ${backendUrl}`);
     

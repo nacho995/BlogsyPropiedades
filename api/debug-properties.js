@@ -41,7 +41,7 @@ module.exports = async function handler(req, res) {
     console.log('=== TESTING TOKEN VALIDITY ===');
     
     try {
-      const userResponse = await fetch(`${API_BASE}/api/user/me`, {
+      const userResponse = await fetch(`${API_BASE}/user/me`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
