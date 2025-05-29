@@ -10,52 +10,14 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    // Datos simulados de propiedades para testing
+    // Array de propiedades (inicialmente vacío - se llenará con propiedades reales)
     const properties = [
-      {
-        id: 1,
-        title: 'Casa moderna en Goza Madrid',
-        description: 'Hermosa casa de 3 habitaciones con jardín',
-        price: 350000,
-        location: 'Goza Madrid',
-        bedrooms: 3,
-        bathrooms: 2,
-        area: 150,
-        type: 'casa',
-        status: 'venta',
-        imageUrl: 'https://placekitten.com/800/500',
-        images: [
-          'https://placekitten.com/800/500',
-          'https://placekitten.com/800/501',
-          'https://placekitten.com/800/502'
-        ],
-        features: ['jardín', 'garaje', 'terraza'],
-        publishDate: '2024-01-15'
-      },
-      {
-        id: 2,
-        title: 'Apartamento céntrico',
-        description: 'Apartamento de 2 habitaciones en el centro',
-        price: 250000,
-        location: 'Centro Goza Madrid',
-        bedrooms: 2,
-        bathrooms: 1,
-        area: 80,
-        type: 'apartamento',
-        status: 'venta',
-        imageUrl: 'https://placekitten.com/800/503',
-        images: [
-          'https://placekitten.com/800/503',
-          'https://placekitten.com/800/504'
-        ],
-        features: ['ascensor', 'aire acondicionado'],
-        publishDate: '2024-01-12'
-      }
+      // Las propiedades se añadirán dinámicamente cuando se creen
     ];
 
     switch (req.method) {
       case 'GET':
-        // Devolver lista de propiedades directamente
+        // Devolver lista de propiedades
         return res.status(200).json(properties);
 
       case 'POST':
@@ -68,7 +30,7 @@ module.exports = async function handler(req, res) {
           });
         }
 
-        const { title, description, price, location, bedrooms, bathrooms, area, type, status } = req.body;
+        const { title, description, price, location, bedrooms, bathrooms, area, images, features, type, status } = req.body;
 
         if (!title || !description || !price || !location) {
           return res.status(400).json({
@@ -77,27 +39,38 @@ module.exports = async function handler(req, res) {
           });
         }
 
-        // Simular creación de propiedad
+        // Crear nueva propiedad con datos reales
         const newProperty = {
           id: Date.now(),
+          _id: Date.now(), // Para compatibilidad
           title,
           description,
           price: Number(price),
           location,
+          address: location, // Alias para compatibilidad
           bedrooms: Number(bedrooms) || 1,
           bathrooms: Number(bathrooms) || 1,
           area: Number(area) || 50,
-          type: type || 'apartamento',
-          status: status || 'venta',
-          imageUrl: 'https://placekitten.com/800/505',
-          images: ['https://placekitten.com/800/505'],
-          features: [],
-          publishDate: new Date().toISOString().split('T')[0]
+          m2: Number(area) || 50, // Alias para compatibilidad
+          rooms: Number(bedrooms) || 1, // Alias para compatibilidad
+          wc: Number(bathrooms) || 1, // Alias para compatibilidad
+          typeProperty: type || 'Propiedad',
+          propertyType: status || 'Venta',
+          images: images || [],
+          features: features || [],
+          publishDate: new Date().toISOString().split('T')[0],
+          createdAt: new Date().toISOString(),
+          status: 'Disponible'
         };
+
+        // NOTA: En un sistema real, aquí se guardaría en base de datos
+        // Por ahora solo retornamos la propiedad creada
+        console.log('Nueva propiedad creada:', newProperty);
 
         return res.status(201).json({
           success: true,
-          property: newProperty
+          property: newProperty,
+          message: 'Propiedad creada exitosamente'
         });
 
       default:

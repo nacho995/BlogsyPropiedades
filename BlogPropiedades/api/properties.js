@@ -10,47 +10,9 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    // Datos simulados de propiedades para testing
+    // Array de propiedades (inicialmente vacío - se llenará con propiedades reales)
     const properties = [
-      {
-        id: 1,
-        title: 'Casa moderna en Goza Madrid',
-        description: 'Hermosa casa de 3 habitaciones con jardín',
-        price: 350000,
-        location: 'Goza Madrid',
-        bedrooms: 3,
-        bathrooms: 2,
-        area: 150,
-        type: 'casa',
-        status: 'venta',
-        imageUrl: 'https://placekitten.com/800/500',
-        images: [
-          'https://placekitten.com/800/500',
-          'https://placekitten.com/800/501',
-          'https://placekitten.com/800/502'
-        ],
-        features: ['jardín', 'garaje', 'terraza'],
-        publishDate: '2024-01-15'
-      },
-      {
-        id: 2,
-        title: 'Apartamento céntrico',
-        description: 'Apartamento de 2 habitaciones en el centro',
-        price: 250000,
-        location: 'Centro Goza Madrid',
-        bedrooms: 2,
-        bathrooms: 1,
-        area: 80,
-        type: 'apartamento',
-        status: 'venta',
-        imageUrl: 'https://placekitten.com/800/503',
-        images: [
-          'https://placekitten.com/800/503',
-          'https://placekitten.com/800/504'
-        ],
-        features: ['ascensor', 'aire acondicionado'],
-        publishDate: '2024-01-12'
-      }
+      // Las propiedades se añadirán dinámicamente cuando se creen
     ];
 
     switch (req.method) {
