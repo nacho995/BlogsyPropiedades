@@ -10,7 +10,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const API_BASE = 'https://api.realestategozamadrid.com';
+    const API_BASE = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
     
     // Construir URL del backend real
     let backendUrl = `${API_BASE}/api/properties`;
