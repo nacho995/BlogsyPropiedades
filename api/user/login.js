@@ -18,87 +18,55 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    console.log('=== DEBUG LOGIN ===');
-    console.log('Method:', req.method);
-    console.log('Content-Type:', req.headers['content-type']);
-    console.log('Body type:', typeof req.body);
-    console.log('Body:', req.body);
+    const API_BASE = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
     
-    // Si no hay body, devolver un mensaje de debug
-    if (!req.body) {
-      console.log('No body received');
+    console.log('=== PROXY LOGIN REQUEST ===');
+    console.log('Method:', req.method);
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+    
+    if (!req.body || !req.body.email || !req.body.password) {
       return res.status(400).json({
         error: true,
-        message: 'No se recibieron datos',
-        debug: {
-          bodyReceived: false,
-          contentType: req.headers['content-type'],
-          method: req.method
-        }
+        message: 'Email y contraseña son requeridos'
       });
     }
 
-    const { email, password } = req.body;
+    // Construir URL del backend real
+    const backendUrl = `${API_BASE}/api/user/login`;
     
-    console.log('Email received:', email);
-    console.log('Password received:', password ? 'YES' : 'NO');
-
-    // Para testing temporal: aceptar cualquier credencial
-    if (email && password) {
-      // Crear un JWT válido manualmente (header.payload.signature)
-      const header = {
-        "alg": "HS256",
-        "typ": "JWT"
-      };
-      
-      const payload = {
-        userId: 1,
-        email: email,
-        iat: Math.floor(Date.now() / 1000), // issued at
-        exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // expira en 24 horas
-      };
-      
-      // Codificar header y payload en base64 (no base64url)
-      const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64');
-      const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64');
-      
-      // Crear signature simple (en producción real usarías una librería como jsonwebtoken)
-      const signature = Buffer.from('fake-signature-for-testing').toString('base64');
-      
-      // Construir JWT: header.payload.signature
-      const token = `${encodedHeader}.${encodedPayload}.${signature}`;
-
-      console.log('Login success (debug mode)');
-      console.log('Generated JWT token:', token.substring(0, 50) + '...');
-      
-      return res.status(200).json({
-        success: true,
-        token,
-        user: {
-          id: 1,
-          email: email,
-          name: 'Usuario Debug',
-          role: 'user'
-        }
-      });
-    }
-
-    return res.status(400).json({
-      error: true,
-      message: 'Email y contraseña requeridos',
-      debug: {
-        emailReceived: !!email,
-        passwordReceived: !!password,
-        bodyData: req.body
-      }
-    });
-
+    console.log(`Proxy login request to: ${backendUrl}`);
+    
+    // Preparar headers para el backend
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    };
+    
+    // Configurar opciones de fetch
+    const fetchOptions = {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(req.body)
+    };
+    
+    console.log('Request body to backend:', JSON.stringify(req.body, null, 2));
+    
+    // Hacer petición al backend real
+    const response = await fetch(backendUrl, fetchOptions);
+    const data = await response.json();
+    
+    console.log(`Backend response status: ${response.status}`);
+    console.log(`Backend response data:`, JSON.stringify(data, null, 2));
+    
+    // Retornar la respuesta del backend con el mismo status
+    return res.status(response.status).json(data);
+    
   } catch (error) {
-    console.error('Error en login:', error);
+    console.error('Error en proxy login:', error);
     return res.status(500).json({
       error: true,
-      message: 'Error interno del servidor',
-      debug: error.message
+      message: 'Error al conectar con el backend',
+      details: error.message
     });
   }
 }; 

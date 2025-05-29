@@ -18,79 +18,55 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    console.log('=== USER ME ===');
-    console.log('Method:', req.method);
-    console.log('Headers:', req.headers.authorization ? 'Authorization provided' : 'No authorization');
-
-    // Obtener token del header Authorization
-    const authHeader = req.headers.authorization;
+    const API_BASE = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
     
+    console.log('=== PROXY USER ME REQUEST ===');
+    console.log('Method:', req.method);
+    console.log('Authorization header:', req.headers.authorization ? 'Present' : 'Missing');
+
+    // Verificar token
+    const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         error: true,
-        message: 'Token de acceso requerido'
+        message: 'Token de autorización requerido'
       });
     }
 
-    const token = authHeader.split(' ')[1];
-    console.log('Token received:', token.substring(0, 50) + '...');
-
-    try {
-      // Verificar que el token tenga formato JWT (3 segmentos)
-      const tokenParts = token.split('.');
-      if (tokenParts.length !== 3) {
-        return res.status(401).json({
-          error: true,
-          message: 'Token formato inválido'
-        });
-      }
-
-      // Decodificar payload del JWT (usar base64 en lugar de base64url)
-      const payload = tokenParts[1];
-      
-      // Añadir padding si es necesario para base64
-      const paddedPayload = payload + '='.repeat((4 - payload.length % 4) % 4);
-      const decoded = JSON.parse(Buffer.from(paddedPayload, 'base64').toString());
-      
-      console.log('Token decoded:', decoded);
-
-      // Verificar expiración
-      if (decoded.exp < Math.floor(Date.now() / 1000)) {
-        return res.status(401).json({
-          error: true,
-          message: 'Token expirado'
-        });
-      }
-
-      // Simular datos de usuario - DEVOLVER DIRECTAMENTE SIN WRAPPER
-      const userData = {
-        id: decoded.userId,
-        email: decoded.email,
-        name: decoded.email === 'ignaciodalesio1995@gmail.com' ? 'Ignacio Dalesio' : 'Usuario de Prueba',
-        role: decoded.email === 'ignaciodalesio1995@gmail.com' ? 'admin' : 'user',
-        avatar: null,
-        profileImage: null, // Agregar campo profileImage
-        createdAt: '2024-01-01T00:00:00.000Z'
-      };
-
-      console.log('Returning user data directly:', userData);
-
-      // DEVOLVER DIRECTAMENTE LOS DATOS DEL USUARIO, NO COMO WRAPPER
-      return res.status(200).json(userData);
-
-    } catch (decodeError) {
-      console.error('Error decoding token:', decodeError);
-      return res.status(401).json({
-        error: true,
-        message: 'Token inválido'
-      });
-    }
-
+    // Construir URL del backend real
+    const backendUrl = `${API_BASE}/api/user/me`;
+    
+    console.log(`Proxy user/me request to: ${backendUrl}`);
+    
+    // Preparar headers para el backend
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': authHeader // Pasar el token al backend real
+    };
+    
+    // Configurar opciones de fetch
+    const fetchOptions = {
+      method: 'GET',
+      headers: headers
+    };
+    
+    // Hacer petición al backend real
+    const response = await fetch(backendUrl, fetchOptions);
+    const data = await response.json();
+    
+    console.log(`Backend response status: ${response.status}`);
+    console.log(`Backend response data:`, JSON.stringify(data, null, 2));
+    
+    // Retornar la respuesta del backend con el mismo status
+    return res.status(response.status).json(data);
+    
   } catch (error) {
-    console.error('Error en obtener perfil:', error);
+    console.error('Error en proxy user/me:', error);
     return res.status(500).json({
       error: true,
-      message: 'Error interno del servidor'
+      message: 'Error al conectar con el backend',
+      details: error.message
     });
   }
 }; 
