@@ -518,23 +518,6 @@ export const getBlogById = async (id) => {
 };
 
 /**
- * Registra un nuevo usuario.
- * @param {Object} data - Datos del usuario.
- * @returns {Promise<Object>}
- */
-export const createUser = async (data) => {
-  try {
-    return await fetchAPI('/user/register', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  } catch (error) {
-    console.error('Error al crear usuario:', error);
-    throw error;
-  }
-};
-
-/**
  * Funciones específicas de autenticación
  */
 export const loginUser = async (credentials) => {
@@ -560,7 +543,7 @@ export const loginUser = async (credentials) => {
     
     console.log(`📝 Intentando login con email: ${loginData.email}`);
     
-    // Usar la URL específica para login
+    // Usar la ruta correcta del backend AWS
     const loginUrl = '/user/login';
     
     // Enviar las credenciales como JSON string
@@ -637,426 +620,18 @@ export const loginUser = async (credentials) => {
 };
 
 /**
- * Obtiene la lista de usuarios.
- * @returns {Promise<Array>}
+ * Registra un nuevo usuario.
+ * @param {Object} data - Datos del usuario.
+ * @returns {Promise<Object>}
  */
-export const getUsers = async () => {
+export const createUser = async (data) => {
   try {
-    return await fetchAPI('/user');
-  } catch (error) {
-    console.error('Error al obtener usuarios:', error);
-    throw error;
-  }
-};
-
-/**
- * Solicita el envío de un correo para recuperar la contraseña
- * @param {string} email - Correo electrónico del usuario
- * @returns {Promise} - Promesa con la respuesta del servidor
- */
-export const requestPasswordRecovery = async (email) => {
-  return await fetchAPI('/user/request-reset', {
-    method: 'POST',
-    body: JSON.stringify({ email })
-  });
-};
-
-/**
- * Restablece la contraseña utilizando el token recibido por correo
- * @param {string} token - Token de recuperación de contraseña
- * @param {string} password - Nueva contraseña
- * @param {string} passwordConfirm - Confirmación de la nueva contraseña
- * @returns {Promise} - Promesa con la respuesta del servidor
- */
-export const resetPassword = async (token, password, passwordConfirm) => {
-  return await fetchAPI('/user/reset-password', {
-    method: 'POST',
-    body: JSON.stringify({ token, password, passwordConfirm })
-  });
-};
-
-/**
- * Actualiza el perfil del usuario
- * @param {Object} userData - Datos del usuario a actualizar
- * @param {string} token - Token de autenticación
- * @returns {Promise<Object>} - Datos actualizados del usuario
- */
-export const updateProfile = async (userData, token) => {
-  try {
-    // Usar el token del localStorage si no se proporciona uno
-    const authToken = token || localStorage.getItem('token');
-    if (!authToken) {
-      throw new Error('No hay token de autenticación disponible');
-    }
-    
-    console.log("Actualizando perfil con token:", authToken);
-    
-    // Crear el objeto con los datos del usuario
-    const updateData = {};
-    
-    // Añadir nombre si existe
-    if (userData.name) {
-      updateData.name = userData.name;
-    }
-    
-    // Convertir formData a JSON si es necesario
-    if (userData.profilePic) {
-      // Si es un archivo, necesitamos usar FormData
-      if (userData.profilePic instanceof File) {
-        const formData = new FormData();
-        
-        // Añadir los campos del formulario
-        if (userData.name) {
-          formData.append('name', userData.name);
-        }
-        
-        formData.append('profilePic', userData.profilePic);
-        
-        // Usar fetchAPI con la ruta correcta
-        return await fetchAPI('/user/update-profile', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: formData,
-          // No establecer Content-Type para que el navegador lo haga automáticamente con el boundary
-          omitContentType: true
-        });
-      } else {
-        // Si es una URL o string, simplemente agregar al objeto JSON
-        updateData.profilePic = userData.profilePic;
-      }
-    }
-    
-    // Si no hay archivo, usar JSON
-    if (!userData.profilePic || !(userData.profilePic instanceof File)) {
-      return await fetchAPI('/user/update-profile', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(updateData)
-      });
-    }
-  } catch (error) {
-    console.error('Error al actualizar perfil:', error);
-    throw error;
-  }
-};
-
-/**
- * Sube una imagen para un blog.
- * @param {FormData} formData - FormData que contiene la imagen y metadatos
- * @returns {Promise<Object>} - Retorna un objeto con la URL de la imagen
- */
-export const uploadImageBlog = async (formData) => {
-  try {
-    console.log('Subiendo imagen para blog...');
-    
-    const result = await fetchAPI('/api/blogs/upload', {
+    return await fetchAPI('/user/register', {
       method: 'POST',
-      body: formData
-    });
-
-    if (!result || !result.imageUrl) {
-      throw new Error('No se recibió una URL de imagen válida del servidor');
-    }
-
-    // Normalizar el resultado para que coincida con el formato esperado
-    return {
-      src: result.imageUrl,
-      alt: formData.get('title') || 'Imagen del blog'
-    };
-  } catch (error) {
-    console.error('Error al subir imagen:', error);
-    throw error;
-  }
-};
-
-/**
- * Función para subir archivos de propiedades
- * @param {File} file - Archivo a subir
- * @param {string} token - Token de autenticación
- * @returns {Promise<Object>} - Promise que se resuelve con la URL del archivo subido
- */
-export const uploadFile = async (file, token) => {
-  const formData = new FormData();
-  formData.append('file', file);
-  
-  // Añadir campos requeridos para la validación del modelo
-  formData.append('title', 'Título temporal');
-  formData.append('description', 'Descripción temporal');
-  formData.append('price', '0');
-  formData.append('bedrooms', '0');
-  formData.append('bathrooms', '0');
-  formData.append('area', '0');
-  formData.append('location', 'Ubicación temporal');
-  
-  try {
-    const headers = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    
-    // Intentar primero con la ruta de subida específica
-    console.log("Intentando subir archivo a:", `${BASE_URL}/property/upload`);
-    
-    let response;
-    let usePropertyRoute = false;
-    
-    try {
-      // Intentar con la ruta de subida específica
-      response = await fetch(`${BASE_URL}/property/upload`, {
-        method: 'POST',
-        headers,
-        body: formData
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Respuesta exitosa del servidor (property/upload):", data);
-        
-        // Asegurar que cualquier URL en la respuesta use el mismo protocolo que la página
-        if (data.imageUrl && isHttps && data.imageUrl.startsWith('http:')) {
-          data.imageUrl = data.imageUrl.replace('http://', 'https://');
-        }
-        
-        return data;
-      }
-    } catch (err) {
-      console.log("Error con property/upload, intentando con blog/upload:", err);
-      usePropertyRoute = true;
-    }
-    
-    // Si falla, intentar con la ruta de blog
-    if (usePropertyRoute || !response || !response.ok) {
-      console.log("Intentando con ruta alternativa:", `${BASE_URL}/blog/upload`);
-      
-      response = await fetch(`${BASE_URL}/blog/upload`, {
-        method: 'POST',
-        headers,
-        body: formData
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Respuesta exitosa del servidor (blog/upload):", data);
-        
-        // Asegurar que cualquier URL en la respuesta use el mismo protocolo que la página
-        if (data.imageUrl && isHttps && data.imageUrl.startsWith('http:')) {
-          data.imageUrl = data.imageUrl.replace('http://', 'https://');
-        }
-        
-        return data;
-      }
-    }
-    
-    // Si ambas rutas fallan, intentar con la ruta principal
-    if (!response || !response.ok) {
-      console.log("Intentando con ruta principal:", `${BASE_URL}/property`);
-      
-      response = await fetch(`${BASE_URL}/property`, {
-        method: 'POST',
-        headers,
-        body: formData
-      });
-    }
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Respuesta de error del servidor:", errorText);
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    console.log("Respuesta exitosa del servidor:", data);
-    
-    // Asegurar que cualquier URL en la respuesta use el mismo protocolo que la página
-    if (data.imageUrl && isHttps && data.imageUrl.startsWith('http:')) {
-      data.imageUrl = data.imageUrl.replace('http://', 'https://');
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('Error al subir archivo:', error);
-    throw error;
-  }
-};
-
-/**
- * @param {Object} data - Datos de la propiedad.
- * @returns {Promise<Object>}
- */
-export const createPropertyPost = async (data) => {
-  console.log('[createPropertyPost] Iniciando creación con datos:', data); // Log al inicio
-  if (!data) {
-    console.error('[createPropertyPost] No data provided');
-    throw new Error('No se proporcionaron datos para crear la propiedad.');
-  }
-
-  // Asegurarse de que las imágenes sean solo un array de URLs (o el formato esperado)
-  if (data.images && Array.isArray(data.images)) {
-    console.log('[createPropertyPost] Enviando imágenes:', data.images);
-  }
-
-  try {
-    // *** LOG JUSTO ANTES DE LA LLAMADA PROBLEMÁTICA ***
-    const tokenCheckMomentaneo = localStorage.getItem('token');
-    console.log(`[createPropertyPost] TOKEN JUSTO ANTES DE LLAMAR A postData('/api/properties'): ${tokenCheckMomentaneo ? 'EXISTE' : 'NULL'}`);
-    // ***************************************************
-
-    // Llamar a postData con ruta correcta del backend AWS
-    const response = await postData('/api/properties', data);
-
-    console.log('[createPropertyPost] Respuesta recibida de postData:', response);
-    if (response && response.error) {
-      // Usar el mensaje de error de postData si existe
-      throw new Error(response.message || 'Error devuelto por postData al crear la propiedad');
-    }
-    return response;
-  } catch (error) {
-    console.error('[createPropertyPost] Error detallado:', error);
-    // Asegurarse de relanzar un objeto Error
-    throw new Error(error.message || 'Error desconocido en createPropertyPost');
-  }
-};
-
-/**
- * Obtiene todas las propiedades.
- * @returns {Promise<Array>}
- */
-export const getPropertyPosts = async () => {
-  try {
-    console.log("Obteniendo propiedades del servidor...");
-    const properties = await fetchAPI('/api/properties'); // Ruta correcta del backend AWS
-    console.log("Propiedades recibidas del servidor:", properties);
-    
-    // Verificar la estructura de cada propiedad y corregir las imágenes si es necesario
-    if (Array.isArray(properties)) {
-      return properties.map(property => {
-        console.log(`Propiedad ${property._id} - Procesando...`);
-        
-        // Corregir el array de imágenes si es necesario
-        if (!property.images || !Array.isArray(property.images)) {
-          console.log(`Propiedad ${property._id} - Inicializando array de imágenes vacío`);
-          property.images = [];
-        } else {
-          // Filtrar imágenes no válidas
-          property.images = property.images.filter(img => {
-            if (!img || typeof img !== 'object' || !img.src) {
-              return false;
-            }
-            
-            const src = img.src;
-            return typeof src === 'string' && 
-                   src.trim() !== '' && 
-                   src !== '""' && 
-                   src !== '"' && 
-                   src !== "''";
-          });
-        }
-        
-        return property;
-      });
-    }
-    
-    return [];
-  } catch (error) {
-    console.error('Error al obtener propiedades:', error);
-    // Devolver array vacío en caso de error
-    return [];
-  }
-};
-
-/**
- * Elimina una propiedad por su id.
- * @param {string} id - Identificador del property post.
- * @returns {Promise<Object>}
- */
-export const deletePropertyPost = async (id) => {
-  try {
-    console.log(`[deletePropertyPost] Eliminando propiedad con ID: ${id}`);
-    
-    // Obtener el token del localStorage
-    const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('No hay token de autenticación disponible');
-    }
-    
-    // Usar ruta correcta del backend AWS
-    const result = await fetchAPI(`/api/properties/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    console.log(`[deletePropertyPost] Resultado:`, result);
-    return result;
-  } catch (error) {
-    console.error(`Error al eliminar propiedad ${id}:`, error);
-    throw error;
-  }
-};
-
-/**
- * Actualiza un property post.
- * @param {string} id - Identificador del property post.
- * @param {Object} data - Datos actualizados del property post.
- * @returns {Promise<Object>}
- */
-export const updatePropertyPost = async (id, data) => {
-  try {
-    console.log(`[updatePropertyPost] Actualizando propiedad ${id} con datos:`, data);
-    
-    if (!id || !data) {
-      throw new Error('ID o datos faltantes para actualizar la propiedad.');
-    }
-
-    // Similar a create, verificar/ajustar el formato de las imágenes si es necesario
-    if (data.images && Array.isArray(data.images)) {
-      console.log('[updatePropertyPost] Enviando imágenes actualizadas:', data.images.length, 'imágenes');
-    }
-
-    // Usar ruta correcta del backend AWS
-    const result = await fetchAPI(`/api/properties/${id}`, {
-      method: 'PUT',
       body: JSON.stringify(data)
     });
-
-    console.log('[updatePropertyPost] Respuesta recibida:', result);
-    
-    if (result && result.error) {
-      throw new Error(result.message || 'Error al actualizar la propiedad');
-    }
-    
-    return result;
   } catch (error) {
-    console.error(`Error detallado en updatePropertyPost para ID ${id}:`, error);
-    throw error;
-  }
-};
-
-/**
- * Obtiene una propiedad por su id.
- * @param {string} id - Identificador de la propiedad.
- * @returns {Promise<Object>}
- */
-export const getPropertyById = async (id) => {
-  try {
-    console.log(`[getPropertyById] Obteniendo propiedad con ID: ${id}`);
-    // Usar ruta correcta del backend AWS
-    const result = await fetchAPI(`/api/properties/${id}`);
-    console.log(`[getPropertyById] Resultado recibido:`, {
-      id: result._id || result.id,
-      title: result.title,
-      imagesCount: result.images?.length || 0,
-      hasDescription: !!result.description
-    });
-    return result;
-  } catch (error) {
-    console.error(`Error al obtener propiedad ${id}:`, error);
+    console.error('Error al crear usuario:', error);
     throw error;
   }
 };
@@ -1125,7 +700,7 @@ export async function getUserProfile(token) {
     veryRecentAttempts.push(now);
     localStorage.setItem(profileAttemptsKey, JSON.stringify(veryRecentAttempts));
     
-    // Intentar obtener el perfil del usuario
+    // Intentar obtener el perfil del usuario usando la ruta correcta del backend AWS
     const userDataFromApi = await fetchAPI('/user/me', {
       headers: {
         'Authorization': `Bearer ${authToken}`
@@ -1757,5 +1332,182 @@ export const uploadProfileImageAndUpdate = async (userId, file) => {
   } catch (error) {
     console.error('❌ Error en uploadProfileImageAndUpdate:', error);
     return { error: true, message: error.message || 'Error de red o desconocido' };
+  }
+};
+
+/**
+ * @param {Object} data - Datos de la propiedad.
+ * @returns {Promise<Object>}
+ */
+export const createPropertyPost = async (data) => {
+  console.log('[createPropertyPost] Iniciando creación con datos:', data); // Log al inicio
+  if (!data) {
+    console.error('[createPropertyPost] No data provided');
+    throw new Error('No se proporcionaron datos para crear la propiedad.');
+  }
+
+  // Asegurarse de que las imágenes sean solo un array de URLs (o el formato esperado)
+  if (data.images && Array.isArray(data.images)) {
+    console.log('[createPropertyPost] Enviando imágenes:', data.images);
+  }
+
+  try {
+    // *** LOG JUSTO ANTES DE LA LLAMADA PROBLEMÁTICA ***
+    const tokenCheckMomentaneo = localStorage.getItem('token');
+    console.log(`[createPropertyPost] TOKEN JUSTO ANTES DE LLAMAR A postData('/api/properties'): ${tokenCheckMomentaneo ? 'EXISTE' : 'NULL'}`);
+    // ***************************************************
+
+    // Llamar a postData con ruta correcta del backend AWS
+    const response = await postData('/api/properties', data);
+
+    console.log('[createPropertyPost] Respuesta recibida de postData:', response);
+    if (response && response.error) {
+      // Usar el mensaje de error de postData si existe
+      throw new Error(response.message || 'Error devuelto por postData al crear la propiedad');
+    }
+    return response;
+  } catch (error) {
+    console.error('[createPropertyPost] Error detallado:', error);
+    // Asegurarse de relanzar un objeto Error
+    throw new Error(error.message || 'Error desconocido en createPropertyPost');
+  }
+};
+
+/**
+ * Obtiene todas las propiedades.
+ * @returns {Promise<Array>}
+ */
+export const getPropertyPosts = async () => {
+  try {
+    console.log("Obteniendo propiedades del servidor...");
+    const properties = await fetchAPI('/api/properties'); // Ruta correcta del backend AWS
+    console.log("Propiedades recibidas del servidor:", properties);
+    
+    // Verificar la estructura de cada propiedad y corregir las imágenes si es necesario
+    if (Array.isArray(properties)) {
+      return properties.map(property => {
+        console.log(`Propiedad ${property._id} - Procesando...`);
+        
+        // Corregir el array de imágenes si es necesario
+        if (!property.images || !Array.isArray(property.images)) {
+          console.log(`Propiedad ${property._id} - Inicializando array de imágenes vacío`);
+          property.images = [];
+        } else {
+          // Filtrar imágenes no válidas
+          property.images = property.images.filter(img => {
+            if (!img || typeof img !== 'object' || !img.src) {
+              return false;
+            }
+            
+            const src = img.src;
+            return typeof src === 'string' && 
+                   src.trim() !== '' && 
+                   src !== '""' && 
+                   src !== '"' && 
+                   src !== "''";
+          });
+        }
+        
+        return property;
+      });
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Error al obtener propiedades:', error);
+    // Devolver array vacío en caso de error
+    return [];
+  }
+};
+
+/**
+ * Elimina una propiedad por su id.
+ * @param {string} id - Identificador del property post.
+ * @returns {Promise<Object>}
+ */
+export const deletePropertyPost = async (id) => {
+  try {
+    console.log(`[deletePropertyPost] Eliminando propiedad con ID: ${id}`);
+    
+    // Obtener el token del localStorage
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No hay token de autenticación disponible');
+    }
+    
+    // Usar ruta correcta del backend AWS
+    const result = await fetchAPI(`/api/properties/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    console.log(`[deletePropertyPost] Resultado:`, result);
+    return result;
+  } catch (error) {
+    console.error(`Error al eliminar propiedad ${id}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Actualiza un property post.
+ * @param {string} id - Identificador del property post.
+ * @param {Object} data - Datos actualizados del property post.
+ * @returns {Promise<Object>}
+ */
+export const updatePropertyPost = async (id, data) => {
+  try {
+    console.log(`[updatePropertyPost] Actualizando propiedad ${id} con datos:`, data);
+    
+    if (!id || !data) {
+      throw new Error('ID o datos faltantes para actualizar la propiedad.');
+    }
+
+    // Similar a create, verificar/ajustar el formato de las imágenes si es necesario
+    if (data.images && Array.isArray(data.images)) {
+      console.log('[updatePropertyPost] Enviando imágenes actualizadas:', data.images.length, 'imágenes');
+    }
+
+    // Usar ruta correcta del backend AWS
+    const result = await fetchAPI(`/api/properties/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+
+    console.log('[updatePropertyPost] Respuesta recibida:', result);
+    
+    if (result && result.error) {
+      throw new Error(result.message || 'Error al actualizar la propiedad');
+    }
+    
+    return result;
+  } catch (error) {
+    console.error(`Error detallado en updatePropertyPost para ID ${id}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Obtiene una propiedad por su id.
+ * @param {string} id - Identificador de la propiedad.
+ * @returns {Promise<Object>}
+ */
+export const getPropertyById = async (id) => {
+  try {
+    console.log(`[getPropertyById] Obteniendo propiedad con ID: ${id}`);
+    // Usar ruta correcta del backend AWS
+    const result = await fetchAPI(`/api/properties/${id}`);
+    console.log(`[getPropertyById] Resultado recibido:`, {
+      id: result._id || result.id,
+      title: result.title,
+      imagesCount: result.images?.length || 0,
+      hasDescription: !!result.description
+    });
+    return result;
+  } catch (error) {
+    console.error(`Error al obtener propiedad ${id}:`, error);
+    throw error;
   }
 };
