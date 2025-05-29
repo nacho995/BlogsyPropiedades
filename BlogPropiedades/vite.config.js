@@ -8,7 +8,7 @@ export default defineConfig({
     react()
   ],
   define: {
-    global: {}, // Esto crea un objeto vacío para 'global'
+    global: 'globalThis',
   },
   optimizeDeps: {
     include: [
@@ -26,15 +26,14 @@ export default defineConfig({
         drop_console: false, // Mantener console.logs para diagnóstico
       },
     },
-    sourcemap: true,
+    sourcemap: false, // Desactivar sourcemaps para producción
     // Inyectar código específico para evitar TDZ
     rollupOptions: {
       output: {
-        banner: '/* TDZ fix banner - init global vars */\n' +
-               'window.y = window.y || {};\n' +
-               'window.b = window.b || {};\n' +
-               'window.wi = window.wi || {};\n' +
-               'window.Fp = window.Fp || {};',
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+        },
       }
     }
   },
@@ -42,7 +41,24 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
-    cors: true
+    cors: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        configure: (proxy, options) => {
+          proxy.on('error', (err, req, res) => {
+            console.log('proxy error', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            console.log('Sending Request to the Target:', req.method, req.url);
+          });
+          proxy.on('proxyRes', (proxyRes, req, res) => {
+            console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
+          });
+        },
+      }
+    }
   },
   resolve: {
     alias: {

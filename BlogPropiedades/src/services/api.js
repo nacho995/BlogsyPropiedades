@@ -354,7 +354,7 @@ export const createBlogPost = async (data) => {
 
     console.log("Datos del blog preparados para enviar:", blogData);
 
-    const result = await fetchAPI('/api/blogs', {
+    const result = await fetchAPI('/blogs', {
       method: 'POST',
       body: JSON.stringify(blogData)
     });
@@ -379,7 +379,7 @@ export const createBlogPost = async (data) => {
 export const getBlogPosts = async () => {
   try {
     console.log("Obteniendo blogs del servidor...");
-    const blogs = await fetchAPI('/api/blogs');
+    const blogs = await fetchAPI('/blogs');
     console.log("Blogs recibidos del servidor:", blogs);
     
     // Verificar la estructura de cada blog y procesar las imágenes
@@ -889,11 +889,11 @@ export const createPropertyPost = async (data) => {
   try {
     // *** LOG JUSTO ANTES DE LA LLAMADA PROBLEMÁTICA ***
     const tokenCheckMomentaneo = localStorage.getItem('token');
-    console.log(`[createPropertyPost] TOKEN JUSTO ANTES DE LLAMAR A postData('/api/properties'): ${tokenCheckMomentaneo ? 'EXISTE' : 'NULL'}`);
+    console.log(`[createPropertyPost] TOKEN JUSTO ANTES DE LLAMAR A postData('/properties'): ${tokenCheckMomentaneo ? 'EXISTE' : 'NULL'}`);
     // ***************************************************
 
     // Llamar a postData (Esta es la línea ~873 según la traza)
-    const response = await postData('/api/properties', data);
+    const response = await postData('/properties', data);
 
     console.log('[createPropertyPost] Respuesta recibida de postData:', response);
     if (response && response.error) {
@@ -911,7 +911,7 @@ export const createPropertyPost = async (data) => {
 export const getPropertyPosts = async () => {
   try {
     console.log("Obteniendo propiedades del servidor...");
-    const properties = await fetchAPI('/api/properties');
+    const properties = await fetchAPI('/properties');
     console.log("Propiedades recibidas del servidor:", properties);
     
     // Verificar la estructura de cada propiedad y corregir las imágenes si es necesario
