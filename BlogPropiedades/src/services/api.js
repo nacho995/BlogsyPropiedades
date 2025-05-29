@@ -972,20 +972,26 @@ export const getPropertyPosts = async () => {
  */
 export const deletePropertyPost = async (id) => {
   try {
+    console.log(`[deletePropertyPost] Eliminando propiedad con ID: ${id}`);
+    
     // Obtener el token del localStorage
     const token = localStorage.getItem('token');
     if (!token) {
       throw new Error('No hay token de autenticación disponible');
     }
     
-    return await fetchAPI(`/api/properties/${id}`, {
+    // Usar query parameter para evitar problemas con rutas dinámicas en Vercel
+    const result = await fetchAPI(`/properties?id=${id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`
       }
     });
+    
+    console.log(`[deletePropertyPost] Resultado:`, result);
+    return result;
   } catch (error) {
-    console.error('Error al eliminar propiedad:', error);
+    console.error(`Error al eliminar propiedad ${id}:`, error);
     throw error;
   }
 };
@@ -997,28 +1003,33 @@ export const deletePropertyPost = async (id) => {
  * @returns {Promise<Object>}
  */
 export const updatePropertyPost = async (id, data) => {
-  console.log(`Actualizando propiedad ${id} con datos:`, data);
-  if (!id || !data) {
-    throw new Error('ID o datos faltantes para actualizar la propiedad.');
-  }
-
-  // Similar a create, verificar/ajustar el formato de las imágenes si es necesario
-  if (data.images && Array.isArray(data.images)) {
-    console.log('Enviando imágenes actualizadas:', data.images);
-  }
-
   try {
-    // ***** CORRECCIÓN AQUÍ *****
-    const response = await updateData(`/api/properties/${id}`, data); // Usar /api/properties/:id
-    // ***********************
-
-    console.log('Respuesta de updatePropertyPost:', response);
-    if (response && response.error) {
-      throw new Error(response.message || 'Error al actualizar la propiedad');
+    console.log(`[updatePropertyPost] Actualizando propiedad ${id} con datos:`, data);
+    
+    if (!id || !data) {
+      throw new Error('ID o datos faltantes para actualizar la propiedad.');
     }
-    return response;
+
+    // Similar a create, verificar/ajustar el formato de las imágenes si es necesario
+    if (data.images && Array.isArray(data.images)) {
+      console.log('[updatePropertyPost] Enviando imágenes actualizadas:', data.images.length, 'imágenes');
+    }
+
+    // Usar query parameter para evitar problemas con rutas dinámicas en Vercel
+    const result = await fetchAPI(`/properties?id=${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+
+    console.log('[updatePropertyPost] Respuesta recibida:', result);
+    
+    if (result && result.error) {
+      throw new Error(result.message || 'Error al actualizar la propiedad');
+    }
+    
+    return result;
   } catch (error) {
-    console.error('Error detallado en updatePropertyPost:', error);
+    console.error(`Error detallado en updatePropertyPost para ID ${id}:`, error);
     throw error;
   }
 };
