@@ -117,14 +117,15 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
   }, 10000); // 10 segundos de tiempo máximo
   
   try {
-    // Construir la URL completa - Siempre en HTTPS
+    // Construir la URL completa - MANTENER EL PROTOCOLO ORIGINAL DEL BACKEND
     let url = combineUrls(BASE_URL, endpoint.startsWith('/') ? endpoint : `/${endpoint}`);
     
-    // Asegurar que sea HTTPS para el backend de producción, pero mantener HTTP para desarrollo local
-    if (url.startsWith('http://') && !url.includes('localhost') && !url.includes('127.0.0.1')) {
-      // Solo convertir a HTTPS si NO es localhost o IP local
-      url = url.replace('http://', 'https://');
-    }
+    // *** COMENTAR LA CONVERSIÓN AUTOMÁTICA A HTTPS ***
+    // El backend de AWS no tiene certificado SSL válido, mantener HTTP
+    // if (url.startsWith('http://') && !url.includes('localhost') && !url.includes('127.0.0.1')) {
+    //   // Solo convertir a HTTPS si NO es localhost o IP local
+    //   url = url.replace('http://', 'https://');
+    // }
     
     console.log(`🔄 Enviando solicitud directa a: ${url}`);
     
@@ -1026,14 +1027,15 @@ export const uploadImageProperty = async (formData) => {
     
     const imageUrl = data.imageUrl || data.url || data.secure_url;
     
-    // Asegurar que la URL devuelta use el mismo protocolo que la página
-    let processedUrl = imageUrl;
-    if (isHttps && processedUrl.startsWith('http:')) {
-      processedUrl = processedUrl.replace('http://', 'https://');
-    }
+    // Comentado: No convertir a HTTPS para el backend de AWS sin certificado SSL válido
+    // // Asegurar que la URL devuelta use el mismo protocolo que la página
+    // let processedUrl = imageUrl;
+    // if (isHttps && processedUrl.startsWith('http:')) {
+    //   processedUrl = processedUrl.replace('http://', 'https://');
+    // }
     
     return {
-      src: processedUrl,
+      src: imageUrl, // Usar URL original sin conversión
       alt: 'Imagen de propiedad'
     };
     
@@ -1304,7 +1306,7 @@ export const uploadProfileImageAndUpdate = async (userId, file) => {
 
   // Construir URL SIN el parámetro dinámico userId
   let url = combineUrls(BASE_URL, '/user/profile-image');
-  url = ensureHttps(url);
+  // url = ensureHttps(url); // Comentado: mantener HTTP para el backend de AWS
   
   console.log(`🔄 Subiendo imagen de perfil a: ${url}`);
 
@@ -1587,16 +1589,17 @@ export const uploadFile = async (file) => {
     
     const fileUrl = data.imageUrl || data.url || data.secure_url;
     
-    // Asegurar que la URL devuelta use el mismo protocolo que la página
-    let processedUrl = fileUrl;
-    if (isHttps && processedUrl.startsWith('http:')) {
-      processedUrl = processedUrl.replace('http://', 'https://');
-    }
+    // Comentado: No convertir a HTTPS para el backend de AWS sin certificado SSL válido
+    // // Asegurar que la URL devuelta use el mismo protocolo que la página
+    // let processedUrl = fileUrl;
+    // if (isHttps && processedUrl.startsWith('http:')) {
+    //   processedUrl = processedUrl.replace('http://', 'https://');
+    // }
     
     return {
-      secure_url: processedUrl,
-      url: processedUrl,
-      imageUrl: processedUrl
+      secure_url: fileUrl, // Usar URL original sin conversión
+      url: fileUrl,
+      imageUrl: fileUrl
     };
     
   } catch (error) {
