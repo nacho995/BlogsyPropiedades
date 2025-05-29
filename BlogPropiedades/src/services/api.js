@@ -1024,13 +1024,22 @@ export const updatePropertyPost = async (id, data) => {
 };
 
 /**
- * Obtiene un blog post por su id.
- * @param {string} id - Identificador del blog post.
+ * Obtiene una propiedad por su id.
+ * @param {string} id - Identificador de la propiedad.
  * @returns {Promise<Object>}
  */
 export const getPropertyById = async (id) => {
   try {
-    return await fetchAPI(`/api/properties/${id}`);
+    console.log(`[getPropertyById] Obteniendo propiedad con ID: ${id}`);
+    // Usar el nuevo endpoint que evita problemas con rutas dinámicas en Vercel
+    const result = await fetchAPI(`/property-detail?id=${id}`);
+    console.log(`[getPropertyById] Resultado recibido:`, {
+      id: result._id || result.id,
+      title: result.title,
+      imagesCount: result.images?.length || 0,
+      hasDescription: !!result.description
+    });
+    return result;
   } catch (error) {
     console.error(`Error al obtener propiedad ${id}:`, error);
     throw error;
