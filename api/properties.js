@@ -1,3 +1,62 @@
+// Conexión a MongoDB y modelo de Property
+let mongoose;
+let Property;
+
+// Inicializar conexión y modelo
+async function initializeMongoDB() {
+  if (!mongoose) {
+    mongoose = require('mongoose');
+    
+    // URI de conexión
+    const MONGODB_URI = 'mongodb+srv://nacho995:eminem50cent@cluster0.o6i9n.mongodb.net/GozaMadrid?retryWrites=true&w=majority&appName=Cluster0';
+    
+    // Conectar si no está conectado
+    if (mongoose.connection.readyState === 0) {
+      try {
+        await mongoose.connect(MONGODB_URI);
+        console.log('Conectado a MongoDB');
+      } catch (error) {
+        console.error('Error conectando a MongoDB:', error);
+        throw error;
+      }
+    }
+    
+    // Definir schema de Property si no existe
+    if (!Property) {
+      const propertySchema = new mongoose.Schema({
+        title: { type: String, required: true },
+        description: { type: String, required: true },
+        price: { type: Number, required: true },
+        location: { type: String, required: true },
+        address: { type: String },
+        bedrooms: { type: Number, default: 1 },
+        bathrooms: { type: Number, default: 1 },
+        area: { type: Number, default: 50 },
+        m2: { type: Number },
+        rooms: { type: Number },
+        wc: { type: Number },
+        typeProperty: { type: String, default: 'Propiedad' },
+        propertyType: { type: String, default: 'Venta' },
+        images: [{ 
+          src: String, 
+          alt: String 
+        }],
+        features: [String],
+        status: { type: String, default: 'Disponible' },
+        publishDate: { type: Date, default: Date.now },
+        createdAt: { type: Date, default: Date.now }
+      }, { 
+        timestamps: true,
+        collection: 'properties' // Nombre específico de la colección
+      });
+      
+      Property = mongoose.models.Property || mongoose.model('Property', propertySchema);
+    }
+  }
+  
+  return Property;
+}
+
 module.exports = async function handler(req, res) {
   // Configurar headers CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -10,14 +69,14 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    // Array de propiedades (inicialmente vacío - se llenará con propiedades reales)
-    const properties = [
-      // Las propiedades se añadirán dinámicamente cuando se creen
-    ];
+    // Inicializar MongoDB
+    const PropertyModel = await initializeMongoDB();
 
     switch (req.method) {
       case 'GET':
-        // Devolver lista de propiedades
+        // Obtener propiedades desde MongoDB
+        const properties = await PropertyModel.find({}).sort({ createdAt: -1 });
+        console.log(`Propiedades encontradas en DB: ${properties.length}`);
         return res.status(200).json(properties);
 
       case 'POST':
@@ -39,37 +98,34 @@ module.exports = async function handler(req, res) {
           });
         }
 
-        // Crear nueva propiedad con datos reales
-        const newProperty = {
-          id: Date.now(),
-          _id: Date.now(), // Para compatibilidad
+        // Crear nueva propiedad en MongoDB
+        const newPropertyData = {
           title,
           description,
           price: Number(price),
           location,
-          address: location, // Alias para compatibilidad
+          address: location,
           bedrooms: Number(bedrooms) || 1,
           bathrooms: Number(bathrooms) || 1,
           area: Number(area) || 50,
-          m2: Number(area) || 50, // Alias para compatibilidad
-          rooms: Number(bedrooms) || 1, // Alias para compatibilidad
-          wc: Number(bathrooms) || 1, // Alias para compatibilidad
+          m2: Number(area) || 50,
+          rooms: Number(bedrooms) || 1,
+          wc: Number(bathrooms) || 1,
           typeProperty: type || 'Propiedad',
           propertyType: status || 'Venta',
           images: images || [],
           features: features || [],
-          publishDate: new Date().toISOString().split('T')[0],
-          createdAt: new Date().toISOString(),
           status: 'Disponible'
         };
 
-        // NOTA: En un sistema real, aquí se guardaría en base de datos
-        // Por ahora solo retornamos la propiedad creada
-        console.log('Nueva propiedad creada:', newProperty);
+        const newProperty = new PropertyModel(newPropertyData);
+        const savedProperty = await newProperty.save();
+        
+        console.log('Nueva propiedad guardada en MongoDB:', savedProperty._id);
 
         return res.status(201).json({
           success: true,
-          property: newProperty,
+          property: savedProperty,
           message: 'Propiedad creada exitosamente'
         });
 
@@ -84,7 +140,8 @@ module.exports = async function handler(req, res) {
     console.error('Error en API properties:', error);
     return res.status(500).json({
       error: true,
-      message: 'Error interno del servidor'
+      message: 'Error interno del servidor',
+      details: error.message
     });
   }
-} 
+}; 
