@@ -1,4 +1,7 @@
 {
+  "dependencies": {
+    "@remix-run/dev": "^2.3.0"
+  },
   "devDependencies": {
     "terser": "^5.39.0"
   }
