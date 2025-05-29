@@ -41,22 +41,50 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // Credenciales reales de Cloudinary - usar directamente
+    // Credenciales reales de Cloudinary
     const cloudName = 'dv31mt6pd';
     const apiKey = '915443216824292';
+    const apiSecret = 'FMDbe6eOaHniPHQnrn-qbd6EqW4';
+
+    // Generar timestamp
+    const timestamp = Math.round(Date.now() / 1000);
+
+    // Parámetros para signed upload (SOLO los que se enviarán a Cloudinary)
+    const uploadParams = {
+      timestamp: timestamp,
+      folder: 'blogsy-uploads'
+    };
+
+    // Generar la firma usando crypto
+    const crypto = require('crypto');
     
-    // Para unsigned upload, usamos un upload preset sin firma
-    // Esto es más simple y evita problemas de generación de firma
-    console.log('Usando unsigned upload - no se requiere firma');
+    // Crear string para firmar (parámetros ordenados alfabéticamente)
+    const sortedParams = Object.keys(uploadParams)
+      .sort()
+      .map(key => `${key}=${uploadParams[key]}`)
+      .join('&');
+    
+    const stringToSign = `${sortedParams}${apiSecret}`;
+    
+    console.log('String to sign:', stringToSign);
+    
+    // Generar firma SHA-1
+    const signature = crypto
+      .createHash('sha1')
+      .update(stringToSign)
+      .digest('hex');
+
+    console.log('Generated signature:', signature);
 
     return res.status(200).json({
       success: true,
+      signature: signature,
+      timestamp: timestamp,
       api_key: apiKey,
       cloud_name: cloudName,
-      upload_preset: 'blogsy_unsigned', // Preset para unsigned upload
-      folder: 'blogsy-uploads',
-      unsigned: true, // Indicar que es unsigned upload
-      message: 'Configuración de Cloudinary para unsigned upload'
+      folder: uploadParams.folder,
+      signed: true, // Indicar que es signed upload
+      message: 'Firma de Cloudinary generada correctamente'
     });
 
   } catch (error) {
