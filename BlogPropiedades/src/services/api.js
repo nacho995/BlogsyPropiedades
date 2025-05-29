@@ -271,8 +271,8 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
 };
 
 /**
- * Obtiene la configuración de Cloudinary desde el backend para unsigned upload.
- * @returns {Promise<Object>} - Promise que se resuelve con los datos de configuración (apiKey, cloudName, etc.)
+ * Obtiene la configuración de Cloudinary desde el backend para signed upload.
+ * @returns {Promise<Object>} - Promise que se resuelve con los datos de configuración (signature, timestamp, etc.)
  */
 export const getCloudinarySignature = async () => {
   console.log('Solicitando configuración de Cloudinary...');
@@ -299,11 +299,12 @@ export const getCloudinarySignature = async () => {
     console.log('Configuración de Cloudinary obtenida con éxito.');
     return {
       success: true,
+      signature: configData.signature,
+      timestamp: configData.timestamp,
       apiKey: configData.api_key,
       cloudName: configData.cloud_name,
-      uploadPreset: configData.upload_preset,
       folder: configData.folder || 'blogsy-uploads',
-      unsigned: true // Para unsigned upload
+      signed: true // Para signed upload
     };
 
   } catch (error) {
