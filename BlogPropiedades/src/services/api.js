@@ -303,8 +303,8 @@ export const getCloudinarySignature = async () => {
       timestamp: signatureData.timestamp,
       apiKey: signatureData.api_key,
       cloudName: signatureData.cloud_name,
-      folder: 'blogsy-uploads', // Folder por defecto
-      transformation: null // Sin transformaciones por defecto
+      folder: signatureData.folder || 'blogsy-uploads'
+      // No incluir upload_preset ni transformation ya que no existen
     };
 
   } catch (error) {

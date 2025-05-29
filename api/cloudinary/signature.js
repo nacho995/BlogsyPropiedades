@@ -49,11 +49,11 @@ module.exports = async function handler(req, res) {
     // Generar timestamp actual
     const timestamp = Math.floor(Date.now() / 1000);
     
-    // Parámetros para la subida
+    // Parámetros para la subida - SIMPLIFICADOS para evitar problemas de firma
     const uploadParams = {
       timestamp: timestamp,
-      upload_preset: 'blogsy_preset', // Puedes crear este preset en Cloudinary
       folder: 'blogsy-uploads'
+      // Removido upload_preset ya que puede no existir en la cuenta
     };
 
     // Crear string para firma (ordenado alfabéticamente)
@@ -79,7 +79,6 @@ module.exports = async function handler(req, res) {
       timestamp: timestamp,
       api_key: apiKey,
       cloud_name: cloudName,
-      upload_preset: uploadParams.upload_preset,
       folder: uploadParams.folder,
       message: 'Firma de Cloudinary generada correctamente'
     });
