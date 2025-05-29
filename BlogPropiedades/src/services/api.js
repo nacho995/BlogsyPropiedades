@@ -70,15 +70,15 @@ const isLocalDevelopment = typeof window !== 'undefined' && (
   window.location.hostname === '127.0.0.1'
 );
 
-// Modificar la URL base para usar el servidor local en desarrollo
+// Modificar la URL base para usar el servidor local en desarrollo o el proxy en producción
 const API_DOMAIN = isLocalDevelopment 
   ? 'localhost:8081'  // Servidor de desarrollo local
-  : 'api.realestategozamadrid.com';  // Servidor de producción
+  : null;  // En producción usaremos una ruta relativa para el proxy
 
-// Usar HTTP para localhost, HTTPS para producción
+// Usar HTTP para localhost, ruta relativa para producción (proxy API)
 export const BASE_URL = isLocalDevelopment 
   ? `http://${API_DOMAIN}`  // Desarrollo local: HTTP
-  : `https://${API_DOMAIN}`; // Producción: HTTPS
+  : '/api';  // Producción: Usar el proxy configurado en Vercel
 
 // Determinar si estamos usando HTTPS
 const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
