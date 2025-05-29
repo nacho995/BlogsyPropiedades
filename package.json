@@ -1,8 +1,15 @@
 {
-  "dependencies": {
-    "@remix-run/dev": "^2.3.0"
+  "name": "blogsypropiedades",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "cd BlogPropiedades && npm install && npm run build",
+    "start": "cd BlogPropiedades && npm start"
   },
   "devDependencies": {
     "terser": "^5.39.0"
+  },
+  "engines": {
+    "node": "18.x"
   }
 }
