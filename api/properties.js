@@ -1,62 +1,3 @@
-// Conexión a MongoDB y modelo de Property
-let mongoose;
-let Property;
-
-// Inicializar conexión y modelo
-async function initializeMongoDB() {
-  if (!mongoose) {
-    mongoose = require('mongoose');
-    
-    // URI de conexión
-    const MONGODB_URI = 'mongodb+srv://nacho995:eminem50cent@cluster0.o6i9n.mongodb.net/GozaMadrid?retryWrites=true&w=majority&appName=Cluster0';
-    
-    // Conectar si no está conectado
-    if (mongoose.connection.readyState === 0) {
-      try {
-        await mongoose.connect(MONGODB_URI);
-        console.log('Conectado a MongoDB');
-      } catch (error) {
-        console.error('Error conectando a MongoDB:', error);
-        throw error;
-      }
-    }
-    
-    // Definir schema de Property si no existe
-    if (!Property) {
-      const propertySchema = new mongoose.Schema({
-        title: { type: String, required: true },
-        description: { type: String, required: true },
-        price: { type: Number, required: true },
-        location: { type: String, required: true },
-        address: { type: String },
-        bedrooms: { type: Number, default: 1 },
-        bathrooms: { type: Number, default: 1 },
-        area: { type: Number, default: 50 },
-        m2: { type: Number },
-        rooms: { type: Number },
-        wc: { type: Number },
-        typeProperty: { type: String, default: 'Propiedad' },
-        propertyType: { type: String, default: 'Venta' },
-        images: [{ 
-          src: String, 
-          alt: String 
-        }],
-        features: [String],
-        status: { type: String, default: 'Disponible' },
-        publishDate: { type: Date, default: Date.now },
-        createdAt: { type: Date, default: Date.now }
-      }, { 
-        timestamps: true,
-        collection: 'properties' // Nombre específico de la colección
-      });
-      
-      Property = mongoose.models.Property || mongoose.model('Property', propertySchema);
-    }
-  }
-  
-  return Property;
-}
-
 module.exports = async function handler(req, res) {
   // Configurar headers CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -69,78 +10,59 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    // Inicializar MongoDB
-    const PropertyModel = await initializeMongoDB();
-
-    switch (req.method) {
-      case 'GET':
-        // Obtener propiedades desde MongoDB
-        const properties = await PropertyModel.find({}).sort({ createdAt: -1 });
-        console.log(`Propiedades encontradas en DB: ${properties.length}`);
-        return res.status(200).json(properties);
-
-      case 'POST':
-        // Verificar autorización para crear propiedad
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-          return res.status(401).json({
-            error: true,
-            message: 'Token de autorización requerido'
-          });
-        }
-
-        const { title, description, price, location, bedrooms, bathrooms, area, images, features, type, status } = req.body;
-
-        if (!title || !description || !price || !location) {
-          return res.status(400).json({
-            error: true,
-            message: 'Título, descripción, precio y ubicación son requeridos'
-          });
-        }
-
-        // Crear nueva propiedad en MongoDB
-        const newPropertyData = {
-          title,
-          description,
-          price: Number(price),
-          location,
-          address: location,
-          bedrooms: Number(bedrooms) || 1,
-          bathrooms: Number(bathrooms) || 1,
-          area: Number(area) || 50,
-          m2: Number(area) || 50,
-          rooms: Number(bedrooms) || 1,
-          wc: Number(bathrooms) || 1,
-          typeProperty: type || 'Propiedad',
-          propertyType: status || 'Venta',
-          images: images || [],
-          features: features || [],
-          status: 'Disponible'
-        };
-
-        const newProperty = new PropertyModel(newPropertyData);
-        const savedProperty = await newProperty.save();
-        
-        console.log('Nueva propiedad guardada en MongoDB:', savedProperty._id);
-
-        return res.status(201).json({
-          success: true,
-          property: savedProperty,
-          message: 'Propiedad creada exitosamente'
-        });
-
-      default:
-        return res.status(405).json({
-          error: true,
-          message: 'Método no permitido'
-        });
+    const API_BASE = 'https://api.realestategozamadrid.com';
+    
+    // Construir URL del backend real
+    let backendUrl = `${API_BASE}/api/properties`;
+    
+    // Pasar query parameters si existen
+    if (req.url.includes('?')) {
+      const queryString = req.url.split('?')[1];
+      backendUrl += `?${queryString}`;
     }
-
+    
+    console.log(`Proxy request to: ${backendUrl}`);
+    console.log(`Method: ${req.method}`);
+    
+    // Preparar headers para el backend
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    };
+    
+    // Pasar token de autorización si existe
+    if (req.headers.authorization) {
+      headers['Authorization'] = req.headers.authorization;
+      console.log('Authorization header forwarded');
+    }
+    
+    // Configurar opciones de fetch
+    const fetchOptions = {
+      method: req.method,
+      headers: headers
+    };
+    
+    // Añadir body para POST/PUT/PATCH
+    if (req.method !== 'GET' && req.method !== 'DELETE' && req.body) {
+      fetchOptions.body = JSON.stringify(req.body);
+      console.log('Request body:', JSON.stringify(req.body, null, 2));
+    }
+    
+    // Hacer petición al backend real
+    const response = await fetch(backendUrl, fetchOptions);
+    const data = await response.json();
+    
+    console.log(`Backend response status: ${response.status}`);
+    console.log(`Backend response data:`, JSON.stringify(data, null, 2));
+    
+    // Retornar la respuesta del backend con el mismo status
+    return res.status(response.status).json(data);
+    
   } catch (error) {
-    console.error('Error en API properties:', error);
+    console.error('Error en proxy a backend:', error);
     return res.status(500).json({
       error: true,
-      message: 'Error interno del servidor',
+      message: 'Error al conectar con el backend',
       details: error.message
     });
   }
