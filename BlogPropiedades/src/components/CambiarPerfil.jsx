@@ -20,9 +20,9 @@ const validateAndProcessImage = (imageFile) => {
       return;
     }
 
-    // Verificar el tamaño (máximo 2MB)
-    if (imageFile.size > 2 * 1024 * 1024) {
-      reject(new Error('La imagen es demasiado grande. El tamaño máximo es 2MB'));
+    // Verificar el tamaño (máximo 10MB)
+    if (imageFile.size > 10 * 1024 * 1024) {
+      reject(new Error('La imagen es demasiado grande. El tamaño máximo es 10MB'));
       return;
     }
 
@@ -49,7 +49,7 @@ export default function CambiarPerfil() {
   const { user, refreshUserData, safeProfileSync, loading: userLoading } = useUser();
   
   // Usar la imagen del contexto directamente para mostrarla
-  const currentProfileImage = user?.profileImage || fallbackImageBase64;
+  const currentProfileImage = user?.profileImage || fallbackImageBase4;
 
   // Efecto para cargar el nombre inicial
   useEffect(() => {
@@ -88,8 +88,8 @@ export default function CambiarPerfil() {
       if (!file.type.startsWith('image/')) {
         throw new Error("El archivo debe ser una imagen (jpg, png, etc.)");
       }
-      if (file.size > 2 * 1024 * 1024) { // Usar el límite consistente de 2MB
-        throw new Error("La imagen no debe superar los 2MB");
+      if (file.size > 10 * 1024 * 1024) { // Usar el límite consistente de 10MB
+        throw new Error("La imagen no debe superar los 10MB");
       }
 
       console.log(`CambiarPerfil: Llamando a safeProfileSync para ${file.name}...`);

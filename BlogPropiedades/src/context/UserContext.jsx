@@ -17,9 +17,9 @@ const validateAndProcessImage = (imageFile) => {
       return;
     }
 
-    // Verificar el tamaño (máximo 2MB)
-    if (imageFile.size > 2 * 1024 * 1024) {
-      reject(new Error('La imagen es demasiado grande. El tamaño máximo es 2MB'));
+    // Verificar el tamaño (máximo 10MB)
+    if (imageFile.size > 10 * 1024 * 1024) {
+      reject(new Error('La imagen es demasiado grande. El tamaño máximo es 10MB'));
       return;
     }
 

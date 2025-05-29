@@ -277,8 +277,14 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
 export const getCloudinarySignature = async () => {
   console.log('Solicitando firma de Cloudinary...');
   try {
-    // No necesitamos enviar nada en el body para GET
-    const signatureData = await fetchAPI('/api/cloudinary/signature', { method: 'GET' });
+    // Usar POST como lo espera nuestro endpoint
+    const signatureData = await fetchAPI('/cloudinary/signature', { 
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}) // Enviar body vacío
+    });
     
     if (signatureData.error) {
       console.error('Error al obtener la firma desde la API:', signatureData.message);
@@ -291,7 +297,15 @@ export const getCloudinarySignature = async () => {
     }
     
     console.log('Firma de Cloudinary obtenida con éxito.');
-    return signatureData; // Devolvemos el objeto completo { success, signature, timestamp, apiKey, ... }
+    return {
+      success: true,
+      signature: signatureData.signature,
+      timestamp: signatureData.timestamp,
+      apiKey: signatureData.api_key,
+      cloudName: signatureData.cloud_name,
+      folder: 'blogsy-uploads', // Folder por defecto
+      transformation: null // Sin transformaciones por defecto
+    };
 
   } catch (error) {
     console.error('Error en getCloudinarySignature:', error);
