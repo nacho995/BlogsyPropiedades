@@ -70,15 +70,15 @@ const isLocalDevelopment = typeof window !== 'undefined' && (
   window.location.hostname === '127.0.0.1'
 );
 
-// Modificar la URL base para usar el servidor local en desarrollo o el proxy en producción
+// SOLUCIÓN TEMPORAL: Conectar directamente al backend de AWS debido a protección de Vercel
 const API_DOMAIN = isLocalDevelopment 
   ? 'localhost:8081'  // Servidor de desarrollo local
-  : null;  // En producción usaremos una ruta relativa para el proxy
+  : 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';  // Backend real en AWS
 
-// Usar HTTP para localhost, ruta relativa para producción (proxy API)
+// Usar HTTP para localhost, HTTP para AWS (ya que el backend usa HTTP)
 export const BASE_URL = isLocalDevelopment 
   ? `http://${API_DOMAIN}`  // Desarrollo local: HTTP
-  : '/api';  // Producción: Usar el proxy configurado en Vercel
+  : `http://${API_DOMAIN}`;  // Producción: Conectar directamente al backend AWS
 
 // Determinar si estamos usando HTTPS
 const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
@@ -903,11 +903,11 @@ export const createPropertyPost = async (data) => {
   try {
     // *** LOG JUSTO ANTES DE LA LLAMADA PROBLEMÁTICA ***
     const tokenCheckMomentaneo = localStorage.getItem('token');
-    console.log(`[createPropertyPost] TOKEN JUSTO ANTES DE LLAMAR A postData('/props'): ${tokenCheckMomentaneo ? 'EXISTE' : 'NULL'}`);
+    console.log(`[createPropertyPost] TOKEN JUSTO ANTES DE LLAMAR A postData('/api/properties'): ${tokenCheckMomentaneo ? 'EXISTE' : 'NULL'}`);
     // ***************************************************
 
-    // Llamar a postData con nueva ruta
-    const response = await postData('/props', data); // Cambio de /properties a /props
+    // Llamar a postData con ruta correcta del backend AWS
+    const response = await postData('/api/properties', data);
 
     console.log('[createPropertyPost] Respuesta recibida de postData:', response);
     if (response && response.error) {
@@ -929,7 +929,7 @@ export const createPropertyPost = async (data) => {
 export const getPropertyPosts = async () => {
   try {
     console.log("Obteniendo propiedades del servidor...");
-    const properties = await fetchAPI('/props'); // Cambio de /properties a /props
+    const properties = await fetchAPI('/api/properties'); // Ruta correcta del backend AWS
     console.log("Propiedades recibidas del servidor:", properties);
     
     // Verificar la estructura de cada propiedad y corregir las imágenes si es necesario
@@ -984,8 +984,8 @@ export const deletePropertyPost = async (id) => {
       throw new Error('No hay token de autenticación disponible');
     }
     
-    // Usar nueva ruta fuera de /api/
-    const result = await fetchAPI(`/props?id=${id}`, {
+    // Usar ruta correcta del backend AWS
+    const result = await fetchAPI(`/api/properties/${id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -1019,8 +1019,8 @@ export const updatePropertyPost = async (id, data) => {
       console.log('[updatePropertyPost] Enviando imágenes actualizadas:', data.images.length, 'imágenes');
     }
 
-    // Usar nueva ruta fuera de /api/
-    const result = await fetchAPI(`/props?id=${id}`, {
+    // Usar ruta correcta del backend AWS
+    const result = await fetchAPI(`/api/properties/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
     });
@@ -1046,8 +1046,8 @@ export const updatePropertyPost = async (id, data) => {
 export const getPropertyById = async (id) => {
   try {
     console.log(`[getPropertyById] Obteniendo propiedad con ID: ${id}`);
-    // Usar nueva ruta fuera de /api/
-    const result = await fetchAPI(`/prop-detail?id=${id}`);
+    // Usar ruta correcta del backend AWS
+    const result = await fetchAPI(`/api/properties/${id}`);
     console.log(`[getPropertyById] Resultado recibido:`, {
       id: result._id || result.id,
       title: result.title,
