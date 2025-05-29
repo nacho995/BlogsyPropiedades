@@ -1517,14 +1517,9 @@ export default function BlogCreation() {
       try {
         const formDataCloudinary = new FormData();
         formDataCloudinary.append('file', file);
-        formDataCloudinary.append('api_key', signatureData.apiKey);
-        formDataCloudinary.append('timestamp', signatureData.timestamp);
-        formDataCloudinary.append('signature', signatureData.signature);
+        formDataCloudinary.append('upload_preset', signatureData.uploadPreset);
         formDataCloudinary.append('folder', signatureData.folder);
-        if (signatureData.transformation) {
-          formDataCloudinary.append('transformation', signatureData.transformation);
-        }
-        console.log(`Subiendo a Cloudinary: ${file.name}`);
+        console.log(`Subiendo a Cloudinary (unsigned): ${file.name}`);
         const uploadUrl = `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/image/upload`;
         const resp = await fetch(uploadUrl, { method: 'POST', body: formDataCloudinary });
         const result = await resp.json();

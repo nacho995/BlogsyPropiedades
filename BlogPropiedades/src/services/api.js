@@ -271,14 +271,14 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
 };
 
 /**
- * Obtiene la firma segura de Cloudinary desde el backend.
- * @returns {Promise<Object>} - Promise que se resuelve con los datos de la firma (signature, timestamp, apiKey, etc.)
+ * Obtiene la configuración de Cloudinary desde el backend para unsigned upload.
+ * @returns {Promise<Object>} - Promise que se resuelve con los datos de configuración (apiKey, cloudName, etc.)
  */
 export const getCloudinarySignature = async () => {
-  console.log('Solicitando firma de Cloudinary...');
+  console.log('Solicitando configuración de Cloudinary...');
   try {
     // Usar POST como lo espera nuestro endpoint
-    const signatureData = await fetchAPI('/cloudinary/signature', { 
+    const configData = await fetchAPI('/cloudinary/signature', { 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -286,25 +286,24 @@ export const getCloudinarySignature = async () => {
       body: JSON.stringify({}) // Enviar body vacío
     });
     
-    if (signatureData.error) {
-      console.error('Error al obtener la firma desde la API:', signatureData.message);
-      throw new Error(signatureData.message || 'Error del servidor al obtener la firma');
+    if (configData.error) {
+      console.error('Error al obtener la configuración desde la API:', configData.message);
+      throw new Error(configData.message || 'Error del servidor al obtener la configuración');
     }
     
-    if (!signatureData.success || !signatureData.signature) {
-      console.error('Respuesta inválida del endpoint de firma:', signatureData);
-      throw new Error('Respuesta inválida del servidor al obtener la firma');
+    if (!configData.success) {
+      console.error('Respuesta inválida del endpoint de configuración:', configData);
+      throw new Error('Respuesta inválida del servidor al obtener la configuración');
     }
     
-    console.log('Firma de Cloudinary obtenida con éxito.');
+    console.log('Configuración de Cloudinary obtenida con éxito.');
     return {
       success: true,
-      signature: signatureData.signature,
-      timestamp: signatureData.timestamp,
-      apiKey: signatureData.api_key,
-      cloudName: signatureData.cloud_name,
-      folder: signatureData.folder || 'blogsy-uploads'
-      // No incluir upload_preset ni transformation ya que no existen
+      apiKey: configData.api_key,
+      cloudName: configData.cloud_name,
+      uploadPreset: configData.upload_preset,
+      folder: configData.folder || 'blogsy-uploads',
+      unsigned: true // Para unsigned upload
     };
 
   } catch (error) {

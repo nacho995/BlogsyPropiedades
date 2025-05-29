@@ -473,26 +473,14 @@ export default function PropertyCreation() {
 
             // Procesar un archivo a la vez
             try {
-                // 1. Obtener firma del backend PARA ESTE ARCHIVO
-                // console.log(`Obteniendo firma para: ${file.name}`);
-                // const signatureData = await getCloudinarySignature(); // <<-- YA NO SE LLAMA AQUÍ
-
-                // -- Ya no es necesario verificar signatureData aquí, se hizo antes del bucle --
-                // if (!signatureData || !signatureData.success) { ... }
-
-                // 2. Preparar FormData para Cloudinary (usando la firma obtenida antes del bucle)
+                // 2. Preparar FormData para Cloudinary (usando unsigned upload)
                 const formDataCloudinary = new FormData();
                 formDataCloudinary.append('file', file);
-                formDataCloudinary.append('api_key', signatureData.apiKey);
-                formDataCloudinary.append('timestamp', signatureData.timestamp);
-                formDataCloudinary.append('signature', signatureData.signature);
+                formDataCloudinary.append('upload_preset', signatureData.uploadPreset);
                 formDataCloudinary.append('folder', signatureData.folder);
-                 if (signatureData.transformation) {
-                    formDataCloudinary.append('transformation', signatureData.transformation);
-                 }
 
-                // 3. Subir a Cloudinary
-                console.log(`Subiendo a Cloudinary: ${file.name}`);
+                // 3. Subir a Cloudinary usando unsigned upload
+                console.log(`Subiendo a Cloudinary (unsigned): ${file.name}`);
                 const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/image/upload`;
 
                 const response = await fetch(cloudinaryUrl, {
