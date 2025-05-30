@@ -1,58 +1,49 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import commonjs from '@rollup/plugin-commonjs'
 import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
-    react(),
-    commonjs() // Plugin para manejar módulos CommonJS
+    react()
   ],
   define: {
     global: 'globalThis',
-    // Evitar errores de require
     'process.env': {},
   },
   optimizeDeps: {
     include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
       '@tiptap/react',
       '@tiptap/starter-kit',
       '@tiptap/extension-image'
     ],
-    // Forzar pre-bundling de dependencias problemáticas
-    force: true
+    esbuildOptions: {
+      target: 'es2020'
+    }
   },
-  // Configuración para manejar CommonJS y ESM
-  ssr: {
-    noExternal: []
+  esbuild: {
+    target: 'es2020'
   },
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
     minify: 'terser',
+    target: 'es2020',
     terserOptions: {
       compress: {
-        drop_console: false, // Mantener console.logs para diagnóstico
+        drop_console: false,
       },
     },
-    sourcemap: false, // Desactivar sourcemaps para producción
-    // Configurar rollup para manejar CommonJS
-    commonjsOptions: {
-      include: [/node_modules/],
-      transformMixedEsModules: true
-    },
-    // Agregar timestamp para forzar invalidación de caché
+    sourcemap: false,
     rollupOptions: {
       output: {
-        entryFileNames: `assets/[name]-[hash]-${Date.now()}-v4-FIXED.js`,
-        chunkFileNames: `assets/[name]-[hash]-${Date.now()}-v4-FIXED.js`,
-        assetFileNames: `assets/[name]-[hash]-${Date.now()}-v4-FIXED.[ext]`,
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          router: ['react-router-dom'],
-        },
-      }
+        entryFileNames: `assets/[name]-[hash]-${Date.now()}-v7-SIMPLIFIED.js`,
+        chunkFileNames: `assets/[name]-[hash]-${Date.now()}-v7-SIMPLIFIED.js`,
+        assetFileNames: `assets/[name]-[hash]-${Date.now()}-v7-SIMPLIFIED.[ext]`,
+      },
     }
   },
   base: '/',
@@ -81,6 +72,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      // Forzar resolución de React
+      'react': path.resolve(__dirname, 'node_modules/react'),
+      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
     },
   }
 })
