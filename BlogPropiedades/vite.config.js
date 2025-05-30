@@ -40,9 +40,9 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        entryFileNames: `assets/[name]-[hash]-${Date.now()}-v8-API-FIXED.js`,
-        chunkFileNames: `assets/[name]-[hash]-${Date.now()}-v8-API-FIXED.js`,
-        assetFileNames: `assets/[name]-[hash]-${Date.now()}-v8-API-FIXED.[ext]`,
+        entryFileNames: `assets/[name]-[hash]-${Date.now()}-v9-FORCE-DEPLOY.js`,
+        chunkFileNames: `assets/[name]-[hash]-${Date.now()}-v9-FORCE-DEPLOY.js`,
+        assetFileNames: `assets/[name]-[hash]-${Date.now()}-v9-FORCE-DEPLOY.[ext]`,
       },
     }
   },

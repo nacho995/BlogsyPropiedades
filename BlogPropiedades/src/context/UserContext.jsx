@@ -462,27 +462,33 @@ export function UserProvider({ children }) {
       localStorage.removeItem("email");
       localStorage.removeItem("name");
       localStorage.removeItem("role");
+      localStorage.removeItem("profilePic");
+      localStorage.removeItem("profilePic_backup");
+      localStorage.removeItem("profilePic_temp");
+      sessionStorage.clear(); // Limpiar también sessionStorage
       
       console.log(`🔒 [LOGOUT] State cleared for reason: ${reason}`);
     } catch (e) {
       console.error("❌ Error al eliminar datos de sesión:", e);
     }
     
-    // Solo redirigir si se solicita explícitamente
-    if (shouldRedirect) {
+    // Solo redirigir si se solicita explícitamente y NO estamos ya en la página de login
+    if (shouldRedirect && !window.location.pathname.includes('/login')) {
       console.log("🔄 Redirecting to login page...");
       
       // Usar timeout para evitar bucles inmediatos
       setTimeout(() => {
         try {
-          window.location.replace("/login");
+          // Usar window.location.href en lugar de replace para evitar problemas
+          window.location.href = window.location.origin;
         } catch (error) {
           console.error("Error during redirect:", error);
-          window.location.href = "/login";
+          // Como último recurso, recargar la página
+          window.location.reload();
         }
-      }, 100);
+      }, 150); // Aumentar el timeout ligeramente
     } else {
-      console.log("🔒 [LOGOUT] No redirect requested");
+      console.log("🔒 [LOGOUT] No redirect requested or already on login page");
     }
     
     console.log(`🔒 [LOGOUT] Finished.`);
