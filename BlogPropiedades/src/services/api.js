@@ -70,15 +70,15 @@ const isLocalDevelopment = typeof window !== 'undefined' && (
   window.location.hostname === '127.0.0.1'
 );
 
-// SOLUCIÓN DEFINITIVA: Usar proxies de Vercel para evitar Mixed Content
+// SOLUCIÓN DEFINITIVA: Usar la URL directa del backend en Render
 const API_DOMAIN = isLocalDevelopment 
   ? 'localhost:5173'  // Servidor de desarrollo local
-  : window.location.hostname;  // Mismo dominio que el frontend
+  : 'nextjs-gozamadrid-qrfk.onrender.com';  // Backend en Render
 
-// Usar HTTP para localhost, HTTPS para producción (mismo protocolo que frontend)
+// Usar HTTP para localhost, HTTPS para producción
 export const BASE_URL = isLocalDevelopment 
   ? `http://${API_DOMAIN}/api`  // Desarrollo local: HTTP con proxy
-  : `https://${API_DOMAIN}/api`;  // Producción: HTTPS con proxy de Vercel
+  : `https://${API_DOMAIN}`;  // Producción: HTTPS directo a Render
 
 // Determinar si estamos usando HTTPS
 const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
