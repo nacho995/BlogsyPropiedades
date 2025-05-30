@@ -611,224 +611,227 @@ function ProtectedRoute({ children }) {
 }
 
 function App() {
-    // Verificar si hay un ciclo al renderizar App
-    checkRenderCycle();
+  console.log('🚀 APP VERSION: v2.0.1 - Backend Fixed');
+  console.log('🔗 Backend URL:', window.ENV?.REACT_APP_API_URL || 'https://nextjs-gozamadrid-qrfk.onrender.com');
+  
+  // Verificar si hay un ciclo al renderizar App
+  checkRenderCycle();
+  
+  // Estado para seguimiento del rendimiento de la app
+  const [appHealth, setAppHealth] = useState({
+    loadStartTime: Date.now(),
+    appLoaded: false,
+    renderCount: 0,
+    lastRenderTime: null,
+    errors: []
+  });
+  
+  // Estado para mostrar el componente de recuperación
+  const [showRecovery, setShowRecovery] = useState(false);
+  
+  // Verificar el rendimiento de la aplicación
+  useEffect(() => {
+    // Marcar que la app está cargada
+    setAppHealth(prev => ({
+      ...prev,
+      appLoaded: true,
+      lastRenderTime: Date.now(),
+      renderCount: prev.renderCount + 1
+    }));
     
-    // Estado para seguimiento del rendimiento de la app
-    const [appHealth, setAppHealth] = useState({
-      loadStartTime: Date.now(),
-      appLoaded: false,
-      renderCount: 0,
-      lastRenderTime: null,
-      errors: []
-    });
+    // Sistema de detección y recuperación automática
+    const healthCheck = setInterval(() => {
+      // Comprobar si la aplicación está congelada
+      const now = Date.now();
+      const lastRender = appHealth.lastRenderTime;
+      
+      // Si han pasado más de 20 segundos desde el último render y ha habido errores
+      if (lastRender && (now - lastRender > 20000) && (appHealth.errors.length > 0)) {
+        console.error("⚠️ Aplicación posiblemente congelada - Activando recuperación");
+        setShowRecovery(true);
+        clearInterval(healthCheck);
+      }
+    }, 5000);
     
-    // Estado para mostrar el componente de recuperación
-    const [showRecovery, setShowRecovery] = useState(false);
-    
-    // Verificar el rendimiento de la aplicación
-    useEffect(() => {
-      // Marcar que la app está cargada
+    // Capturar errores globales
+    const errorHandler = (error) => {
+      console.error("Capturado error global:", error);
       setAppHealth(prev => ({
         ...prev,
-        appLoaded: true,
-        lastRenderTime: Date.now(),
-        renderCount: prev.renderCount + 1
+        errors: [...prev.errors, {
+          message: error.message || "Error desconocido",
+          time: Date.now()
+        }]
       }));
       
-      // Sistema de detección y recuperación automática
-      const healthCheck = setInterval(() => {
-        // Comprobar si la aplicación está congelada
-        const now = Date.now();
-        const lastRender = appHealth.lastRenderTime;
-        
-        // Si han pasado más de 20 segundos desde el último render y ha habido errores
-        if (lastRender && (now - lastRender > 20000) && (appHealth.errors.length > 0)) {
-          console.error("⚠️ Aplicación posiblemente congelada - Activando recuperación");
-          setShowRecovery(true);
-          clearInterval(healthCheck);
-        }
-      }, 5000);
-      
-      // Capturar errores globales
-      const errorHandler = (error) => {
-        console.error("Capturado error global:", error);
-        setAppHealth(prev => ({
-          ...prev,
-          errors: [...prev.errors, {
-            message: error.message || "Error desconocido",
-            time: Date.now()
-          }]
-        }));
-        
-        // Si hay muchos errores, mostrar recuperación
-        if (appHealth.errors.length >= 5) {
-          setShowRecovery(true);
-        }
-      };
-      
-      // Escuchar evento de cierre de sesión para sincronizar la aplicación
-      const handleUserLogout = (event) => {
-        console.log("🔐 Evento de cierre de sesión detectado en App:", event.detail?.reason || "desconocido");
-        
-        // Si el cierre es por token expirado, mostrar mensaje
-        if (event.detail?.reason === 'token_expired') {
-          toast.error('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
-          
-          // Forzar redirección si no estamos ya en la página de login
-          if (window.location.pathname !== '/login') {
-            window.location.href = '/login';
-          }
-        } else if (event.detail?.reason === 'token_invalid') {
-          toast.error('Tu sesión no es válida. Por favor, inicia sesión nuevamente.');
-          
-          // Forzar redirección a login
-          if (window.location.pathname !== '/login') {
-            window.location.href = '/login';
-          }
-        }
-      };
-      
-      // Evento para detectar cuando se inicia sesión
-      const handleUserLogin = () => {
-        console.log("🔐 Evento de inicio de sesión detectado en App");
-        
-        // Si estamos en la página de login, redirigir a la página principal
-        if (window.location.pathname === '/login') {
-          console.log("Redirigiendo a página principal después de inicio de sesión");
-          window.location.href = '/';
-        }
-      };
-      
-      // Sistema para detectar errores de autenticación repetidos
-      let authErrors = 0;
-      const handleAuthError = () => {
-        authErrors++;
-        
-        // Si hay muchos errores de autenticación seguidos, limpiar el estado
-        if (authErrors > 3) {
-          console.warn("⚠️ Múltiples errores de autenticación detectados, limpiando estado");
-          try {
-            // Preservar solo imagen de perfil
-            const profilePic = localStorage.getItem('profilePic');
-            const profilePic_local = localStorage.getItem('profilePic_local');
-            
-            // Limpiar localStorage
-            localStorage.clear();
-            
-            // Restaurar imágenes
-            if (profilePic) localStorage.setItem('profilePic', profilePic);
-            if (profilePic_local) localStorage.setItem('profilePic_local', profilePic_local);
-            
-            // Redirigir a login
-            window.location.href = '/login';
-          } catch (e) {
-            console.error("Error al limpiar estado tras errores de autenticación:", e);
-          }
-        }
-      };
-      
-      // Resetear contador de errores de autenticación cada 2 minutos
-      const authErrorReset = setInterval(() => {
-        authErrors = 0;
-      }, 120000);
-      
-      // Suscribirse a eventos
-      window.addEventListener('error', errorHandler);
-      window.addEventListener('unhandledrejection', errorHandler);
-      window.addEventListener('userLoggedOut', handleUserLogout);
-      window.addEventListener('userLoggedIn', handleUserLogin);
-      window.addEventListener('authError', handleAuthError);
-      
-      return () => {
-        clearInterval(healthCheck);
-        clearInterval(authErrorReset);
-        window.removeEventListener('error', errorHandler);
-        window.removeEventListener('unhandledrejection', errorHandler);
-        window.removeEventListener('userLoggedOut', handleUserLogout);
-        window.removeEventListener('userLoggedIn', handleUserLogin);
-        window.removeEventListener('authError', handleAuthError);
-      };
-    }, [appHealth.errors.length]);
+      // Si hay muchos errores, mostrar recuperación
+      if (appHealth.errors.length >= 5) {
+        setShowRecovery(true);
+      }
+    };
     
-    // Función para reiniciar la aplicación
-    const handleAppReset = useCallback(() => {
-      localStorage.clear();
-      window.location.href = '/';
-    }, []);
+    // Escuchar evento de cierre de sesión para sincronizar la aplicación
+    const handleUserLogout = (event) => {
+      console.log("🔐 Evento de cierre de sesión detectado en App:", event.detail?.reason || "desconocido");
+      
+      // Si el cierre es por token expirado, mostrar mensaje
+      if (event.detail?.reason === 'token_expired') {
+        toast.error('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+        
+        // Forzar redirección si no estamos ya en la página de login
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+      } else if (event.detail?.reason === 'token_invalid') {
+        toast.error('Tu sesión no es válida. Por favor, inicia sesión nuevamente.');
+        
+        // Forzar redirección a login
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+      }
+    };
     
-    // Componente de recuperación de emergencia
-    const EmergencyRecovery = () => (
-      <div className="fixed inset-0 bg-red-800 bg-opacity-50 backdrop-blur-md flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
-          <div className="flex items-center justify-center mb-4">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-red-700 text-center mb-4">¡Oops! Algo salió mal</h2>
-          <p className="text-gray-700 mb-4">La aplicación está experimentando problemas. Por favor, elija una opción:</p>
+    // Evento para detectar cuando se inicia sesión
+    const handleUserLogin = () => {
+      console.log("🔐 Evento de inicio de sesión detectado en App");
+      
+      // Si estamos en la página de login, redirigir a la página principal
+      if (window.location.pathname === '/login') {
+        console.log("Redirigiendo a página principal después de inicio de sesión");
+        window.location.href = '/';
+      }
+    };
+    
+    // Sistema para detectar errores de autenticación repetidos
+    let authErrors = 0;
+    const handleAuthError = () => {
+      authErrors++;
+      
+      // Si hay muchos errores de autenticación seguidos, limpiar el estado
+      if (authErrors > 3) {
+        console.warn("⚠️ Múltiples errores de autenticación detectados, limpiando estado");
+        try {
+          // Preservar solo imagen de perfil
+          const profilePic = localStorage.getItem('profilePic');
+          const profilePic_local = localStorage.getItem('profilePic_local');
           
-          <div className="space-y-4">
-            <button 
-              onClick={() => window.location.reload()}
-              className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none"
-            >
-              Recargar la página
-            </button>
-            
-            <button 
-              onClick={handleAppReset}
-              className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none"
-            >
-              Reiniciar aplicación (borra datos locales)
-            </button>
-            
-            <button 
-              onClick={() => setShowRecovery(false)}
-              className="w-full py-2 px-4 border border-gray-300 rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none"
-            >
-              Continuar de todos modos
-            </button>
-          </div>
+          // Limpiar localStorage
+          localStorage.clear();
+          
+          // Restaurar imágenes
+          if (profilePic) localStorage.setItem('profilePic', profilePic);
+          if (profilePic_local) localStorage.setItem('profilePic_local', profilePic_local);
+          
+          // Redirigir a login
+          window.location.href = '/login';
+        } catch (e) {
+          console.error("Error al limpiar estado tras errores de autenticación:", e);
+        }
+      }
+    };
+    
+    // Resetear contador de errores de autenticación cada 2 minutos
+    const authErrorReset = setInterval(() => {
+      authErrors = 0;
+    }, 120000);
+    
+    // Suscribirse a eventos
+    window.addEventListener('error', errorHandler);
+    window.addEventListener('unhandledrejection', errorHandler);
+    window.addEventListener('userLoggedOut', handleUserLogout);
+    window.addEventListener('userLoggedIn', handleUserLogin);
+    window.addEventListener('authError', handleAuthError);
+    
+    return () => {
+      clearInterval(healthCheck);
+      clearInterval(authErrorReset);
+      window.removeEventListener('error', errorHandler);
+      window.removeEventListener('unhandledrejection', errorHandler);
+      window.removeEventListener('userLoggedOut', handleUserLogout);
+      window.removeEventListener('userLoggedIn', handleUserLogin);
+      window.removeEventListener('authError', handleAuthError);
+    };
+  }, [appHealth.errors.length]);
+  
+  // Función para reiniciar la aplicación
+  const handleAppReset = useCallback(() => {
+    localStorage.clear();
+    window.location.href = '/';
+  }, []);
+  
+  // Componente de recuperación de emergencia
+  const EmergencyRecovery = () => (
+    <div className="fixed inset-0 bg-red-800 bg-opacity-50 backdrop-blur-md flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+        <div className="flex items-center justify-center mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-bold text-red-700 text-center mb-4">¡Oops! Algo salió mal</h2>
+        <p className="text-gray-700 mb-4">La aplicación está experimentando problemas. Por favor, elija una opción:</p>
+        
+        <div className="space-y-4">
+          <button 
+            onClick={() => window.location.reload()}
+            className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none"
+          >
+            Recargar la página
+          </button>
+          
+          <button 
+            onClick={handleAppReset}
+            className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none"
+          >
+            Reiniciar aplicación (borra datos locales)
+          </button>
+          
+          <button 
+            onClick={() => setShowRecovery(false)}
+            className="w-full py-2 px-4 border border-gray-300 rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none"
+          >
+            Continuar de todos modos
+          </button>
         </div>
       </div>
-    );
-    
-    return (
-        <ErrorBoundary>
-            <SafeAppContainer>
-                <UserProvider>
-                    <div className="min-h-screen bg-gray-100">
-                        <Toaster position="top-right" richColors />
-                        <BrowserRouter>
-                            <ImageLoader />
-                            <Navbar />
-                            <Routes>
-                                <Route path="/" element={<SafeRender><HomeRoute /></SafeRender>} />
-                                <Route path="/login" element={<SafeRender><SignIn /></SafeRender>} />
-                                <Route path="/crear-blog" element={<ProtectedRoute><SafeRender><BlogCreation /></SafeRender></ProtectedRoute>} />
-                                <Route path="/ver-blogs" element={<SafeRender><SeeBlogs /></SafeRender>} />
-                                <Route path="/blog/:id" element={<SafeRender><BlogDetail /></SafeRender>} />
-                                <Route path="/cambiar-perfil" element={<ProtectedRoute><SafeRender><CambiarPerfil/></SafeRender></ProtectedRoute>} />
-                                <Route path="/propiedades" element={<SafeRender><SeeProperty/></SafeRender>} />
-                                <Route path="/add-property" element={<ProtectedRoute><SafeRender><PropertyCreation/></SafeRender></ProtectedRoute>} />
-                                <Route path="/property/:id" element={<SafeRender><PropertyDetail/></SafeRender>} />
-                                <Route path="/subir" element={<ProtectedRoute><SafeRender><SubirPage /></SafeRender></ProtectedRoute>} />
-                                <Route path="/diagnostico" element={<AdminRoute><SafeRender><DiagnosticPage /></SafeRender></AdminRoute>} />
-                                <Route path="/test-imagen" element={<ProtectedRoute><SafeRender><TestImagePage /></SafeRender></ProtectedRoute>} />
-                                <Route path="/not-found" element={<NotFound />} />
-                                <Route path="*" element={<Navigate to="/not-found" replace />} />
-                            </Routes>
-                            
-                            {/* Componente de recuperación de emergencia */}
-                            {showRecovery && <EmergencyRecovery />}
-                        </BrowserRouter>
-                    </div>
-                </UserProvider>
-            </SafeAppContainer>
-        </ErrorBoundary>
-    );
+    </div>
+  );
+  
+  return (
+    <ErrorBoundary>
+      <SafeAppContainer>
+        <UserProvider>
+          <div className="min-h-screen bg-gray-100">
+            <Toaster position="top-right" richColors />
+            <BrowserRouter>
+              <ImageLoader />
+              <Navbar />
+              <Routes>
+                <Route path="/" element={<SafeRender><HomeRoute /></SafeRender>} />
+                <Route path="/login" element={<SafeRender><SignIn /></SafeRender>} />
+                <Route path="/crear-blog" element={<ProtectedRoute><SafeRender><BlogCreation /></SafeRender></ProtectedRoute>} />
+                <Route path="/ver-blogs" element={<SafeRender><SeeBlogs /></SafeRender>} />
+                <Route path="/blog/:id" element={<SafeRender><BlogDetail /></SafeRender>} />
+                <Route path="/cambiar-perfil" element={<ProtectedRoute><SafeRender><CambiarPerfil/></SafeRender></ProtectedRoute>} />
+                <Route path="/propiedades" element={<SafeRender><SeeProperty/></SafeRender>} />
+                <Route path="/add-property" element={<ProtectedRoute><SafeRender><PropertyCreation/></SafeRender></ProtectedRoute>} />
+                <Route path="/property/:id" element={<SafeRender><PropertyDetail/></SafeRender>} />
+                <Route path="/subir" element={<ProtectedRoute><SafeRender><SubirPage /></SafeRender></ProtectedRoute>} />
+                <Route path="/diagnostico" element={<AdminRoute><SafeRender><DiagnosticPage /></SafeRender></AdminRoute>} />
+                <Route path="/test-imagen" element={<ProtectedRoute><SafeRender><TestImagePage /></SafeRender></ProtectedRoute>} />
+                <Route path="/not-found" element={<NotFound />} />
+                <Route path="*" element={<Navigate to="/not-found" replace />} />
+              </Routes>
+              
+              {/* Componente de recuperación de emergencia */}
+              {showRecovery && <EmergencyRecovery />}
+            </BrowserRouter>
+          </div>
+        </UserProvider>
+      </SafeAppContainer>
+    </ErrorBoundary>
+  );
 }
 
 export default App;

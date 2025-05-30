@@ -30,9 +30,9 @@ export default defineConfig({
     // Agregar timestamp para forzar invalidación de caché
     rollupOptions: {
       output: {
-        entryFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
-        chunkFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
-        assetFileNames: `assets/[name]-[hash]-${Date.now()}.[ext]`,
+        entryFileNames: `assets/[name]-[hash]-${Date.now()}-v2.js`,
+        chunkFileNames: `assets/[name]-[hash]-${Date.now()}-v2.js`,
+        assetFileNames: `assets/[name]-[hash]-${Date.now()}-v2.[ext]`,
         manualChunks: {
           vendor: ['react', 'react-dom'],
           router: ['react-router-dom'],
