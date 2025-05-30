@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext } from "react";
+import React, { createContext, useState, useEffect, useContext, useRef } from "react";
 import { getUserProfile, uploadProfileImageAndUpdate } from '../services/api';
 
 // Definimos las constantes y funciones que antes estaban en utils/imageUtils
@@ -44,6 +44,41 @@ export const UserContext = createContext();
 
 // Proveedor del contexto
 export function UserProvider({ children }) {
+  // NUEVO: Detector de bucles de inicialización
+  const initCountRef = useRef(0);
+  const lastInitTime = useRef(Date.now());
+  
+  useEffect(() => {
+    const now = Date.now();
+    const timeSinceLastInit = now - lastInitTime.current;
+    
+    initCountRef.current += 1;
+    lastInitTime.current = now;
+    
+    console.log(`🔄 [LOOP_DETECTOR] UserProvider init #${initCountRef.current}, timeSince: ${timeSinceLastInit}ms`);
+    
+    // Si hay más de 5 inicializaciones en menos de 3 segundos, hay un bucle
+    if (initCountRef.current > 5 && timeSinceLastInit < 3000) {
+      console.error(`🚨 [LOOP_DETECTOR] BUCLE DETECTADO! ${initCountRef.current} inicializaciones`);
+      
+      // Guardar información del bucle
+      const loopInfo = {
+        count: initCountRef.current,
+        timeSinceLastInit,
+        timestamp: new Date().toISOString(),
+        url: window.location.href
+      };
+      
+      localStorage.setItem('loopDetected', JSON.stringify(loopInfo));
+      
+      // Mostrar en consola con stack trace
+      console.trace('🚨 Stack trace del bucle detectado');
+      
+      // Detener el bucle forzando un estado estable
+      console.log('🛑 Forzando estado estable para romper bucle');
+    }
+  });
+  
   // Estados básicos
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -53,12 +88,18 @@ export function UserProvider({ children }) {
   // Función para registrar eventos de autenticación para depuración
   const logAuthEvent = (event, details = {}) => {
     try {
-      const eventLog = JSON.parse(localStorage.getItem('authEventLog') || '[]');
-      eventLog.unshift({
+      const timestamp = new Date().toISOString();
+      const logEntry = {
         event,
-        timestamp: new Date().toISOString(),
-        details
-      });
+        timestamp,
+        details,
+        url: window.location.href,
+        userAgent: navigator.userAgent.substring(0, 100)
+      };
+      
+      // Guardar en eventLog normal
+      const eventLog = JSON.parse(localStorage.getItem('authEventLog') || '[]');
+      eventLog.unshift(logEntry);
       
       // Limitar a los últimos 10 eventos
       if (eventLog.length > 10) {
@@ -66,6 +107,24 @@ export function UserProvider({ children }) {
       }
       
       localStorage.setItem('authEventLog', JSON.stringify(eventLog));
+      
+      // NUEVO: También guardar en un log de emergencia que persiste recargas
+      const emergencyLog = JSON.parse(localStorage.getItem('emergencyAuthLog') || '[]');
+      emergencyLog.unshift(logEntry);
+      
+      // Limitar a los últimos 20 eventos para emergencias
+      if (emergencyLog.length > 20) {
+        emergencyLog.length = 20;
+      }
+      
+      localStorage.setItem('emergencyAuthLog', JSON.stringify(emergencyLog));
+      
+      // Log adicional en consola con trace para ver el stack
+      console.log(`🚨 [AUTH_EVENT] ${event}:`, details);
+      if (event.includes('error') || event.includes('failed') || event.includes('invalid')) {
+        console.trace(`🚨 Stack trace for ${event}`);
+      }
+      
     } catch (e) {
       console.error("Error al registrar evento de autenticación:", e);
     }
@@ -73,10 +132,18 @@ export function UserProvider({ children }) {
   
   // Función auxiliar para verificar token
   const isValidToken = (token) => {
-    if (!token) return false;
+    console.log("🔍 [isValidToken] Checking token:", token ? `${token.substring(0, 20)}...` : 'null');
+    
+    if (!token) {
+      console.log("🔍 [isValidToken] No token provided");
+      return false;
+    }
     
     // Verificar que tenga formato JWT (3 segmentos separados por puntos)
-    if (token.split('.').length !== 3) return false;
+    if (token.split('.').length !== 3) {
+      console.log("🔍 [isValidToken] Invalid JWT format");
+      return false;
+    }
     
     try {
       // Intentar decodificar la parte del payload
@@ -84,44 +151,18 @@ export function UserProvider({ children }) {
       
       // Verificar si el token ha expirado
       if (payload.exp && payload.exp < Date.now() / 1000) {
-        console.warn("Token expirado:", new Date(payload.exp * 1000).toLocaleString());
+        console.warn("🔍 [isValidToken] Token expired:", new Date(payload.exp * 1000).toLocaleString());
         logAuthEvent('token_expired', { expiry: new Date(payload.exp * 1000).toLocaleString() });
         
-        // Al detectar token expirado, cerrar sesión inmediatamente
+        // NO hacer redirección automática aquí - solo limpiar localStorage
         try {
-          // Guardar una copia de la imagen de perfil temporalmente si existe
-          const profileImage = localStorage.getItem('profilePic');
-          if (profileImage) {
-            localStorage.setItem('profilePic_temp', profileImage);
-          }
-          
-          // Limpiar todos los datos relacionados con la sesión
+          console.log("🧹 [isValidToken] Cleaning expired token from localStorage");
           localStorage.removeItem("token");
           localStorage.removeItem("userData");
           localStorage.removeItem("userResponse");
           localStorage.removeItem("tempToken");
-          localStorage.removeItem("email");
-          localStorage.removeItem("name");
-          localStorage.removeItem("role");
-          
-          // También limpiar banderas y estados de recuperación
-          localStorage.removeItem("authRedirects");
-          localStorage.removeItem("redirectLoop");
-          localStorage.removeItem("appRestarted");
-          
-          // Despachar evento de cierre de sesión
-          window.dispatchEvent(new CustomEvent('userLoggedOut', {
-            detail: { reason: 'token_expired' }
-          }));
-          
-          console.log("🔒 Sesión cerrada por token expirado");
-          
-          // Redirigir inmediatamente a la página de login
-          window.location.replace("/login");
         } catch (e) {
-          console.error("Error al cerrar sesión por token expirado:", e);
-          // Si falla, intentar redirección directa como última opción
-          window.location.href = "/login";
+          console.error("Error cleaning expired token:", e);
         }
         
         return false;
@@ -129,44 +170,25 @@ export function UserProvider({ children }) {
       
       // Verificar si tiene campo de "iat" (issued at)
       if (!payload.iat) {
-        console.warn("Token sin fecha de emisión (iat)");
+        console.warn("🔍 [isValidToken] Token without iat field");
         logAuthEvent('token_without_iat');
       }
       
+      console.log("✅ [isValidToken] Token is valid");
       return true;
     } catch (error) {
-      console.error("Error al validar token:", error);
+      console.error("🔍 [isValidToken] Error validating token:", error);
       logAuthEvent('token_validation_error', { error: error.message });
       
-      // Si hay un error al validar el token, también cerrar sesión inmediatamente
+      // NO hacer redirección automática aquí - solo limpiar localStorage
       try {
-        // Limpiar todos los datos relacionados con la sesión
+        console.log("🧹 [isValidToken] Cleaning invalid token from localStorage");
         localStorage.removeItem("token");
         localStorage.removeItem("userData");
         localStorage.removeItem("userResponse");
         localStorage.removeItem("tempToken");
-        localStorage.removeItem("email");
-        localStorage.removeItem("name");
-        localStorage.removeItem("role");
-        
-        // También limpiar banderas y estados de recuperación
-        localStorage.removeItem("authRedirects");
-        localStorage.removeItem("redirectLoop");
-        localStorage.removeItem("appRestarted");
-        
-        // Despachar evento de cierre de sesión
-        window.dispatchEvent(new CustomEvent('userLoggedOut', {
-          detail: { reason: 'token_invalid' }
-        }));
-        
-        console.log("🔒 Sesión cerrada por token inválido");
-        
-        // Redirigir inmediatamente a la página de login
-        window.location.replace("/login");
       } catch (e) {
-        console.error("Error al cerrar sesión por token inválido:", e);
-        // Si falla, intentar redirección directa como última opción
-        window.location.href = "/login";
+        console.error("Error cleaning invalid token:", e);
       }
       
       return false;
@@ -425,27 +447,7 @@ export function UserProvider({ children }) {
 
   // Función de logout
   const logout = (shouldRedirect = true, reason = 'user_action') => {
-    console.log(`🔒 [LOGOUT] Initiating logout. Reason: ${reason}`); // LOG INICIO
-    // Guardar una copia de la imagen de perfil temporalmente si existe
-    try {
-      const profileImage = localStorage.getItem('profilePic') || 
-                          localStorage.getItem('profilePic_local') || 
-                          localStorage.getItem('profilePic_base64');
-                          
-      if (profileImage) {
-        // Guardar en múltiples ubicaciones para redundancia
-        localStorage.setItem('profilePic_temp', profileImage);
-        localStorage.setItem('profilePic_backup', profileImage);
-        localStorage.setItem('profilePic_last', profileImage);
-        
-        // También guardar en sessionStorage para persistencia durante la sesión
-        sessionStorage.setItem('profilePic_temp', profileImage);
-        
-        console.log("✅ Imagen de perfil guardada para futura recuperación");
-      }
-    } catch (e) {
-      console.error("Error al guardar imagen temporal:", e);
-    }
+    console.log(`🔒 [LOGOUT] Initiating logout. Reason: ${reason}, shouldRedirect: ${shouldRedirect}`);
     
     // Limpiar y reestablecer después del cierre de sesión
     setUser(null);
@@ -461,42 +463,29 @@ export function UserProvider({ children }) {
       localStorage.removeItem("name");
       localStorage.removeItem("role");
       
-      // También limpiar banderas y estados de recuperación
-      localStorage.removeItem("authRedirects");
-      localStorage.removeItem("redirectLoop");
-      localStorage.removeItem("appRestarted");
-      
-      // NO borrar las imágenes guardadas
-      // localStorage.removeItem("profilePic");
-      // localStorage.removeItem("profilePic_temp");
-      // localStorage.removeItem("profilePic_backup");
-      
-      // Despachar evento de cierre de sesión
-      window.dispatchEvent(new CustomEvent('userLoggedOut', {
-        detail: { reason }
-      }));
-      
-      console.log(`🔒 [LOGOUT] State cleared. Dispatching event...`);
+      console.log(`🔒 [LOGOUT] State cleared for reason: ${reason}`);
     } catch (e) {
-      console.error("❌ Error al eliminar token:", e);
+      console.error("❌ Error al eliminar datos de sesión:", e);
     }
     
-    // Siempre redirigir a la página de login, ignorando el parámetro shouldRedirect
-    console.log("🔄 Redirigiendo a página de login...");
-    
-    // Asegurar que la redirección funcione correctamente
-    try {
-      // Retrasar la redirección para permitir que otros componentes reaccionen primero
+    // Solo redirigir si se solicita explícitamente
+    if (shouldRedirect) {
+      console.log("🔄 Redirecting to login page...");
+      
+      // Usar timeout para evitar bucles inmediatos
       setTimeout(() => {
-        // Usar replace para evitar problemas con el historial
-        window.location.replace("/login");
+        try {
+          window.location.replace("/login");
+        } catch (error) {
+          console.error("Error during redirect:", error);
+          window.location.href = "/login";
+        }
       }, 100);
-    } catch (error) {
-      console.error("Error durante la redirección:", error);
-      // Plan B: usar href directo
-      window.location.href = "/login";
+    } else {
+      console.log("🔒 [LOGOUT] No redirect requested");
     }
-    console.log(`🔒 [LOGOUT] Finished.`); // LOG FIN
+    
+    console.log(`🔒 [LOGOUT] Finished.`);
   };
   
   // Función para iniciar sesión
@@ -780,35 +769,18 @@ export function UserProvider({ children }) {
     };
   }, [isAuthenticated]); // Dependencia de isAuthenticated es correcta
 
-  // Escuchar cambios en localStorage (Revisar dependencias y lógica)
+  // Escuchar cambios en localStorage (simplificado para evitar bucles)
   useEffect(() => {
     const handleStorageChange = (e) => {
-      console.log(`🔔 [STORAGE_CHANGE] Event detected: key='${e.key}'`); // LOG EVENTO
-
-      if (e.key === 'token') {
-        const newToken = e.newValue;
-        if (newToken && isValidToken(newToken)) {
-          console.log("🔔 [STORAGE_CHANGE] Token changed/added. Calling refreshUserData...");
-          refreshUserData().catch(err => console.error("🔔 [STORAGE_CHANGE] Error refreshing after token change:", err));
-        } else {
-          console.log("🔔 [STORAGE_CHANGE] Token removed or invalid. Calling logout...");
-          logout(false, 'token_removed_or_invalid_external');
-        }
-      } else if (e.key === 'profilePic') {
-        console.log("🔔 [STORAGE_CHANGE] Profile pic changed. Calling refreshUserData (if authenticated)...");
-        if (isAuthenticated) {
-          refreshUserData().catch(err => {
-            console.error("🔔 [STORAGE_CHANGE] Error refreshing after pic change:", err);
-            // Fallback: actualizar directamente
-            setUser(prevUser => prevUser ? { ...prevUser, profileImage: e.newValue || fallbackImageBase64 } : null);
-          });
-        } else {
-             // Actualizar si hay usuario temporal
-             setUser(prevUser => {
-               if (!prevUser || !(prevUser._recovered || prevUser._anonymous || prevUser._minimal)) return prevUser;
-               return { ...prevUser, profileImage: e.newValue || fallbackImageBase64 };
-             });
-        }
+      console.log(`🔔 [STORAGE_CHANGE] Event detected: key='${e.key}'`);
+      
+      // Solo manejar cambios de profilePic para evitar bucles
+      if (e.key === 'profilePic') {
+        console.log("🔔 [STORAGE_CHANGE] Profile pic changed");
+        setUser(prevUser => prevUser ? { 
+          ...prevUser, 
+          profileImage: e.newValue || fallbackImageBase64 
+        } : null);
       }
     };
 
@@ -819,8 +791,7 @@ export function UserProvider({ children }) {
       window.removeEventListener('storage', handleStorageChange);
       console.log("🔔 [STORAGE_CHANGE] Event listener removed.");
     };
-    // Asegurarse de que las dependencias sean estables. isValidToken, refreshUserData, logout podrían necesitar useCallback si no lo usan ya.
-  }, [isAuthenticated, logout, refreshUserData]); // Dependencias OK si las funciones son estables (useCallback)
+  }, []);
 
   // Valor del contexto
   const contextValue = {
