@@ -544,8 +544,8 @@ export const loginUser = async (credentials) => {
     
     console.log(`📝 Intentando login con email: ${loginData.email}`);
     
-    // Usar el proxy de autenticación de Vercel
-    const loginUrl = '/auth';
+    // Usar la ruta correcta del backend de Render
+    const loginUrl = '/user/login';
     
     // Enviar las credenciales como JSON string
     const body = JSON.stringify(loginData);
