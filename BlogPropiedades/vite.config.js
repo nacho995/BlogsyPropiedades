@@ -1,14 +1,18 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import commonjs from '@rollup/plugin-commonjs'
 import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
-    react()
+    react(),
+    commonjs() // Plugin para manejar módulos CommonJS
   ],
   define: {
     global: 'globalThis',
+    // Evitar errores de require
+    'process.env': {},
   },
   optimizeDeps: {
     include: [
@@ -16,6 +20,12 @@ export default defineConfig({
       '@tiptap/starter-kit',
       '@tiptap/extension-image'
     ],
+    // Forzar pre-bundling de dependencias problemáticas
+    force: true
+  },
+  // Configuración para manejar CommonJS y ESM
+  ssr: {
+    noExternal: []
   },
   build: {
     outDir: 'dist',
@@ -27,12 +37,17 @@ export default defineConfig({
       },
     },
     sourcemap: false, // Desactivar sourcemaps para producción
+    // Configurar rollup para manejar CommonJS
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true
+    },
     // Agregar timestamp para forzar invalidación de caché
     rollupOptions: {
       output: {
-        entryFileNames: `assets/[name]-[hash]-${Date.now()}-v3-FINAL.js`,
-        chunkFileNames: `assets/[name]-[hash]-${Date.now()}-v3-FINAL.js`,
-        assetFileNames: `assets/[name]-[hash]-${Date.now()}-v3-FINAL.[ext]`,
+        entryFileNames: `assets/[name]-[hash]-${Date.now()}-v4-FIXED.js`,
+        chunkFileNames: `assets/[name]-[hash]-${Date.now()}-v4-FIXED.js`,
+        assetFileNames: `assets/[name]-[hash]-${Date.now()}-v4-FIXED.[ext]`,
         manualChunks: {
           vendor: ['react', 'react-dom'],
           router: ['react-router-dom'],

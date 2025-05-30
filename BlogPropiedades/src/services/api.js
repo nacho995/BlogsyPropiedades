@@ -369,7 +369,7 @@ export const createBlogPost = async (data) => {
 
     console.log("Datos del blog preparados para enviar:", blogData);
 
-    const result = await fetchAPI('/blogs', {
+    const result = await fetchAPI('/api/blogs', {
       method: 'POST',
       body: JSON.stringify(blogData)
     });
@@ -394,7 +394,7 @@ export const createBlogPost = async (data) => {
 export const getBlogPosts = async () => {
   try {
     console.log("Obteniendo blogs del servidor...");
-    const blogs = await fetchAPI('/blogs');
+    const blogs = await fetchAPI('/api/blogs');
     console.log("Blogs recibidos del servidor:", blogs);
     
     // Verificar la estructura de cada blog y procesar las imágenes
@@ -472,7 +472,7 @@ export const deleteBlogPost = async (id) => {
       throw new Error('No hay token de autenticación disponible');
     }
 
-    return await fetchAPI(`/blogs?id=${id}`, {
+    return await fetchAPI(`/api/blogs?id=${id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -492,9 +492,9 @@ export const deleteBlogPost = async (id) => {
  */
 export const updateBlogPost = async (id, data) => {
   try {
-    console.log(`Enviando PATCH a /blogs/${id} con datos:`, data);
+    console.log(`Enviando PATCH a /api/blogs/${id} con datos:`, data);
     
-    return await fetchAPI(`/blogs?id=${id}`, {
+    return await fetchAPI(`/api/blogs?id=${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data)
     });
@@ -510,8 +510,11 @@ export const updateBlogPost = async (id, data) => {
  * @returns {Promise<Object>}
  */
 export const getBlogById = async (id) => {
+  console.log(`Obteniendo blog por ID: ${id}`);
   try {
-    return await fetchAPI(`/blogs?id=${id}`);
+    return await fetchAPI(`/api/blogs?id=${id}`, {
+      method: 'GET',
+    });
   } catch (error) {
     console.error(`Error al obtener blog ${id}:`, error);
     throw error;
@@ -1047,52 +1050,61 @@ export const uploadImageProperty = async (formData) => {
 
 // Añadir función de prueba para verificar la conexión con la API
 export const testApiConnection = async () => {
+  console.log('🔍 Probando conexión a la API en:', BASE_URL);
+  
   try {
-    console.log(`🔍 Probando conexión a la API en: ${BASE_URL}`);
-    
-    // Intentar una conexión simple a la raíz de la API
-    const response = await fetch(`${BASE_URL}/`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json'
-      }
-    });
-    
-    console.log(`📊 Respuesta de conexión a API: Status ${response.status}`);
-    
-    // Probar la ruta de blogs específicamente
+    // Probar endpoint de blogs
     const blogTestResponse = await fetch(`${BASE_URL}/api/blogs`, {
       method: 'GET',
       headers: {
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
       }
     });
     
-    console.log(`📚 Prueba de ruta de blogs: Status ${blogTestResponse.status}`);
+    console.log('📚 Prueba de ruta de blogs: Status', blogTestResponse.status);
     
-    // Probar la ruta de propiedades específicamente
+    // Probar endpoint de propiedades
     const propertyTestResponse = await fetch(`${BASE_URL}/api/properties`, {
       method: 'GET',
       headers: {
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
       }
     });
     
-    console.log(`🏠 Prueba de ruta de propiedades: Status ${propertyTestResponse.status}`);
+    console.log('🏠 Prueba de ruta de propiedades: Status', propertyTestResponse.status);
     
-    return {
-      baseApi: response.status,
-      blogs: blogTestResponse.status,
-      properties: propertyTestResponse.status
-    };
+    // Determinar estado general
+    if (blogTestResponse.status === 200 && propertyTestResponse.status === 200) {
+      console.log('✅ Todas las rutas principales funcionan correctamente');
+      return {
+        success: true,
+        message: 'API conectada correctamente',
+        blogs: blogTestResponse.status,
+        properties: propertyTestResponse.status
+      };
+    } else {
+      console.warn('⚠️ Algunas rutas no funcionan correctamente');
+      return {
+        success: false,
+        message: 'Algunas rutas de la API no están disponibles',
+        blogs: blogTestResponse.status,
+        properties: propertyTestResponse.status
+      };
+    }
   } catch (error) {
-    console.error('❌ Error en prueba de conexión a API:', error);
+    console.error('❌ Error al probar conexión de API:', error);
     return {
+      success: false,
       error: true,
-      message: error.message
+      message: error.message || 'Error de conexión con la API'
     };
   }
 };
+
+// Alias para compatibilidad
+export const testConnection = testApiConnection;
 
 /**
  * Sincroniza la imagen de perfil con el servidor para permitir sincronización entre dispositivos
@@ -1291,7 +1303,7 @@ export const uploadImageBlog = async (formData) => {
       'Authorization': `Bearer ${token}`
     };
 
-    const response = await fetch(`${BASE_URL}/blogs/upload`, {
+    const response = await fetch(`${BASE_URL}/api/blogs/upload`, {
       method: 'POST',
       headers: headers,
       body: formData
@@ -1364,20 +1376,24 @@ export const uploadProfileImageAndUpdate = async (userId, imageFile) => {
 };
 
 /**
- * Obtiene todas las propiedades.
+ * Función para obtener todas las propiedades
  * @returns {Promise<Array>}
  */
-export const getPropertyPosts = async () => {
+export const getProperties = async () => {
+  console.log('Obteniendo propiedades del servidor...');
+  
   try {
-    console.log("Obteniendo propiedades del servidor...");
-    const properties = await fetchAPI('/properties');
-    console.log("Propiedades recibidas del servidor:", properties);
+    const properties = await fetchAPI('/api/properties');
+    
+    console.log('Propiedades recibidas del servidor:', properties);
     
     if (Array.isArray(properties)) {
+      console.log(`Se obtuvieron ${properties.length} propiedades`);
       return properties;
+    } else {
+      console.warn('La respuesta de propiedades no es un array:', properties);
+      return [];
     }
-    
-    return [];
   } catch (error) {
     console.error('Error al obtener propiedades:', error);
     return [];
@@ -1385,28 +1401,16 @@ export const getPropertyPosts = async () => {
 };
 
 /**
- * Elimina una propiedad por su id.
- * @param {string} id - Identificador de la propiedad.
+ * Función para eliminar una propiedad por ID
+ * @param {string} id - Identificador de la propiedad
  * @returns {Promise<Object>}
  */
 export const deletePropertyPost = async (id) => {
+  console.log(`Eliminando propiedad ${id}`);
   try {
-    console.log(`[deletePropertyPost] Eliminando propiedad con ID: ${id}`);
-    
-    const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('No hay token de autenticación disponible');
-    }
-
-    const result = await fetchAPI(`/properties/${id}`, {
+    return await fetchAPI(`/api/properties/${id}`, {
       method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
     });
-
-    console.log("[deletePropertyPost] Resultado:", result);
-    return result;
   } catch (error) {
     console.error(`Error al eliminar propiedad ${id}:`, error);
     throw error;
@@ -1414,48 +1418,41 @@ export const deletePropertyPost = async (id) => {
 };
 
 /**
- * Crea una nueva propiedad.
- * @param {Object} data - Datos de la propiedad.
+ * Función para crear una nueva propiedad
+ * @param {Object} data - Datos de la propiedad
  * @returns {Promise<Object>}
  */
 export const createPropertyPost = async (data) => {
-  console.log("[createPropertyPost] Iniciando creación con datos:", data);
-  
-  if (!data) {
-    console.error("[createPropertyPost] No data provided");
-    throw new Error("No se proporcionaron datos para crear la propiedad.");
-  }
-
-  if (data.images && Array.isArray(data.images)) {
-    console.log("[createPropertyPost] Enviando imágenes:", data.images);
-  }
-
   try {
+    console.log("[createPropertyPost] Datos recibidos:", data);
     const token = localStorage.getItem('token');
-    console.log("[createPropertyPost] TOKEN JUSTO ANTES DE LLAMAR A postData('/properties'): " + (token ? "EXISTE" : "NULL"));
+    console.log("[createPropertyPost] TOKEN JUSTO ANTES DE LLAMAR A postData('/api/properties'): " + (token ? "EXISTE" : "NULL"));
     
-    const result = await postData('/properties', data);
-    console.log("[createPropertyPost] Respuesta recibida de postData:", result);
+    const result = await postData('/api/properties', data);
     
-    if (result && result.error) {
-      throw new Error(result.message || "Error devuelto por postData al crear la propiedad");
+    console.log("[createPropertyPost] Respuesta del servidor:", result);
+    
+    if (!result || result.error) {
+      console.error("[createPropertyPost] Error al crear propiedad:", result);
+      throw new Error(result?.message || 'Error al crear la propiedad');
     }
     
     return result;
   } catch (error) {
-    console.error("[createPropertyPost] Error detallado:", error);
-    throw new Error(error.message || "Error desconocido en createPropertyPost");
+    console.error("[createPropertyPost] Error crítico:", error);
+    throw error;
   }
 };
 
 /**
- * Obtiene una propiedad por su id.
- * @param {string} id - Identificador de la propiedad.
+ * Función para obtener una propiedad por ID
+ * @param {string} id - Identificador de la propiedad
  * @returns {Promise<Object>}
  */
 export const getPropertyById = async (id) => {
+  console.log(`Obteniendo propiedad por ID: ${id}`);
   try {
-    return await fetchAPI(`/properties/${id}`);
+    return await fetchAPI(`/api/properties/${id}`);
   } catch (error) {
     console.error(`Error al obtener propiedad ${id}:`, error);
     throw error;
@@ -1463,18 +1460,20 @@ export const getPropertyById = async (id) => {
 };
 
 /**
- * Actualiza una propiedad.
- * @param {string} id - Identificador de la propiedad.
- * @param {Object} data - Datos actualizados de la propiedad.
+ * Función para actualizar una propiedad
+ * @param {string} id - Identificador de la propiedad
+ * @param {Object} data - Datos actualizados de la propiedad
  * @returns {Promise<Object>}
  */
 export const updatePropertyPost = async (id, data) => {
+  console.log(`Actualizando propiedad ${id} con datos:`, data);
   try {
-    console.log(`[updatePropertyPost] Actualizando propiedad ${id} con datos:`, data);
-    
-    return await fetchAPI(`/properties/${id}`, {
+    return await fetchAPI(`/api/properties/${id}`, {
       method: 'PATCH',
-      body: JSON.stringify(data)
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
     });
   } catch (error) {
     console.error(`Error al actualizar propiedad ${id}:`, error);

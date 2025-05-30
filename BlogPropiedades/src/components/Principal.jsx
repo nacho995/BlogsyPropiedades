@@ -21,9 +21,9 @@ const stripHtml = (html) => {
 // Importar funciones de API usando lazy loading para evitar problemas de inicialización
 const ApiService = lazy(() => import("../services/api").then(module => ({
   default: {
-    getBlogPosts: module.getBlogPosts,
-    getPropertyPosts: module.getPropertyPosts,
-    testApiConnection: module.testApiConnection
+    getBlogs: module.getBlogs,
+    getProperties: module.getProperties,
+    testConnection: module.testConnection
   }
 })));
 
@@ -31,18 +31,17 @@ const ApiService = lazy(() => import("../services/api").then(module => ({
 const defaultProfilePic = fallbackImageBase64;
 
 // Wrapper para ejecutar funciones de API de forma segura
-const safeApiCall = async (apiFunction, ...args) => {
+const safeApiCall = async (apiFunction, fallback = []) => {
   try {
-    // En caso de que la API no esté cargada, devolver un array vacío
-    if (!apiFunction) {
-      console.warn('Función de API no disponible');
-      return [];
+    if (typeof apiFunction !== 'function') {
+      console.warn('Función de API no disponible, usando fallback');
+      return fallback;
     }
-    
-    return await apiFunction(...args);
+    const result = await apiFunction();
+    return result || fallback;
   } catch (error) {
     console.error('Error en llamada a API:', error);
-    return [];
+    return fallback;
   }
 };
 
@@ -111,50 +110,51 @@ function Principal() {
       try {
         setLoading(true);
         setApiStatus({ testing: true, status: 'pendiente' });
-        let blogsData = [];
-        let propertiesData = [];
         
-        // Cargar servicios de API de forma lazy
-        const apis = await import("../services/api");
+        // Configurar APIs disponibles con fallbacks seguros
+        const apis = {
+          getBlogs: module.getBlogs,
+          getProperties: module.getProperties,
+          testConnection: module.testConnection,
+        };
+
+        console.log('APIs disponibles:', Object.keys(apis));
+
+        // Función auxiliar para llamadas seguras a la API
+        const safeApiCall = async (apiFunction, fallback = []) => {
+          try {
+            if (typeof apiFunction !== 'function') {
+              console.warn('Función de API no disponible, usando fallback');
+              return fallback;
+            }
+            const result = await apiFunction();
+            return result || fallback;
+          } catch (error) {
+            console.error('Error en llamada a API:', error);
+            return fallback;
+          }
+        };
+
+        // Probar conexión primero
+        const isConnected = await safeApiCall(apis.testConnection, false);
         
-        // Realizar prueba de conexión a la API primero
-        console.log("Probando conexión a la API...");
-        const apiTest = await safeApiCall(apis.testApiConnection);
-        
-        // Actualizar estado basado en resultados de la prueba
-        if (apiTest.error) {
-          if (isMounted) setApiStatus({ testing: false, status: 'error', details: apiTest.message });
-          console.error("Error de conexión a API:", apiTest.message);
-        } else if (apiTest.blogs === 200 || apiTest.properties === 200) {
-          if (isMounted) setApiStatus({ testing: false, status: 'conectado', details: apiTest });
-          console.log("API conectada correctamente");
+        if (isConnected) {
+          console.log('API conectada correctamente');
+          
+          // Obtener datos en paralelo
+          const [blogsData, propertiesData] = await Promise.all([
+            safeApiCall(apis.getBlogs),
+            safeApiCall(apis.getProperties)
+          ]);
+          
+          if (isMounted) {
+            setBlogs(blogsData || []);
+            setProperties(propertiesData || []);
+            setLoading(false);
+          }
         } else {
           if (isMounted) setApiStatus({ testing: false, status: 'error', details: 'Códigos de estado incorrectos' });
-          console.error("API devolvió códigos de estado incorrectos:", apiTest);
-        }
-        
-        // Intentar obtener blogs
-        try {
-          blogsData = await safeApiCall(apis.getBlogPosts);
-          console.log(`Se obtuvieron ${blogsData?.length || 0} blogs`);
-        } catch (error) {
-          console.error("Error al cargar blogs:", error);
-          blogsData = [];
-        }
-        
-        // Intentar obtener propiedades
-        try {
-          propertiesData = await safeApiCall(apis.getPropertyPosts);
-          console.log(`Se obtuvieron ${propertiesData?.length || 0} propiedades`);
-        } catch (error) {
-          console.error("Error al cargar propiedades:", error);
-          propertiesData = [];
-        }
-        
-        if (isMounted) {
-          setBlogs(blogsData || []);
-          setProperties(propertiesData || []);
-          setLoading(false);
+          console.error("API devolvió códigos de estado incorrectos:", isConnected);
         }
       } catch (generalError) {
         console.error("Error general al cargar datos:", generalError);
