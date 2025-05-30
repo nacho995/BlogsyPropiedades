@@ -279,7 +279,7 @@ export const getCloudinarySignature = async () => {
   console.log('Solicitando configuración de Cloudinary...');
   try {
     // Usar POST como lo espera nuestro endpoint
-    const configData = await fetchAPI('/cloudinary/signature', { 
+    const configData = await fetchAPI('/api/cloudinary/signature', { 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -547,20 +547,14 @@ export const loginUser = async (credentials) => {
     
     console.log(`📝 Intentando login con email: ${loginData.email}`);
     
-    // Usar la ruta correcta del backend de Render
-    const loginUrl = '/user/login';
-    
     // Enviar las credenciales como JSON string
     const body = JSON.stringify(loginData);
     
     // Log detallado
-    console.log('Enviando solicitud de login:', {
-      url: loginUrl,
-      method: 'POST',
-      bodyLength: body.length,
-      hasEmail: !!loginData.email,
-      hasPassword: !!loginData.password
-    });
+    console.log('Enviando solicitud de login:', JSON.parse(JSON.stringify(loginData))); // Clonar para evitar problemas de log
+    
+    // Construir la URL de login
+    const loginUrl = '/api/user/login';
     
     // Enviar las credenciales
     const result = await fetchAPI(loginUrl, {
@@ -628,33 +622,31 @@ export const loginUser = async (credentials) => {
  * @param {Object} data - Datos del usuario.
  * @returns {Promise<Object>}
  */
-export const createUser = async (data) => {
+export const registerUser = async (userData) => {
+  console.log("Datos recibidos para registro:", userData);
   try {
-    return await fetchAPI('/auth/register', {
+    return await fetchAPI('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify(data)
+      body: JSON.stringify(userData)
     });
   } catch (error) {
-    console.error('Error al crear usuario:', error);
+    console.error('Error en registerUser:', error);
     throw error;
   }
 };
 
-/**
- * Obtiene los datos del usuario actual
- * @param {string} [tokenParam] - Token opcional para autenticación
- * @returns {Promise<Object>} Datos del usuario
- */
-export const getCurrentUser = async (tokenParam) => {
-  const token = tokenParam || localStorage.getItem('token');
-  if (!token) {
-    throw new Error('No hay token de autenticación');
-  }
+// Alias para mantener compatibilidad con el código existente
+export const createUser = registerUser;
 
+/**
+ * Obtiene los datos del usuario autenticado mediante el token.
+ * @returns {Promise<Object>} - Datos del usuario.
+ */
+export const getAuthenticatedUser = async () => {
   try {
-    return await fetchAPI('/auth/me');
+    return await fetchAPI('/api/auth/me');
   } catch (error) {
-    console.error('Error en getCurrentUser:', error);
+    console.error('Error al obtener usuario autenticado:', error);
     throw error;
   }
 };
@@ -704,13 +696,13 @@ export async function getUserProfile(token) {
     veryRecentAttempts.push(now);
     localStorage.setItem(profileAttemptsKey, JSON.stringify(veryRecentAttempts));
     
-    // Intentar obtener el perfil del usuario usando el proxy de auth de Vercel
-    const userDataFromApi = await fetchAPI('/auth/me', {
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-      }
+    console.log("🔍 getUserProfile: Consultando perfil del usuario autenticado...");
+    
+    // Enviar el token en las cabeceras
+    const userDataFromApi = await fetchAPI('/api/auth/me', {
+      method: 'GET',
     });
-
+    
     // Verificar si la llamada a fetchAPI fue exitosa y devolvió datos
     if (userDataFromApi && !userDataFromApi.error && (userDataFromApi.id || userDataFromApi._id)) {
       // Asegurar que el campo 'id' esté presente, copiándolo de '_id' si es necesario
@@ -1048,62 +1040,63 @@ export const uploadImageProperty = async (formData) => {
   }
 };
 
-// Añadir función de prueba para verificar la conexión con la API
+/**
+ * Función de prueba específica para verificar la conexión a la API
+ * @returns {Promise<Object>} - Estado de la conexión
+ */
 export const testApiConnection = async () => {
   console.log('🔍 Probando conexión a la API en:', BASE_URL);
   
   try {
-    // Probar endpoint de blogs
+    // Prueba básica de conexión (endpoint root)
+    const basicResponse = await fetch(`${BASE_URL}`, { method: 'GET' });
+    console.log('📊 Respuesta de conexión a API: Status', basicResponse.status);
+    
+    // Prueba de endpoint de blogs
     const blogTestResponse = await fetch(`${BASE_URL}/api/blogs`, {
       method: 'GET',
       headers: {
-        'Accept': 'application/json',
         'Content-Type': 'application/json'
       }
     });
-    
     console.log('📚 Prueba de ruta de blogs: Status', blogTestResponse.status);
     
-    // Probar endpoint de propiedades
+    // Prueba de endpoint de propiedades  
     const propertyTestResponse = await fetch(`${BASE_URL}/api/properties`, {
       method: 'GET',
       headers: {
-        'Accept': 'application/json',
         'Content-Type': 'application/json'
       }
     });
-    
     console.log('🏠 Prueba de ruta de propiedades: Status', propertyTestResponse.status);
     
-    // Determinar estado general
-    if (blogTestResponse.status === 200 && propertyTestResponse.status === 200) {
-      console.log('✅ Todas las rutas principales funcionan correctamente');
-      return {
-        success: true,
-        message: 'API conectada correctamente',
-        blogs: blogTestResponse.status,
-        properties: propertyTestResponse.status
-      };
+    // Verificar que todas las pruebas fueron exitosas
+    if (basicResponse.ok && blogTestResponse.ok && propertyTestResponse.ok) {
+      console.log('✅ Todas las rutas API están funcionando correctamente');
+      return { success: true, message: 'API conectada correctamente' };
     } else {
-      console.warn('⚠️ Algunas rutas no funcionan correctamente');
-      return {
-        success: false,
-        message: 'Algunas rutas de la API no están disponibles',
+      console.warn('⚠️ Algunas rutas tienen problemas:', {
+        basic: basicResponse.status,
         blogs: blogTestResponse.status,
         properties: propertyTestResponse.status
+      });
+      return { 
+        success: false, 
+        message: 'Conexión parcial a la API',
+        details: {
+          basic: basicResponse.status,
+          blogs: blogTestResponse.status,
+          properties: propertyTestResponse.status
+        }
       };
     }
   } catch (error) {
-    console.error('❌ Error al probar conexión de API:', error);
-    return {
-      success: false,
-      error: true,
-      message: error.message || 'Error de conexión con la API'
-    };
+    console.error('❌ Error al probar conexión a la API:', error);
+    return { success: false, message: 'Error de conexión', error: error.message };
   }
 };
 
-// Alias para compatibilidad
+// Alias para mantener compatibilidad con el código existente
 export const testConnection = testApiConnection;
 
 /**
@@ -1268,7 +1261,7 @@ export const fetchProfileImageFromServer = async () => {
 
     console.log("🔍 Obteniendo imagen de perfil desde el servidor...");
 
-    const response = await fetch(`${BASE_URL}/user/profile-image`, {
+    const response = await fetch(`${BASE_URL}/api/user/profile-image`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -1351,7 +1344,7 @@ export const uploadProfileImageAndUpdate = async (userId, imageFile) => {
 
     console.log(`Subiendo imagen de perfil para usuario ${userId}...`);
 
-    const response = await fetch(`${BASE_URL}/user/update-profile`, {
+    const response = await fetch(`${BASE_URL}/api/user/update-profile`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -1495,7 +1488,7 @@ export const uploadFile = async (formData) => {
       'Authorization': `Bearer ${token}`
     };
 
-    const response = await fetch(`${BASE_URL}/upload`, {
+    const response = await fetch(`${BASE_URL}/api/upload`, {
       method: 'POST',
       headers: headers,
       body: formData
