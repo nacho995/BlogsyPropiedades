@@ -320,7 +320,12 @@ const SignIn = ({ isRegistering = false }) => {
             }, 1000);
         } catch (err) {
             console.error("Error general durante la autenticación:", err);
-            setError(err.message || "Error durante la autenticación");
+            // Manejar timeout específicamente (cold start del backend)
+            if (err.message && err.message.includes("timeout") || err.message.includes("Timeout")) {
+                setError("🕐 El servidor está iniciando (Render cold start). Esto puede tardar hasta 60 segundos la primera vez. Por favor, intenta nuevamente en unos momentos.");
+            } else {
+                setError(err.message || "Error durante la autenticación");
+            }
         } finally {
             setLoading(false);
             isSubmitting.current = false;
@@ -454,7 +459,7 @@ const SignIn = ({ isRegistering = false }) => {
                                                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                                                         ></path>
                                                     </svg>
-                                                    {isRegistering ? "Creando cuenta..." : "Iniciando sesión..."}
+                                                    {isRegistering ? "Creando cuenta..." : "Conectando al servidor... (puede tardar hasta 60s)"}
                                                 </span>
                                             ) : (
                                                 <span>{isRegistering ? "Crear cuenta" : "Iniciar sesión"}</span>
