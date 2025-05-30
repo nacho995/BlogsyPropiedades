@@ -515,7 +515,6 @@ function ProtectedRoute({ children }) {
 }
 
 function App() {
-  console.log('🚀 APP VERSION: v9.0.0 - FORCE DEPLOY - API FIXED');
   console.log('🔗 Backend URL:', import.meta.env.VITE_BACKEND_URL || 'https://nextjs-gozamadrid-qrfk.onrender.com');
   
   // Verificar si hay un ciclo al renderizar App

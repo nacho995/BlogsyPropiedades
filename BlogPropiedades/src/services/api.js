@@ -554,7 +554,7 @@ export const loginUser = async (credentials) => {
     console.log('Enviando solicitud de login:', JSON.parse(JSON.stringify(loginData))); // Clonar para evitar problemas de log
     
     // Construir la URL de login
-    const loginUrl = '/api/user/login';
+    const loginUrl = '/user/login';
     
     // Enviar las credenciales
     const result = await fetchAPI(loginUrl, {
@@ -625,7 +625,7 @@ export const loginUser = async (credentials) => {
 export const registerUser = async (userData) => {
   console.log("Datos recibidos para registro:", userData);
   try {
-    return await fetchAPI('/api/auth/register', {
+    return await fetchAPI('/user/register', {
       method: 'POST',
       body: JSON.stringify(userData)
     });
@@ -644,7 +644,7 @@ export const createUser = registerUser;
  */
 export const getAuthenticatedUser = async () => {
   try {
-    return await fetchAPI('/api/auth/me');
+    return await fetchAPI('/user/me');
   } catch (error) {
     console.error('Error al obtener usuario autenticado:', error);
     throw error;
@@ -699,7 +699,7 @@ export async function getUserProfile(token) {
     console.log("🔍 getUserProfile: Consultando perfil del usuario autenticado...");
     
     // Enviar el token en las cabeceras
-    const userDataFromApi = await fetchAPI('/api/auth/me', {
+    const userDataFromApi = await fetchAPI('/user/me', {
       method: 'GET',
     });
     
