@@ -719,69 +719,46 @@ export function UserProvider({ children }) {
 
   // Inicializar datos de usuario al cargar la aplicación
   useEffect(() => {
+    let mounted = true;
+    
     const initializeUser = async () => {
-      console.log("🚀 [INITIALIZE_USER] Starting user initialization..."); // LOG INICIO
+      console.log("🚀 [INITIALIZE_USER] Starting user initialization..."); 
+      
       try {
-        setLoading(true);
         const storedToken = localStorage.getItem('token');
         console.log(`[INITIALIZE_USER] Token in localStorage: ${storedToken ? 'Exists' : 'Not available'}`);
 
-        if (storedToken) {
-          if (!isValidToken(storedToken)) {
-            console.warn("[INITIALIZE_USER] Invalid/Expired token. Attempting recovery...");
-            await recuperateSession(); // Esperar recuperación
-          } else {
-            console.log("[INITIALIZE_USER] Valid token found. Refreshing user data...");
-            await refreshUserData(); // Esperar refresh
-          }
+        if (storedToken && isValidToken(storedToken)) {
+          console.log("[INITIALIZE_USER] Valid token found. Refreshing user data...");
+          if (mounted) await refreshUserData();
         } else {
-          console.log("[INITIALIZE_USER] No token found. Checking for minimal data...");
-          const hasMinimalData = localStorage.getItem('email');
-          if (hasMinimalData) {
-            console.log("[INITIALIZE_USER] Minimal data found. Attempting partial recovery...");
-            await recuperateSession(); // Esperar recuperación parcial
-          } else {
-            console.log("[INITIALIZE_USER] No data for recovery. Setting user to null.");
+          console.log("[INITIALIZE_USER] No valid token. Setting user to null.");
+          if (mounted) {
             setUser(null);
             setIsAuthenticated(false);
           }
         }
       } catch (error) {
-        console.error("❌ [INITIALIZE_USER] Critical error during initialization. Attempting emergency recovery:", error);
-        try {
-          await recuperateSession(); // Esperar recuperación de emergencia
-        } catch (e) {
-          console.error("❌ [INITIALIZE_USER] Fatal error during emergency recovery:", e);
+        console.error("❌ [INITIALIZE_USER] Error during initialization:", error);
+        if (mounted) {
           setUser(null);
           setIsAuthenticated(false);
         }
       } finally {
-        setLoading(false); // Asegurar setLoading false
-        console.log("🚀 [INITIALIZE_USER] Finished."); // LOG FIN
+        if (mounted) {
+          setLoading(false);
+          console.log("🚀 [INITIALIZE_USER] Finished.");
+        }
       }
     };
 
-    // Sistema de reintento
-    let initAttempts = 0;
-    const maxAttempts = 3;
-    const attemptInitialization = () => {
-      initAttempts++;
-      console.log(`[INITIALIZE_USER] Attempt #${initAttempts}`);
-      initializeUser().catch(error => {
-        console.error(`[INITIALIZE_USER] Error in attempt #${initAttempts}:`, error);
-        if (initAttempts < maxAttempts) {
-          const delay = initAttempts * 1000;
-          console.log(`[INITIALIZE_USER] Retrying in ${delay}ms...`);
-          setTimeout(attemptInitialization, delay);
-        } else {
-          console.error("[INITIALIZE_USER] Max initialization attempts reached. Stopping.");
-          setLoading(false); // Asegurar loading false si se agotan reintentos
-        }
-      });
+    // Solo ejecutar una vez
+    initializeUser();
+    
+    return () => {
+      mounted = false;
     };
-
-    attemptInitialization();
-  }, []); // Dependencias vacías, se ejecuta solo al montar
+  }, []); // Array de dependencias vacío para ejecutar solo una vez
 
   // Refrescar datos del usuario cada 15 minutos (Asegurar que refreshUserData sea estable)
   useEffect(() => {

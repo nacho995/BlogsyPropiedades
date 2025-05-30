@@ -438,120 +438,24 @@ function AdminRoute({ children }) {
 
 function HomeRoute() {
   const { user, isAuthenticated, loading } = useUser();
-  const [hasError, setHasError] = useState(false);
-  const renderCountRef = useRef(0);
-  const [forcedComponent, setForcedComponent] = useState(null);
   
-  // Detectar bucles de renderizado
-  useEffect(() => {
-    renderCountRef.current += 1;
-    
-    if (renderCountRef.current > 10) {
-      console.warn(`⚠️ Posible ciclo de renderizado en HomeRoute: ${renderCountRef.current} renderizados`);
-      
-      // Registrar para diagnóstico
-      try {
-        localStorage.setItem('homeRouteCycleDetected', JSON.stringify({
-          timestamp: new Date().toISOString(),
-          renderCount: renderCountRef.current
-        }));
-      } catch (e) {
-        console.error("Error al registrar ciclo:", e);
-      }
-      
-      // Forzar una decisión para romper el ciclo
-      if (!forcedComponent) {
-        console.log("🛑 Rompiendo ciclo de renderizado forzando mostrar SignIn");
-        setHasError(true);
-        setForcedComponent("SignIn");
-      }
-    }
-    
-    return () => {
-      // No reseteamos el contador para poder detectar ciclos entre montados y desmontados
-    };
+  // Agregar logs para debugging
+  console.log("🧭 HomeRoute render:", { 
+    loading, 
+    isAuthenticated, 
+    hasUser: !!user,
+    userEmail: user?.email 
   });
-  
-  // Comprobar si hay problemas de protocolo (HTTP vs HTTPS)
-  useEffect(() => {
-    try {
-      // URL de API actualizada para usar el protocolo correcto
-      const isHttps = window.location.protocol === 'https:';
-      const API_DOMAIN = 'nextjs-gozamadrid-qrfk.onrender.com';
-      const apiUrl = `${isHttps ? 'https' : 'http'}://${API_DOMAIN}`;
-      
-      console.log(`🌐 App usando API en: ${apiUrl}`);
-      
-      // Guardar la URL definitiva en localStorage para otros componentes
-      localStorage.setItem('definitive_api_url', apiUrl);
-      
-      // Limpiar cualquier aviso de conflicto de protocolo
-      localStorage.removeItem('protocolMismatch');
-      
-      // Escuchar el evento personalizado de detección de bucles de login
-      const handleLoginLoopDetected = () => {
-        console.error('⚠️ Se ha detectado un bucle de login, forzando reinicio de la aplicación');
-        setForcedComponent('SignIn');
-        setHasError(true);
-        
-        // Limpiar localStorage para romper el bucle
-        try {
-          // Elementos a preservar
-          const profilePic = localStorage.getItem('profilePic');
-          const profilePic_local = localStorage.getItem('profilePic_local');
-          const profilePic_base64 = localStorage.getItem('profilePic_base64');
-          
-          // Limpiar todo
-          localStorage.clear();
-          
-          // Restaurar elementos preservados
-          if (profilePic) localStorage.setItem('profilePic', profilePic);
-          if (profilePic_local) localStorage.setItem('profilePic_local', profilePic_local);
-          if (profilePic_base64) localStorage.setItem('profilePic_base64', profilePic_base64);
-          
-          // Marcar que hubo un reinicio
-          localStorage.setItem('appRestarted', 'true');
-        } catch (e) {
-          console.error('Error al limpiar localStorage:', e);
-        }
-      };
-      
-      window.addEventListener('loginLoopDetected', handleLoginLoopDetected);
-      
-      // Limpiar listener
-      return () => {
-        window.removeEventListener('loginLoopDetected', handleLoginLoopDetected);
-      };
-    } catch (error) {
-      console.error("Error al verificar protocolos:", error);
-    }
-  }, []);
-  
-  // Si hay un error o hemos detectado un ciclo, mostrar SignIn
-  if (hasError || forcedComponent === "SignIn") {
-    console.log("🚨 Mostrando SignIn debido a error o ciclo detectado");
-    return <SignIn />;
-  }
   
   // Si está cargando, mostrar un spinner
   if (loading) {
+    console.log("⏳ Showing loading spinner");
     return (
       <div className="min-h-screen flex justify-center items-center bg-gradient-to-tr from-blue-900 to-black/60">
         <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white"></div>
       </div>
     );
   }
-  
-  // Verificar si hay un bucle de redirección conocido
-  const redirectLoop = localStorage.getItem('redirectLoop') === 'true';
-  if (redirectLoop) {
-    console.log("🛑 Bucle de redirección detectado, mostrando Principal sin verificar autenticación");
-    localStorage.removeItem('redirectLoop');
-    return <Principal />;
-  }
-  
-  // Decisión normal basada en autenticación
-  console.log("🧭 Decidiendo ruta:", { autenticado: isAuthenticated, usuario: !!user });
   
   // Si está autenticado y hay un usuario, mostrar Principal
   if (isAuthenticated && user) {
