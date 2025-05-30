@@ -1,11 +1,1 @@
-/* /index.html 200 
-
-# Redirects for Single Page Application
 /*    /index.html   200
-
-# API redirects to backend
-/api/*  https://nextjs-gozamadrid-qrfk.onrender.com/:splat  200
-/auth   https://nextjs-gozamadrid-qrfk.onrender.com/user/login  200 
-
-# SPA fallback - must be last
-/*    /index.html   200 

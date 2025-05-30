@@ -27,9 +27,12 @@ export default defineConfig({
       },
     },
     sourcemap: false, // Desactivar sourcemaps para producción
-    // Inyectar código específico para evitar TDZ
+    // Agregar timestamp para forzar invalidación de caché
     rollupOptions: {
       output: {
+        entryFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
+        chunkFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
+        assetFileNames: `assets/[name]-[hash]-${Date.now()}.[ext]`,
         manualChunks: {
           vendor: ['react', 'react-dom'],
           router: ['react-router-dom'],
