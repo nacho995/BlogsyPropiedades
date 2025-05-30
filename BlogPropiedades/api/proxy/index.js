@@ -1,8 +1,8 @@
 // Función API de Vercel para proxear las solicitudes a la API externa
 // y evitar problemas de CORS
 export default async function handler(req, res) {
-  // Configuración de la URL de la API desde variables de entorno
-  const apiUrl = process.env.API_BASE_URL || 'https://api.realestategozamadrid.com';
+  // Configuración de la URL de la API
+  const apiUrl = process.env.API_BASE_URL || 'https://nextjs-gozamadrid-qrfk.onrender.com';
   
   // Obtener la ruta específica desde la URL
   const path = req.url.split('/api/proxy')[1] || '';

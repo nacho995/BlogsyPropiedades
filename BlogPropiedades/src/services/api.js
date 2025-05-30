@@ -70,15 +70,15 @@ const isLocalDevelopment = typeof window !== 'undefined' && (
   window.location.hostname === '127.0.0.1'
 );
 
-// SOLUCIÓN TEMPORAL: Conectar directamente al backend de AWS debido a protección de Vercel
+// SOLUCIÓN DEFINITIVA: Usar proxies de Vercel para evitar Mixed Content
 const API_DOMAIN = isLocalDevelopment 
-  ? 'localhost:8081'  // Servidor de desarrollo local
-  : 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';  // Backend real en AWS
+  ? 'localhost:5173'  // Servidor de desarrollo local
+  : window.location.hostname;  // Mismo dominio que el frontend
 
-// Usar HTTP para localhost, HTTP para AWS (ya que el backend usa HTTP)
+// Usar HTTP para localhost, HTTPS para producción (mismo protocolo que frontend)
 export const BASE_URL = isLocalDevelopment 
-  ? `http://${API_DOMAIN}`  // Desarrollo local: HTTP
-  : `http://${API_DOMAIN}`;  // Producción: Conectar directamente al backend AWS
+  ? `http://${API_DOMAIN}/api`  // Desarrollo local: HTTP con proxy
+  : `https://${API_DOMAIN}/api`;  // Producción: HTTPS con proxy de Vercel
 
 // Determinar si estamos usando HTTPS
 const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
@@ -369,7 +369,7 @@ export const createBlogPost = async (data) => {
 
     console.log("Datos del blog preparados para enviar:", blogData);
 
-    const result = await fetchAPI('/api/blogs', {
+    const result = await fetchAPI('/blogs', {
       method: 'POST',
       body: JSON.stringify(blogData)
     });
@@ -394,7 +394,7 @@ export const createBlogPost = async (data) => {
 export const getBlogPosts = async () => {
   try {
     console.log("Obteniendo blogs del servidor...");
-    const blogs = await fetchAPI('/api/blogs');
+    const blogs = await fetchAPI('/blogs');
     console.log("Blogs recibidos del servidor:", blogs);
     
     // Verificar la estructura de cada blog y procesar las imágenes
@@ -472,7 +472,7 @@ export const deleteBlogPost = async (id) => {
       throw new Error('No hay token de autenticación disponible');
     }
 
-    return await fetchAPI(`/api/blogs/${id}`, {
+    return await fetchAPI(`/blogs?id=${id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -492,9 +492,9 @@ export const deleteBlogPost = async (id) => {
  */
 export const updateBlogPost = async (id, data) => {
   try {
-    console.log(`Enviando PATCH a /api/blogs/${id} con datos:`, data);
+    console.log(`Enviando PATCH a /blogs/${id} con datos:`, data);
     
-    return await fetchAPI(`/api/blogs/${id}`, {
+    return await fetchAPI(`/blogs?id=${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data)
     });
@@ -511,7 +511,7 @@ export const updateBlogPost = async (id, data) => {
  */
 export const getBlogById = async (id) => {
   try {
-    return await fetchAPI(`/api/blogs/${id}`);
+    return await fetchAPI(`/blogs?id=${id}`);
   } catch (error) {
     console.error(`Error al obtener blog ${id}:`, error);
     throw error;
@@ -544,8 +544,8 @@ export const loginUser = async (credentials) => {
     
     console.log(`📝 Intentando login con email: ${loginData.email}`);
     
-    // Usar la ruta correcta del backend AWS
-    const loginUrl = '/user/login';
+    // Usar el proxy de autenticación de Vercel
+    const loginUrl = '/auth';
     
     // Enviar las credenciales como JSON string
     const body = JSON.stringify(loginData);
@@ -627,7 +627,7 @@ export const loginUser = async (credentials) => {
  */
 export const createUser = async (data) => {
   try {
-    return await fetchAPI('/user/register', {
+    return await fetchAPI('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data)
     });
@@ -649,7 +649,7 @@ export const getCurrentUser = async (tokenParam) => {
   }
 
   try {
-    return await fetchAPI('/user/me');
+    return await fetchAPI('/auth/me');
   } catch (error) {
     console.error('Error en getCurrentUser:', error);
     throw error;
@@ -701,8 +701,8 @@ export async function getUserProfile(token) {
     veryRecentAttempts.push(now);
     localStorage.setItem(profileAttemptsKey, JSON.stringify(veryRecentAttempts));
     
-    // Intentar obtener el perfil del usuario usando la ruta correcta del backend AWS
-    const userDataFromApi = await fetchAPI('/user/me', {
+    // Intentar obtener el perfil del usuario usando el proxy de auth de Vercel
+    const userDataFromApi = await fetchAPI('/auth/me', {
       headers: {
         'Authorization': `Bearer ${authToken}`
       }
@@ -726,7 +726,7 @@ export async function getUserProfile(token) {
     } else {
       // Si fetchAPI indicó un error, devolvió datos inválidos (sin id), o vacío
       const errorMessage = userDataFromApi?.message || 'Failed to fetch valid user profile from API (missing id?)';
-      console.error("getUserProfile: fetchAPI('/user/me') failed or returned invalid data:", userDataFromApi);
+      console.error("getUserProfile: fetchAPI('/auth/me') failed or returned invalid data:", userDataFromApi);
       throw new Error(errorMessage);
     }
 
@@ -1152,7 +1152,7 @@ export const syncProfileImageBetweenDevices = async (imageData) => {
     // 2. Si no existe, verificar el protocolo actual y construir la URL
     else {
       const isHttps = window.location.protocol === 'https:';
-      const API_DOMAIN = 'api.realestategozamadrid.com';
+      const API_DOMAIN = 'nextjs-gozamadrid-qrfk.onrender.com';
       apiUrl = `${isHttps ? 'https' : 'http'}://${API_DOMAIN}`;
       
       // Guardar para futuros usos
@@ -1256,122 +1256,110 @@ export const fetchProfileImageFromServer = async () => {
 
     console.log("🔍 Obteniendo imagen de perfil desde el servidor...");
 
-    const response = await fetch(`${BASE_URL}/user/sync-profile-image`, {
+    const response = await fetch(`${BASE_URL}/user/profile-image`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    if (!response.ok) {
-      console.error(`Error al obtener imagen desde servidor: ${response.status}`);
-      return { success: false, status: response.status, error: "Error al obtener imagen" };
-    }
-
-    const data = await response.json();
-    
-    if (data.profilePic) {
-      console.log("✅ Imagen obtenida del servidor correctamente");
-      
-      // Actualizar localmente
-      syncProfileImage(data.profilePic);
-      
-      return {
-        success: true,
-        profileImage: data.profilePic
-      };
-    } else {
-      console.warn("El servidor no devolvió ninguna imagen de perfil");
-      return { success: false, error: "No hay imagen de perfil en el servidor" };
-    }
-  } catch (error) {
-    console.error("Error al obtener imagen de perfil desde servidor:", error);
-    return { 
-      success: false, 
-      error: error.message || "Error desconocido" 
-    };
-  }
-};
-
-// Nueva función para subir imagen de perfil y actualizar usuario
-export const uploadProfileImageAndUpdate = async (userId, file) => {
-  const formData = new FormData();
-  formData.append('profileImage', file);
-
-  // Obtener token
-  const token = localStorage.getItem('token');
-  if (!token) {
-    return { error: true, message: 'No autenticado' };
-  }
-
-  // Construir URL SIN el parámetro dinámico userId
-  let url = combineUrls(BASE_URL, '/user/profile-image');
-  // url = ensureHttps(url); // Comentado: mantener HTTP para el backend de AWS
-  
-  console.log(`🔄 Subiendo imagen de perfil a: ${url}`);
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        // NO establecer Content-Type, el navegador lo hará con FormData
         'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
       },
-      body: formData
+      credentials: 'include'
     });
 
-    const data = await response.json();
-
     if (!response.ok) {
-      console.error(`❌ Error HTTP ${response.status} al subir imagen perfil:`, data);
-      return { error: true, status: response.status, message: data.message || 'Error del servidor' };
+      throw new Error(`Error al obtener imagen: ${response.status}`);
     }
 
-    console.log("✅ Imagen de perfil subida y usuario actualizado:", data);
-    return data; // Contiene { success: true, message: '...', user: { ... } }
+    const data = await response.json();
+    return { success: true, data };
 
   } catch (error) {
-    console.error('❌ Error en uploadProfileImageAndUpdate:', error);
-    return { error: true, message: error.message || 'Error de red o desconocido' };
+    console.error("❌ Error al obtener imagen de perfil desde servidor:", error);
+    return { success: false, error: error.message };
   }
 };
 
 /**
- * @param {Object} data - Datos de la propiedad.
- * @returns {Promise<Object>}
+ * Sube una imagen para un blog
+ * @param {FormData} formData - FormData con la imagen
+ * @returns {Promise<Object>} - Resultado de la operación
  */
-export const createPropertyPost = async (data) => {
-  console.log('[createPropertyPost] Iniciando creación con datos:', data); // Log al inicio
-  if (!data) {
-    console.error('[createPropertyPost] No data provided');
-    throw new Error('No se proporcionaron datos para crear la propiedad.');
-  }
-
-  // Asegurarse de que las imágenes sean solo un array de URLs (o el formato esperado)
-  if (data.images && Array.isArray(data.images)) {
-    console.log('[createPropertyPost] Enviando imágenes:', data.images);
-  }
-
+export const uploadImageBlog = async (formData) => {
   try {
-    // *** LOG JUSTO ANTES DE LA LLAMADA PROBLEMÁTICA ***
-    const tokenCheckMomentaneo = localStorage.getItem('token');
-    console.log(`[createPropertyPost] TOKEN JUSTO ANTES DE LLAMAR A postData('/api/properties'): ${tokenCheckMomentaneo ? 'EXISTE' : 'NULL'}`);
-    // ***************************************************
+    console.log("Subiendo imagen para blog...");
+    
+    const token = localStorage.getItem('token');
+    const headers = {
+      'Authorization': `Bearer ${token}`
+    };
 
-    // Llamar a postData con ruta correcta del backend AWS
-    const response = await postData('/api/properties', data);
+    const response = await fetch(`${BASE_URL}/blogs/upload`, {
+      method: 'POST',
+      headers: headers,
+      body: formData
+    });
 
-    console.log('[createPropertyPost] Respuesta recibida de postData:', response);
-    if (response && response.error) {
-      // Usar el mensaje de error de postData si existe
-      throw new Error(response.message || 'Error devuelto por postData al crear la propiedad');
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Error al subir imagen de blog:", errorText);
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
     }
-    return response;
+
+    const data = await response.json();
+    
+    if (!data || !data.imageUrl) {
+      throw new Error("No se recibió una URL de imagen válida");
+    }
+
+    console.log("Imagen de blog subida exitosamente:", data);
+    return {
+      src: data.imageUrl,
+      alt: 'Imagen del blog'
+    };
   } catch (error) {
-    console.error('[createPropertyPost] Error detallado:', error);
-    // Asegurarse de relanzar un objeto Error
-    throw new Error(error.message || 'Error desconocido en createPropertyPost');
+    console.error('Error al subir imagen de blog:', error);
+    throw error;
+  }
+};
+
+/**
+ * Sube una imagen de perfil y actualiza el perfil del usuario
+ * @param {string} userId - ID del usuario
+ * @param {File} imageFile - Archivo de imagen
+ * @returns {Promise<Object>} - Resultado de la operación
+ */
+export const uploadProfileImageAndUpdate = async (userId, imageFile) => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No hay token de autenticación disponible');
+    }
+
+    // Crear FormData
+    const formData = new FormData();
+    formData.append('profilePic', imageFile);
+
+    console.log(`Subiendo imagen de perfil para usuario ${userId}...`);
+
+    const response = await fetch(`${BASE_URL}/user/update-profile`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Error al subir imagen:", errorText);
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log("Imagen de perfil subida exitosamente:", data);
+    
+    return data;
+  } catch (error) {
+    console.error('Error en uploadProfileImageAndUpdate:', error);
+    throw error;
   }
 };
 
@@ -1382,70 +1370,42 @@ export const createPropertyPost = async (data) => {
 export const getPropertyPosts = async () => {
   try {
     console.log("Obteniendo propiedades del servidor...");
-    const properties = await fetchAPI('/api/properties'); // Ruta correcta del backend AWS
+    const properties = await fetchAPI('/properties');
     console.log("Propiedades recibidas del servidor:", properties);
     
-    // Verificar la estructura de cada propiedad y corregir las imágenes si es necesario
     if (Array.isArray(properties)) {
-      return properties.map(property => {
-        console.log(`Propiedad ${property._id} - Procesando...`);
-        
-        // Corregir el array de imágenes si es necesario
-        if (!property.images || !Array.isArray(property.images)) {
-          console.log(`Propiedad ${property._id} - Inicializando array de imágenes vacío`);
-          property.images = [];
-        } else {
-          // Filtrar imágenes no válidas
-          property.images = property.images.filter(img => {
-            if (!img || typeof img !== 'object' || !img.src) {
-              return false;
-            }
-            
-            const src = img.src;
-            return typeof src === 'string' && 
-                   src.trim() !== '' && 
-                   src !== '""' && 
-                   src !== '"' && 
-                   src !== "''";
-          });
-        }
-        
-        return property;
-      });
+      return properties;
     }
     
     return [];
   } catch (error) {
     console.error('Error al obtener propiedades:', error);
-    // Devolver array vacío en caso de error
     return [];
   }
 };
 
 /**
  * Elimina una propiedad por su id.
- * @param {string} id - Identificador del property post.
+ * @param {string} id - Identificador de la propiedad.
  * @returns {Promise<Object>}
  */
 export const deletePropertyPost = async (id) => {
   try {
     console.log(`[deletePropertyPost] Eliminando propiedad con ID: ${id}`);
     
-    // Obtener el token del localStorage
     const token = localStorage.getItem('token');
     if (!token) {
       throw new Error('No hay token de autenticación disponible');
     }
-    
-    // Usar ruta correcta del backend AWS
-    const result = await fetchAPI(`/api/properties/${id}`, {
+
+    const result = await fetchAPI(`/properties/${id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`
       }
     });
-    
-    console.log(`[deletePropertyPost] Resultado:`, result);
+
+    console.log("[deletePropertyPost] Resultado:", result);
     return result;
   } catch (error) {
     console.error(`Error al eliminar propiedad ${id}:`, error);
@@ -1454,40 +1414,37 @@ export const deletePropertyPost = async (id) => {
 };
 
 /**
- * Actualiza un property post.
- * @param {string} id - Identificador del property post.
- * @param {Object} data - Datos actualizados del property post.
+ * Crea una nueva propiedad.
+ * @param {Object} data - Datos de la propiedad.
  * @returns {Promise<Object>}
  */
-export const updatePropertyPost = async (id, data) => {
+export const createPropertyPost = async (data) => {
+  console.log("[createPropertyPost] Iniciando creación con datos:", data);
+  
+  if (!data) {
+    console.error("[createPropertyPost] No data provided");
+    throw new Error("No se proporcionaron datos para crear la propiedad.");
+  }
+
+  if (data.images && Array.isArray(data.images)) {
+    console.log("[createPropertyPost] Enviando imágenes:", data.images);
+  }
+
   try {
-    console.log(`[updatePropertyPost] Actualizando propiedad ${id} con datos:`, data);
+    const token = localStorage.getItem('token');
+    console.log("[createPropertyPost] TOKEN JUSTO ANTES DE LLAMAR A postData('/properties'): " + (token ? "EXISTE" : "NULL"));
     
-    if (!id || !data) {
-      throw new Error('ID o datos faltantes para actualizar la propiedad.');
-    }
-
-    // Similar a create, verificar/ajustar el formato de las imágenes si es necesario
-    if (data.images && Array.isArray(data.images)) {
-      console.log('[updatePropertyPost] Enviando imágenes actualizadas:', data.images.length, 'imágenes');
-    }
-
-    // Usar ruta correcta del backend AWS
-    const result = await fetchAPI(`/api/properties/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
-
-    console.log('[updatePropertyPost] Respuesta recibida:', result);
+    const result = await postData('/properties', data);
+    console.log("[createPropertyPost] Respuesta recibida de postData:", result);
     
     if (result && result.error) {
-      throw new Error(result.message || 'Error al actualizar la propiedad');
+      throw new Error(result.message || "Error devuelto por postData al crear la propiedad");
     }
     
     return result;
   } catch (error) {
-    console.error(`Error detallado en updatePropertyPost para ID ${id}:`, error);
-    throw error;
+    console.error("[createPropertyPost] Error detallado:", error);
+    throw new Error(error.message || "Error desconocido en createPropertyPost");
   }
 };
 
@@ -1498,16 +1455,7 @@ export const updatePropertyPost = async (id, data) => {
  */
 export const getPropertyById = async (id) => {
   try {
-    console.log(`[getPropertyById] Obteniendo propiedad con ID: ${id}`);
-    // Usar ruta correcta del backend AWS
-    const result = await fetchAPI(`/api/properties/${id}`);
-    console.log(`[getPropertyById] Resultado recibido:`, {
-      id: result._id || result.id,
-      title: result.title,
-      imagesCount: result.images?.length || 0,
-      hasDescription: !!result.description
-    });
-    return result;
+    return await fetchAPI(`/properties/${id}`);
   } catch (error) {
     console.error(`Error al obtener propiedad ${id}:`, error);
     throw error;
@@ -1515,93 +1463,55 @@ export const getPropertyById = async (id) => {
 };
 
 /**
- * Sube una imagen para un blog.
- * @param {FormData} formData - FormData que contiene la imagen y metadatos
- * @returns {Promise<Object>} - Retorna un objeto con la URL de la imagen
+ * Actualiza una propiedad.
+ * @param {string} id - Identificador de la propiedad.
+ * @param {Object} data - Datos actualizados de la propiedad.
+ * @returns {Promise<Object>}
  */
-export const uploadImageBlog = async (formData) => {
+export const updatePropertyPost = async (id, data) => {
   try {
-    console.log('Subiendo imagen para blog...');
+    console.log(`[updatePropertyPost] Actualizando propiedad ${id} con datos:`, data);
     
-    const result = await fetchAPI('/api/blogs/upload', {
-      method: 'POST',
-      body: formData
+    return await fetchAPI(`/properties/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
     });
-
-    if (!result || !result.imageUrl) {
-      throw new Error('No se recibió una URL de imagen válida del servidor');
-    }
-
-    // Normalizar el resultado para que coincida con el formato esperado
-    return {
-      src: result.imageUrl,
-      alt: formData.get('title') || 'Imagen del blog'
-    };
   } catch (error) {
-    console.error('Error al subir imagen:', error);
+    console.error(`Error al actualizar propiedad ${id}:`, error);
     throw error;
   }
 };
 
 /**
- * Función genérica para subir archivos
- * @param {File} file - Archivo a subir
- * @returns {Promise<Object>} - Promise que se resuelve con la URL del archivo subido
+ * Sube un archivo genérico
+ * @param {FormData} formData - FormData con el archivo
+ * @returns {Promise<Object>} - Resultado de la operación
  */
-export const uploadFile = async (file) => {
+export const uploadFile = async (formData) => {
   try {
-    if (!file) {
-      throw new Error('No se proporcionó ningún archivo');
-    }
-
-    const formData = new FormData();
-    formData.append('image', file);
+    console.log("Subiendo archivo genérico...");
     
     const token = localStorage.getItem('token');
     const headers = {
       'Authorization': `Bearer ${token}`
     };
-    
-    console.log("Token de autorización:", token);
-    console.log("Subiendo archivo genérico a:", `${BASE_URL}/api/properties/upload-image`);
-    
-    const response = await fetch(`${BASE_URL}/api/properties/upload-image`, {
+
+    const response = await fetch(`${BASE_URL}/upload`, {
       method: 'POST',
       headers: headers,
-      body: formData,
-      credentials: 'include'
+      body: formData
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Respuesta de error del servidor:", errorText);
-      console.error("Status:", response.status);
-      console.error("StatusText:", response.statusText);
+      console.error("Error al subir archivo genérico:", errorText);
       throw new Error(`Error ${response.status}: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
-    console.log("Respuesta exitosa del servidor para uploadFile:", data);
+    console.log("Archivo subido exitosamente:", data);
     
-    if (!data.imageUrl && !data.url && !data.secure_url) {
-      throw new Error('No se pudo obtener una URL válida del archivo');
-    }
-    
-    const fileUrl = data.imageUrl || data.url || data.secure_url;
-    
-    // Comentado: No convertir a HTTPS para el backend de AWS sin certificado SSL válido
-    // // Asegurar que la URL devuelta use el mismo protocolo que la página
-    // let processedUrl = fileUrl;
-    // if (isHttps && processedUrl.startsWith('http:')) {
-    //   processedUrl = processedUrl.replace('http://', 'https://');
-    // }
-    
-    return {
-      secure_url: fileUrl, // Usar URL original sin conversión
-      url: fileUrl,
-      imageUrl: fileUrl
-    };
-    
+    return data;
   } catch (error) {
     console.error('Error al subir archivo genérico:', error);
     throw error;

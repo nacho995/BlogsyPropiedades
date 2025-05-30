@@ -1,79 +1,62 @@
-module.exports = async function handler(req, res) {
-  // Configurar headers CORS
+// api/properties.js - Proxy para propiedades
+export default async function handler(req, res) {
+  // Configurar CORS
+  res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
+  );
 
-  // Manejar preflight OPTIONS request
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    res.status(200).end();
+    return;
   }
 
+  const { method, body, query } = req;
+  const backendUrl = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+
   try {
-    // Array de propiedades (inicialmente vacío - se llenará con propiedades reales)
-    const properties = [
-      // Las propiedades se añadirán dinámicamente cuando se creen
-    ];
+    console.log(`Proxy properties: ${method} ${req.url}`);
+    
+    // Preparar headers para el backend
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    };
 
-    switch (req.method) {
-      case 'GET':
-        // Devolver lista de propiedades directamente
-        return res.status(200).json(properties);
-
-      case 'POST':
-        // Verificar autorización para crear propiedad
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-          return res.status(401).json({
-            error: true,
-            message: 'Token de autorización requerido'
-          });
-        }
-
-        const { title, description, price, location, bedrooms, bathrooms, area, type, status } = req.body;
-
-        if (!title || !description || !price || !location) {
-          return res.status(400).json({
-            error: true,
-            message: 'Título, descripción, precio y ubicación son requeridos'
-          });
-        }
-
-        // Simular creación de propiedad
-        const newProperty = {
-          id: Date.now(),
-          title,
-          description,
-          price: Number(price),
-          location,
-          bedrooms: Number(bedrooms) || 1,
-          bathrooms: Number(bathrooms) || 1,
-          area: Number(area) || 50,
-          type: type || 'apartamento',
-          status: status || 'venta',
-          imageUrl: 'https://placekitten.com/800/505',
-          images: ['https://placekitten.com/800/505'],
-          features: [],
-          publishDate: new Date().toISOString().split('T')[0]
-        };
-
-        return res.status(201).json({
-          success: true,
-          property: newProperty
-        });
-
-      default:
-        return res.status(405).json({
-          error: true,
-          message: 'Método no permitido'
-        });
+    // Incluir token de autorización si existe
+    if (req.headers.authorization) {
+      headers['Authorization'] = req.headers.authorization;
     }
 
+    // Construir la ruta del backend
+    let targetPath = '/api/properties';
+    
+    // Manejar rutas específicas
+    if (query.id) {
+      targetPath = `/api/properties/${query.id}`;
+    }
+
+    // Hacer la petición al backend HTTP
+    const response = await fetch(`${backendUrl}${targetPath}`, {
+      method,
+      headers,
+      body: method !== 'GET' && body ? JSON.stringify(body) : undefined
+    });
+
+    const data = await response.json();
+
+    // Retornar la respuesta del backend
+    res.status(response.status).json(data);
+
   } catch (error) {
-    console.error('Error en API properties:', error);
-    return res.status(500).json({
-      error: true,
-      message: 'Error interno del servidor'
+    console.error('Error en proxy de properties:', error);
+    res.status(500).json({ 
+      error: true, 
+      message: 'Error del servidor proxy',
+      details: error.message 
     });
   }
 } 

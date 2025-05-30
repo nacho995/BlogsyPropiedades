@@ -1,4 +1,4 @@
-// api/blogs.js - Proxy para blogs
+// api/auth.js - Proxy para autenticación
 export default async function handler(req, res) {
   // Configurar CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -14,11 +14,11 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { method, body, query } = req;
+  const { method, body } = req;
   const backendUrl = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
 
   try {
-    console.log(`Proxy blogs: ${method} ${req.url}`);
+    console.log(`Proxy auth: ${method} request to backend`);
     
     // Preparar headers para el backend
     const headers = {
@@ -31,21 +31,20 @@ export default async function handler(req, res) {
       headers['Authorization'] = req.headers.authorization;
     }
 
-    // Construir la ruta del backend
-    let targetPath = '/api/blogs';
+    // Determinar la ruta según el método y path
+    let targetPath = '/user/login'; // default
     
-    // Manejar rutas específicas
-    if (query.id) {
-      targetPath = `/api/blogs/${query.id}`;
-    } else if (req.url.includes('/upload')) {
-      targetPath = '/api/blogs/upload';
+    if (req.url === '/api/auth/register') {
+      targetPath = '/user/register';
+    } else if (req.url === '/api/auth/me') {
+      targetPath = '/user/me';
     }
 
     // Hacer la petición al backend HTTP
     const response = await fetch(`${backendUrl}${targetPath}`, {
       method,
       headers,
-      body: method !== 'GET' && body ? JSON.stringify(body) : undefined
+      body: method !== 'GET' ? JSON.stringify(body) : undefined
     });
 
     const data = await response.json();
@@ -54,7 +53,7 @@ export default async function handler(req, res) {
     res.status(response.status).json(data);
 
   } catch (error) {
-    console.error('Error en proxy de blogs:', error);
+    console.error('Error en proxy de auth:', error);
     res.status(500).json({ 
       error: true, 
       message: 'Error del servidor proxy',

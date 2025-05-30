@@ -81,7 +81,7 @@ const DiagnosticPage = () => {
   const checkNetworkStatus = async () => {
     // Determinar si estamos usando HTTPS
     const isHttps = window.location.protocol === 'https:';
-    const API_DOMAIN = 'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
+    const API_DOMAIN = 'nextjs-gozamadrid-qrfk.onrender.com';
     const apiUrl = `${isHttps ? 'https' : 'http'}://${API_DOMAIN}`;
     
     // Lista de endpoints a comprobar

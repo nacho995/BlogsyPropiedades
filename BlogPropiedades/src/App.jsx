@@ -477,7 +477,7 @@ function HomeRoute() {
     try {
       // URL de API actualizada para usar el protocolo correcto
       const isHttps = window.location.protocol === 'https:';
-      const API_DOMAIN = 'api.realestategozamadrid.com';
+      const API_DOMAIN = 'nextjs-gozamadrid-qrfk.onrender.com';
       const apiUrl = `${isHttps ? 'https' : 'http'}://${API_DOMAIN}`;
       
       console.log(`🌐 App usando API en: ${apiUrl}`);

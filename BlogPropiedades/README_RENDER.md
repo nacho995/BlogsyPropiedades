@@ -67,3 +67,34 @@ Si sigues experimentando problemas:
 1. Verifica la consola del navegador para ver errores específicos
 2. Asegúrate de que tu backend responda correctamente a peticiones HTTP
 3. Considera usar una extensión de navegador para deshabilitar temporalmente la seguridad de contenido mixto durante el desarrollo 
+
+# Configuración de Variables de Entorno para Render
+
+## Variables de Entorno Principales
+
+```bash
+VITE_BACKEND_URL=https://nextjs-gozamadrid-qrfk.onrender.com
+VITE_API_URL=https://nextjs-gozamadrid-qrfk.onrender.com
+VITE_API_PUBLIC_API_URL=https://nextjs-gozamadrid-qrfk.onrender.com
+VITE_FALLBACK_API=https://nextjs-gozamadrid-qrfk.onrender.com
+VITE_MAIN_DOMAIN=realestategozamadrid.com
+```
+
+## Build Command
+```bash
+npm run build
+```
+
+## Start Command  
+```bash
+npm run serve
+```
+
+## Variables de Entorno Alternativas (para diferentes dominios)
+
+```bash
+VITE_BACKEND_URL=http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com
+VITE_API_URL=http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com
+VITE_API_PUBLIC_API_URL=http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com
+VITE_FALLBACK_API=http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com
+``` 
