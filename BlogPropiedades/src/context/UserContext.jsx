@@ -422,7 +422,7 @@ export function UserProvider({ children }) {
         // Determinar la imagen final a usar: Priorizar la del userData si existe
         const finalProfileImage = userData.profileImage || 
                                localStorage.getItem("profilePic") || // Fallback a localStorage si no hay en user
-                               fallbackImageBase4;
+                               fallbackImageBase64;
         
         // Actualizar estado con los datos validados del usuario
         setUser({
@@ -434,6 +434,45 @@ export function UserProvider({ children }) {
         
       } catch (error) {
         console.error("[REFRESH_USER_DATA] Error getting/validating profile, calling logout:", error);
+        
+        // SOLUCIÓN DE EMERGENCIA: Si el error contiene "auth/me" o es un 404, 
+        // probablemente es un problema de build/deployment, no cerrar sesión automáticamente
+        const errorMessage = error.message || '';
+        if (errorMessage.includes('auth/me') || errorMessage.includes('Cannot GET /auth/me') || errorMessage.includes('404')) {
+          console.warn("🚨 [EMERGENCY] Detected auth/me error - probably build/deployment issue. Maintaining session with cached data.");
+          
+          // Intentar usar datos almacenados en localStorage
+          const storedEmail = localStorage.getItem('email');
+          const storedName = localStorage.getItem('name');
+          const storedRole = localStorage.getItem('role');
+          const storedImage = localStorage.getItem('profilePic');
+          
+          if (storedEmail && storedName) {
+            console.log("🔄 [EMERGENCY] Using cached user data to maintain session");
+            setUser({
+              email: storedEmail,
+              name: storedName,
+              role: storedRole || 'user',
+              profileImage: storedImage || fallbackImageBase64,
+              _cached: true,
+              _emergencyMode: true
+            });
+            setIsAuthenticated(true);
+            success = true;
+            
+            // Mostrar notificación al usuario sobre el problema temporal
+            window.dispatchEvent(new CustomEvent('temporaryError', {
+              detail: { 
+                message: 'Problema temporal del servidor. Usando datos almacenados.',
+                type: 'warning'
+              }
+            }));
+            
+            return; // No hacer logout
+          }
+        }
+        
+        // Si no es el error específico o no hay datos cached, proceder con logout normal
         await logout(true, 'profile_refresh_error'); // Asegurarse de esperar logout
       }
     } catch (outerError) {
