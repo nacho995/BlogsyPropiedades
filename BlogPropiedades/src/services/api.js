@@ -465,7 +465,7 @@ export const deleteBlogPost = async (id) => {
       throw new Error('No hay token de autenticación disponible');
     }
 
-    return await fetchAPI(`/api/blogs?id=${id}`, {
+    return await fetchAPI(`/api/blogs/${id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`
