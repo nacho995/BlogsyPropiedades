@@ -1,9 +1,9 @@
 {
   "version": "13.0.0",
   "name": "blogpropiedades",
-  "buildDate": "2025-06-02T05:07:09.402Z",
+  "buildDate": "2025-06-02T05:17:12.154Z",
   "environment": "development",
   "apiEndpoint": "No definido",
-  "buildNumber": "1748840829402",
+  "buildNumber": "1748841432155",
   "commitHash": "development"
 }
