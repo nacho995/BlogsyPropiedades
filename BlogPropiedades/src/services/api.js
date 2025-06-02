@@ -109,165 +109,84 @@ const INTERVAL_MS = 2000; // Intervalo de 2 segundos
  * @param {Object} options - Opciones para la petición (method, headers, body, etc.)
  * @returns {Promise<Object>} - Promise que se resuelve con la respuesta en formato JSON
  */
-export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
-  // Crear un controlador de aborto para limitar el tiempo máximo de espera
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, 10000); // 10 segundos de tiempo máximo
+const fetchAPI = async (endpoint, options = {}) => {
+  const { body, headers: customHeaders, ...restOptions } = options;
+  const token = localStorage.getItem('token');
   
+  // HOTFIX: Interceptar llamadas incorrectas a /auth/me y corregirlas
+  let correctedEndpoint = endpoint;
+  if (endpoint === '/auth/me') {
+    console.warn('🚨 HOTFIX: Interceptando llamada incorrecta a /auth/me - corrigiendo a /user/me');
+    correctedEndpoint = '/user/me';
+  }
+  
+  console.log(`[fetchAPI Debug] Endpoint: ${correctedEndpoint}`);
+  console.log(`[fetchAPI Debug] Token from localStorage: ${token ? token.substring(0, 20) + '...' : 'NULL'}`);
+  
+  // Configurar headers por defecto
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    ...customHeaders
+  };
+
+  // Agregar token de autorización si existe y está válido
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  console.log(`[fetchAPI Debug] Final Request Headers:`, Object.keys(headers).reduce((acc, key) => {
+    acc[key] = key === 'Authorization' ? 'Bearer ***...' : headers[key];
+    return acc;
+  }, {}));
+
   try {
-    // Construir la URL completa - MANTENER EL PROTOCOLO ORIGINAL DEL BACKEND
-    let url = combineUrls(BASE_URL, endpoint.startsWith('/') ? endpoint : `/${endpoint}`);
+    let response;
     
-    // *** COMENTAR LA CONVERSIÓN AUTOMÁTICA A HTTPS ***
-    // El backend de AWS no tiene certificado SSL válido, mantener HTTP
-    // if (url.startsWith('http://') && !url.includes('localhost') && !url.includes('127.0.0.1')) {
-    //   // Solo convertir a HTTPS si NO es localhost o IP local
-    //   url = url.replace('http://', 'https://');
-    // }
+    // Determinar si estamos en modo desarrollo o producción
+    const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     
-    console.log(`🔄 Enviando solicitud directa a: ${url}`);
-    
-    // Verificar si estamos en un bucle de solicitudes repetidas
-    if (detectAndPreventLoopError('api_fetch_' + endpoint, 8000, 4)) {
-      console.error(`🛑 Bucle de solicitudes detectado para ${endpoint}. Cancelando operación.`);
-      clearTimeout(timeoutId);
-      
-      // Devolver respuesta vacía para evitar bucles
-      if (endpoint.includes('/blog') || endpoint.includes('/property')) {
-        return [];
-      }
-      
-      return {
-        error: true,
-        message: 'Demasiadas solicitudes repetidas. Intente de nuevo más tarde.'
-      };
+    if (isDevelopment) {
+      console.log(`🔄 Enviando solicitud en desarrollo a: ${BASE_URL}${correctedEndpoint}`);
+      response = await fetch(`${BASE_URL}${correctedEndpoint}`, {
+        ...restOptions,
+        headers,
+        body: body ? body : undefined,
+      });
+    } else {
+      console.log(`🔄 Enviando solicitud directa a: ${BASE_URL}${correctedEndpoint}`);
+      response = await fetch(`${BASE_URL}${correctedEndpoint}`, {
+        ...restOptions,
+        headers,
+        body: body ? body : undefined,
+      });
     }
-    
-    // Preparar las cabeceras
-    const headers = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      ...options.headers
-    };
-    
-    // Incluir token de autenticación si está disponible
-    const token = localStorage.getItem('token');
-    if (token && !headers['Authorization']) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    
-    // Agregar signal a las opciones para el aborto por tiempo
-    const requestOptions = {
-      ...options,
-      headers,
-      signal: controller.signal
-    };
 
-    // *** LOG DE DEPURACIÓN ***
-    console.log(`[fetchAPI Debug] Endpoint: ${endpoint}`);
-    console.log(`[fetchAPI Debug] Token from localStorage: ${token ? token.substring(0, 15) + '...' : 'NULL'}`);
-    console.log('[fetchAPI Debug] Final Request Headers:', JSON.parse(JSON.stringify(requestOptions.headers))); // Clonar para evitar problemas de log
-    // ************************
-
-    // Realizar la petición fetch
-    const response = await fetch(url, requestOptions);
-    
-    // Limpiar el timeout independientemente del resultado
-    clearTimeout(timeoutId);
-    
-    // Clonar la respuesta antes de leerla, para evitar el error "body stream already read"
-    const clonedResponse = response.clone();
-    
-    // Manejar diferentes códigos de estado HTTP
     if (!response.ok) {
-      console.error(`❌ Error HTTP: ${response.status} en ${url}`);
+      console.error(`❌ Error HTTP: ${response.status} en ${BASE_URL}${correctedEndpoint}`);
       
-      // Para 404, retornar un array vacío si el endpoint parece ser una colección de datos
-      if (response.status === 404 && 
-         (endpoint.includes('/blogs') || endpoint.includes('/properties'))) {
-        console.warn(`⚠️ Endpoint ${endpoint} no encontrado, devolviendo array vacío`);
-        return [];
-      }
-      
+      // Intentar parsear la respuesta como JSON para obtener el mensaje de error
+      let errorData;
       try {
-        // Intentar leer el mensaje de error como JSON
-        const errorData = await clonedResponse.json();
-        console.error('Mensaje de error del servidor:', errorData);
-        return { 
+        errorData = await response.json();
+      } catch (parseError) {
+        // Si no es JSON, usar el texto de la respuesta
+        const errorText = await response.text();
+        errorData = { 
           error: true, 
-          status: response.status,
-          message: errorData.message || 'Error del servidor',
-          details: errorData
+          status: response.status, 
+          message: errorText 
         };
-      } catch (e) {
-        // Si no es JSON, leer como texto
-        try {
-          const errorText = await response.text();
-          return { 
-            error: true, 
-            status: response.status,
-            message: errorText || 'Error del servidor sin detalles'
-          };
-        } catch (textError) {
-          // Si todo falla, devolver un error genérico
-          return { 
-            error: true, 
-            status: response.status,
-            message: `Error ${response.status} sin detalles disponibles`
-          };
-        }
-      }
-    }
-    
-    // Procesar respuesta exitosa
-    try {
-      // Si es una respuesta vacía (como en un DELETE exitoso)
-      if (response.status === 204 || response.headers.get('content-length') === '0') {
-        return { success: true };
       }
       
-      // Intentar parsear como JSON
-      const data = await response.json();
-      return data;
-    } catch (parseError) {
-      console.error('Error al parsear respuesta JSON:', parseError);
-      
-      // En caso de error de parseo, intentar leer como texto
-      try {
-        const textData = await clonedResponse.text();
-        if (!textData) return { success: true, message: 'Operación exitosa sin datos' };
-        
-        return {
-          success: true,
-          raw: textData
-        };
-      } catch (finalError) {
-        console.error('Error al obtener texto de respuesta:', finalError);
-        return { 
-          success: true,
-          warning: 'No se pudo leer el contenido de la respuesta'
-        };
-      }
+      throw new Error(errorData.message || `HTTP Error ${response.status}`);
     }
+
+    const data = await response.json();
+    return data;
   } catch (error) {
-    // Limpiar el timeout en caso de error
-    clearTimeout(timeoutId);
-    
-    // Manejar errores específicos
-    if (error.name === 'AbortError') {
-      console.error('⏱️ La solicitud ha sido abortada por timeout');
-      return { error: true, message: 'Timeout de solicitud', timeout: true };
-    }
-    
-    if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-      console.error('🌐 Error de red:', error.message);
-      return { error: true, message: 'Error de conexión con el servidor', network: true };
-    }
-    
-    console.error('❌ Error en fetchAPI:', error);
-    return { error: true, message: error.message || 'Error desconocido' };
+    console.error(`❌ Error en fetchAPI(${correctedEndpoint}):`, error);
+    throw error;
   }
 };
 
@@ -642,6 +561,15 @@ export const getAuthenticatedUser = async () => {
     console.error('Error al obtener usuario autenticado:', error);
     throw error;
   }
+};
+
+/**
+ * Función de compatibilidad para getCurrentUser - redirige a getAuthenticatedUser
+ * @returns {Promise<Object>} - Datos del usuario.
+ */
+export const getCurrentUser = async () => {
+  console.log('🔄 getCurrentUser: Redirigiendo a getAuthenticatedUser con ruta /user/me');
+  return await getAuthenticatedUser();
 };
 
 // Función para obtener el perfil del usuario
