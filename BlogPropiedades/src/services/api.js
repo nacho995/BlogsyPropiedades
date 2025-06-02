@@ -714,7 +714,7 @@ export async function getUserProfile(token) {
     } else {
       // Si fetchAPI indicó un error, devolvió datos inválidos (sin id), o vacío
       const errorMessage = userDataFromApi?.message || 'Failed to fetch valid user profile from API (missing id?)';
-      console.error("getUserProfile: fetchAPI('/auth/me') failed or returned invalid data:", userDataFromApi);
+      console.error("getUserProfile: fetchAPI('/user/me') failed or returned invalid data:", userDataFromApi);
       throw new Error(errorMessage);
     }
 

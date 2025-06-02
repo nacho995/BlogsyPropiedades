@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext, useCallback } from 'react';
-import { loginUser, getCurrentUser } from '../services/api';
+import { loginUser, getAuthenticatedUser } from '../services/api';
 import { jwtDecode } from 'jwt-decode';
 
 // Contexto de autenticación
@@ -146,7 +146,7 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingUser(true);
       
       // Intentar obtener los datos del usuario
-      const userData = await getCurrentUser();
+      const userData = await getAuthenticatedUser();
       
       // Almacenar la respuesta completa para acceso posterior
       localStorage.setItem('userResponse', JSON.stringify(userData));
