@@ -304,69 +304,14 @@ export const createBlogPost = async (data) => {
  * @returns {Promise<Array>}
  */
 export const getBlogPosts = async () => {
+  console.log('Obteniendo blogs del servidor...');
   try {
-    console.log("Obteniendo blogs del servidor...");
-    const blogs = await fetchAPI('/api/blogs');
-    console.log("Blogs recibidos del servidor:", blogs);
-    
-    // Verificar la estructura de cada blog y procesar las imágenes
-    if (Array.isArray(blogs)) {
-      return blogs.map(blog => {
-        console.log(`Blog ${blog._id} - Procesando...`);
-        
-        let processedImages = [];
-        
-        // Procesar imágenes del array images
-        if (blog.images && Array.isArray(blog.images)) {
-          processedImages = blog.images
-            .filter(img => img !== null && img !== undefined)
-            .map(img => {
-              // Si la imagen es un string, convertirla a objeto
-              if (typeof img === 'string') {
-                return { src: img, alt: blog.title || 'Imagen del blog' };
-              }
-              // Si la imagen es un objeto, verificar su estructura
-              if (img && typeof img === 'object') {
-                if (img.url) return { src: img.url, alt: img.alt || blog.title || 'Imagen del blog' };
-                if (img.path) return { src: img.path, alt: img.alt || blog.title || 'Imagen del blog' };
-                if (img.src) return img;
-              }
-              return null;
-            })
-            .filter(img => img !== null && img.src && img.src.trim() !== '');
-        }
-
-        // Procesar imagen principal si existe y no está en el array de imágenes
-        if (blog.image) {
-          let mainImage;
-          if (typeof blog.image === 'string') {
-            mainImage = { src: blog.image, alt: blog.title || 'Imagen principal' };
-          } else if (typeof blog.image === 'object') {
-            mainImage = blog.image.url ? { src: blog.image.url, alt: blog.image.alt || blog.title } :
-                       blog.image.path ? { src: blog.image.path, alt: blog.image.alt || blog.title } :
-                       blog.image.src ? blog.image : null;
-          }
-          
-          if (mainImage && mainImage.src && mainImage.src.trim() !== '') {
-            // Verificar si la imagen principal ya existe en el array
-            const mainImageExists = processedImages.some(img => img.src === mainImage.src);
-            if (!mainImageExists) {
-              processedImages.unshift(mainImage);
-            }
-          }
-        }
-        
-        return {
-          ...blog,
-          images: processedImages
-        };
-      });
-    }
-    
-    return [];
+    const response = await fetchAPI('/api/blogs');
+    console.log('Blogs recibidos del servidor:', response);
+    console.log(`Se obtuvieron ${response?.length || 0} blogs`);
+    return response || [];
   } catch (error) {
     console.error('Error al obtener blogs:', error);
-    // Devolver array vacío en caso de error
     return [];
   }
 };
@@ -1295,19 +1240,11 @@ export const uploadProfileImageAndUpdate = async (userId, imageFile) => {
  */
 export const getProperties = async () => {
   console.log('Obteniendo propiedades del servidor...');
-  
   try {
-    const properties = await fetchAPI('/api/properties');
-    
-    console.log('Propiedades recibidas del servidor:', properties);
-    
-    if (Array.isArray(properties)) {
-      console.log(`Se obtuvieron ${properties.length} propiedades`);
-      return properties;
-    } else {
-      console.warn('La respuesta de propiedades no es un array:', properties);
-      return [];
-    }
+    const response = await fetchAPI('/api/properties');
+    console.log('Propiedades recibidas del servidor:', response);
+    console.log(`Se obtuvieron ${response?.length || 0} propiedades`);
+    return response || [];
   } catch (error) {
     console.error('Error al obtener propiedades:', error);
     return [];
