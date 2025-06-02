@@ -349,10 +349,10 @@ export const deleteBlogPost = async (id) => {
  */
 export const updateBlogPost = async (id, data) => {
   try {
-    console.log(`Enviando PATCH a /api/blogs/${id} con datos:`, data);
+    console.log(`Enviando PUT a /api/blogs/${id} con datos:`, data);
     
     return await fetchAPI(`/api/blogs/${id}`, {
-      method: 'PATCH',
+      method: 'PUT',
       body: JSON.stringify(data)
     });
   } catch (error) {
@@ -1320,7 +1320,7 @@ export const updatePropertyPost = async (id, data) => {
   console.log(`Actualizando propiedad ${id} con datos:`, data);
   try {
     return await fetchAPI(`/api/properties/${id}`, {
-      method: 'PATCH',
+      method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
