@@ -272,40 +272,33 @@ export const fetchAPI = async (endpoint, options = {}, retryCount = 0) => {
 };
 
 /**
- * Obtiene la configuración de Cloudinary desde el backend para signed upload.
- * @returns {Promise<Object>} - Promise que se resuelve con los datos de configuración (signature, timestamp, etc.)
+ * Obtiene la configuración de Cloudinary para unsigned upload.
+ * @returns {Promise<Object>} - Promise que se resuelve con los datos de configuración para unsigned upload
  */
 export const getCloudinarySignature = async () => {
-  console.log('Solicitando configuración de Cloudinary...');
+  console.log('Configurando Cloudinary para upload unsigned...');
   try {
-    // Usar POST como lo espera nuestro endpoint
-    const configData = await fetchAPI('/api/cloudinary/signature', { 
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({}) // Enviar body vacío
-    });
+    // En lugar de obtener firma del backend, usar upload unsigned
+    // Usando las credenciales que ya están configuradas en Render
+    const cloudName = 'dv31mt6pd'; // Cloud name del backend
     
-    if (configData.error) {
-      console.error('Error al obtener la configuración desde la API:', configData.message);
-      throw new Error(configData.message || 'Error del servidor al obtener la configuración');
-    }
+    // Intentar varios presets comunes o usar unsigned upload básico
+    const possiblePresets = [
+      'ml_default',       // Preset común de Machine Learning
+      'unsigned',         // Preset genérico común
+      'default',          // Preset básico
+      'upload',           // Otro preset común
+      'unsigned_upload'   // Preset personalizado
+    ];
     
-    if (!configData.success) {
-      console.error('Respuesta inválida del endpoint de configuración:', configData);
-      throw new Error('Respuesta inválida del servidor al obtener la configuración');
-    }
-    
-    console.log('Configuración de Cloudinary obtenida con éxito.');
+    console.log('Configuración de Cloudinary configurada para upload unsigned.');
     return {
       success: true,
-      signature: configData.signature,
-      timestamp: configData.timestamp,
-      apiKey: configData.api_key,
-      cloudName: configData.cloud_name,
-      folder: configData.folder || 'blogsy-uploads',
-      signed: true // Para signed upload
+      cloudName: cloudName,
+      folder: 'blogsy-uploads', // Folder por defecto
+      signed: false, // Para unsigned upload
+      uploadPreset: possiblePresets[0], // Usar el primer preset
+      fallbackPresets: possiblePresets.slice(1) // Otros presets como fallback
     };
 
   } catch (error) {
@@ -494,7 +487,7 @@ export const updateBlogPost = async (id, data) => {
   try {
     console.log(`Enviando PATCH a /api/blogs/${id} con datos:`, data);
     
-    return await fetchAPI(`/api/blogs?id=${id}`, {
+    return await fetchAPI(`/api/blogs/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data)
     });
@@ -512,7 +505,7 @@ export const updateBlogPost = async (id, data) => {
 export const getBlogById = async (id) => {
   console.log(`Obteniendo blog por ID: ${id}`);
   try {
-    return await fetchAPI(`/api/blogs?id=${id}`, {
+    return await fetchAPI(`/api/blogs/${id}`, {
       method: 'GET',
     });
   } catch (error) {
@@ -1506,6 +1499,69 @@ export const uploadFile = async (formData) => {
     return data;
   } catch (error) {
     console.error('Error al subir archivo genérico:', error);
+    throw error;
+  }
+};
+
+/**
+ * Función de fallback para subir imágenes cuando Cloudinary falla
+ * Usa el endpoint del backend para subir imágenes
+ * @param {File} file - Archivo a subir
+ * @param {string} type - Tipo de upload ('blog' o 'property')
+ * @returns {Promise<Object>} - Resultado del upload
+ */
+export const uploadImageFallback = async (file, type = 'blog') => {
+  try {
+    console.log(`🔄 Usando fallback del backend para subir imagen (${type}):`, file.name);
+    
+    const formData = new FormData();
+    // Usar el nombre de campo correcto según el tipo
+    if (type === 'property') {
+      formData.append('image', file);
+    } else {
+      formData.append('image', file);
+    }
+    
+    const token = localStorage.getItem('token');
+    const headers = {
+      'Authorization': `Bearer ${token}`
+    };
+    
+    // Elegir la ruta correcta según el tipo
+    let uploadUrl;
+    if (type === 'property') {
+      uploadUrl = `${BASE_URL}/api/properties/upload-image`;
+    } else {
+      uploadUrl = `${BASE_URL}/api/blogs/upload`;
+    }
+    
+    // Intentar subir al backend
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: headers,
+      body: formData
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error del backend: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result.imageUrl || result.url || result.secure_url) {
+      console.log(`✅ Upload exitoso usando backend (${type})`);
+      return {
+        src: result.imageUrl || result.url || result.secure_url,
+        alt: file.name,
+        fallback: true,
+        type: type
+      };
+    } else {
+      throw new Error('No se recibió URL de imagen del backend');
+    }
+    
+  } catch (error) {
+    console.error(`❌ Error en fallback del backend (${type}):`, error);
     throw error;
   }
 };

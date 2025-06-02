@@ -19,6 +19,7 @@ export default async function handler(req, res) {
 
   try {
     console.log(`Proxy blogs: ${method} ${req.url}`);
+    console.log('Query params:', query);
     
     // Preparar headers para el backend
     const headers = {
@@ -29,6 +30,7 @@ export default async function handler(req, res) {
     // Incluir token de autorización si existe
     if (req.headers.authorization) {
       headers['Authorization'] = req.headers.authorization;
+      console.log('Authorization header forwarded');
     }
 
     // Construir la ruta del backend
@@ -37,18 +39,25 @@ export default async function handler(req, res) {
     // Manejar rutas específicas
     if (query.id) {
       targetPath = `/api/blogs/${query.id}`;
+      console.log(`Routing to specific blog: ${targetPath}`);
     } else if (req.url.includes('/upload')) {
       targetPath = '/api/blogs/upload';
     }
 
+    const fullUrl = `${backendUrl}${targetPath}`;
+    console.log(`Making request to: ${fullUrl}`);
+
     // Hacer la petición al backend HTTP
-    const response = await fetch(`${backendUrl}${targetPath}`, {
+    const response = await fetch(fullUrl, {
       method,
       headers,
       body: method !== 'GET' && body ? JSON.stringify(body) : undefined
     });
 
     const data = await response.json();
+    
+    console.log(`Backend response status: ${response.status}`);
+    console.log('Backend response data:', data);
 
     // Retornar la respuesta del backend
     res.status(response.status).json(data);

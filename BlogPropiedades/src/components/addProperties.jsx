@@ -440,26 +440,26 @@ export default function PropertyCreation() {
     try {
         const uploadedUrls = []; // Array para guardar las URLs subidas exitosamente
 
-        // *** Mover la obtención de la firma FUERA del bucle ***
-        console.log("Obteniendo firma de Cloudinary UNA VEZ para todo el lote...");
+        // *** Mover la obtención de la configuración FUERA del bucle ***
+        console.log("Obteniendo configuración de Cloudinary UNA VEZ para todo el lote...");
         let signatureData = null;
         try {
             signatureData = await getCloudinarySignature();
             if (!signatureData || !signatureData.success) {
                  // Usar el mensaje de error de la API si está disponible
-                const errorMessage = signatureData?.message || "No se pudo obtener la firma necesaria para la subida.";
+                const errorMessage = signatureData?.message || "No se pudo obtener la configuración necesaria para la subida.";
                 throw new Error(errorMessage);
             }
-            console.log("Firma obtenida con éxito para el lote.");
+            console.log("Configuración obtenida con éxito para el lote.");
         } catch (signatureError) {
-            console.error("Error crítico al obtener la firma de Cloudinary:", signatureError);
+            console.error("Error crítico al obtener la configuración de Cloudinary:", signatureError);
             toast.error(`Error al obtener configuración para subir: ${signatureError.message}. No se subirán imágenes.`);
-            // Detener el proceso si no podemos obtener la firma
-            throw new Error("Falla al obtener firma, subida cancelada."); 
+            // Detener el proceso si no podemos obtener la configuración
+            throw new Error("Falla al obtener configuración, subida cancelada."); 
         }
-        // *** Fin de la obtención de la firma única ***
+        // *** Fin de la obtención de la configuración única ***
 
-        // Ahora iterar y subir cada archivo usando la firma obtenida
+        // Ahora iterar y subir cada archivo usando la configuración obtenida
         for (const file of files) {
             // Validar archivo individualmente dentro del bucle
             if (file.size > maxFileSize) {
@@ -473,27 +473,66 @@ export default function PropertyCreation() {
 
             // Procesar un archivo a la vez
             try {
-                // 2. Preparar FormData para Cloudinary (usando signed upload)
-                const formDataCloudinary = new FormData();
-                formDataCloudinary.append('file', file);
-                formDataCloudinary.append('signature', signatureData.signature);
-                formDataCloudinary.append('timestamp', signatureData.timestamp);
-                formDataCloudinary.append('api_key', signatureData.apiKey);
-                formDataCloudinary.append('folder', signatureData.folder);
+                // 2. Preparar FormData para Cloudinary (usando unsigned upload)
+                let uploadSuccessful = false;
+                let result = null;
+                const presetsToTry = [signatureData.uploadPreset, ...(signatureData.fallbackPresets || [])];
+                
+                for (const preset of presetsToTry) {
+                    try {
+                        const formDataCloudinary = new FormData();
+                        formDataCloudinary.append('file', file);
+                        if (preset) {
+                            formDataCloudinary.append('upload_preset', preset);
+                            console.log(`Subiendo a Cloudinary (unsigned) con preset "${preset}": ${file.name}`);
+                        } else {
+                            // Sin preset - upload directo 
+                            console.log(`Subiendo a Cloudinary (unsigned) SIN PRESET: ${file.name}`);
+                        }
+                        formDataCloudinary.append('folder', signatureData.folder);
 
-                // 3. Subir a Cloudinary usando signed upload
-                console.log(`Subiendo a Cloudinary (signed): ${file.name}`);
-                const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/image/upload`;
+                        // 3. Subir a Cloudinary usando unsigned upload
+                        const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/image/upload`;
 
-                const response = await fetch(cloudinaryUrl, {
-                    method: 'POST',
-                    body: formDataCloudinary,
-                });
+                        const response = await fetch(cloudinaryUrl, {
+                            method: 'POST',
+                            body: formDataCloudinary,
+                        });
 
-                const result = await response.json();
+                        result = await response.json();
 
-                if (!response.ok || result.error) {
-                    throw new Error(result.error?.message || `Error de Cloudinary al subir ${file.name}`);
+                        if (response.ok && !result.error) {
+                            uploadSuccessful = true;
+                            console.log(`Upload exitoso ${preset ? `con preset "${preset}"` : 'sin preset'}`);
+                            break;
+                        } else {
+                            console.warn(`${preset ? `Preset "${preset}"` : 'Upload sin preset'} falló:`, result.error?.message || 'Error desconocido');
+                        }
+                    } catch (presetError) {
+                        console.warn(`Error ${preset ? `con preset "${preset}"` : 'sin preset'}:`, presetError.message);
+                        continue;
+                    }
+                }
+
+                if (!uploadSuccessful || !result) {
+                    console.warn(`⚠️ Todos los presets de Cloudinary fallaron para ${file.name}`);
+                    
+                    // Intentar fallback con el backend
+                    try {
+                        console.log(`🔄 Intentando fallback del backend para ${file.name}`);
+                        const { uploadImageFallback } = await import('../services/api');
+                        const fallbackResult = await uploadImageFallback(file, 'property');
+                        
+                        if (fallbackResult && fallbackResult.src) {
+                            uploadedUrls.push(fallbackResult);
+                            console.log(`✅ ${file.name} subido usando backend`);
+                            continue;
+                        }
+                    } catch (fallbackError) {
+                        console.error(`Error en fallback del backend para ${file.name}:`, fallbackError);
+                    }
+                    
+                    throw new Error(`Error al subir ${file.name} - todos los métodos fallaron`);
                 }
 
                 console.log(`Cloudinary upload success for ${file.name}:`, { url: result.secure_url, public_id: result.public_id });

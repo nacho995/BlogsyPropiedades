@@ -12,18 +12,18 @@ module.exports = async function handler(req, res) {
   try {
     const API_BASE = 'http://gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com';
     
-    // Obtener el ID de la propiedad desde la query
+    // Obtener el ID del blog desde la query
     const { id } = req.query;
     
     if (!id) {
       return res.status(400).json({
         error: true,
-        message: 'ID de propiedad requerido'
+        message: 'ID de blog requerido'
       });
     }
     
     // Construir URL del backend real
-    let backendUrl = `${API_BASE}/api/properties/${id}`;
+    let backendUrl = `${API_BASE}/api/blogs/${id}`;
     
     // Pasar query parameters adicionales si existen
     const queryParams = Object.keys(req.query)
@@ -37,7 +37,7 @@ module.exports = async function handler(req, res) {
     
     console.log(`Proxy request to: ${backendUrl}`);
     console.log(`Method: ${req.method}`);
-    console.log(`Property ID: ${id}`);
+    console.log(`Blog ID: ${id}`);
     
     // Preparar headers para el backend
     const headers = {
@@ -74,7 +74,7 @@ module.exports = async function handler(req, res) {
     return res.status(response.status).json(data);
     
   } catch (error) {
-    console.error('Error en proxy a backend para propiedad individual:', error);
+    console.error('Error en proxy a backend para blog individual:', error);
     return res.status(500).json({
       error: true,
       message: 'Error al conectar con el backend',
