@@ -6,6 +6,10 @@ import "./index.css";
 // Importamos el interceptor para corregir URLs de API incorrectas
 import "./interceptors/fetchInterceptor";
 
+// Importamos y registramos el Service Worker para interceptar peticiones fetch a nivel del navegador
+import * as serviceWorkerRegistration from './serviceWorkerRegistration';
+serviceWorkerRegistration.register();
+
 // Solución para errores TDZ (Temporal Dead Zone)
 const y = {};
 const wi = {};
