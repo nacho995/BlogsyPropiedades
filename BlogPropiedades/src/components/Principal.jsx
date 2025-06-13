@@ -2,6 +2,10 @@ import React, { useState, useEffect, useMemo, useRef, Suspense, lazy } from "rea
 import { Link, useNavigate } from "react-router-dom"; // Replace useHistory with useNavigate
 import { useUser } from "../context/UserContext";
 import { motion } from "framer-motion";
+import { FiMapPin, FiCamera, FiHome, FiTrendingUp, FiChevronRight, FiClock, FiUsers, FiStar, FiPlay, FiSearch, FiFilter, FiHeart, FiPhone, FiMail, FiMessageCircle, FiInstagram, FiTwitter } from 'react-icons/fi';
+import { getProperties, getBlogPosts } from '../services/api';
+import { toast } from 'sonner';
+import { formatPrice } from '../utils';
 
 // Definimos las constantes y funciones que antes estaban en utils/imageUtils
 const fallbackImageBase64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNlMWUxZTEiLz48dGV4dCB4PSI1MCIgeT0iNTAiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGFsaWdubWVudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZmlsbD0iIzg4OCI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4=';
@@ -626,7 +630,7 @@ function Principal() {
                       </div>
                       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-blue-900 to-transparent p-4">
                         <div className="text-white font-bold text-xl">
-                          {new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(property.price || 0)}
+                          {formatPrice(property.price)}
                         </div>
                       </div>
                     </div>

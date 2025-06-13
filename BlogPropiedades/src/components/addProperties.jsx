@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { parsePrice, formatPricePreview } from '../utils';
 
 // Inyecta global CSS para la animación de shake (puedes moverlo a tu archivo global si lo prefieres)
 const globalStyles = `
@@ -308,10 +309,25 @@ export default function PropertyCreation() {
   // Manejar cambios en los campos del formulario
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value
-    });
+    
+    // Manejar el precio de forma especial para permitir separadores de miles
+    if (name === 'price') {
+      const processedValue = parsePrice(value);
+      setFormData({
+        ...formData,
+        [name]: processedValue
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value
+      });
+    }
+  };
+  
+  // Función para formatear el precio visualmente
+  const formatPriceDisplay = (price) => {
+    return formatPricePreview(price);
   };
   
   // Manejar cambios en el editor de descripción
@@ -838,15 +854,25 @@ export default function PropertyCreation() {
                 <FiDollarSign className="inline mr-2" />
                 Precio (€)
               </label>
-              <input
-                type="number"
-                name="price"
-                value={formData.price}
-                onChange={handleChange}
-                className="w-full border-2 border-blue-200 p-3 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 transition"
-                placeholder="Ej: 250000"
-                required
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  name="price"
+                  value={formData.price}
+                  onChange={handleChange}
+                  className="w-full border-2 border-blue-200 p-3 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 transition pr-4"
+                  placeholder="Ej: 2000000 o 2.000.000"
+                  required
+                />
+                {formData.price && (
+                  <div className="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded border">
+                    <span className="font-medium">Vista previa: </span>
+                    <span className="text-blue-600 font-semibold">
+                      {formatPriceDisplay(formData.price)} €
+                    </span>
+                  </div>
+                )}
+              </div>
             </motion.div>
             
             <motion.div variants={fadeIn} className="mb-6">

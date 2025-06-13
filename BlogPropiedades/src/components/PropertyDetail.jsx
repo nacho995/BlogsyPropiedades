@@ -6,6 +6,7 @@ import { getPropertyById, updatePropertyPost, uploadFile } from "../services/api
 import { useUser } from "../context/UserContext";
 import { FiMapPin, FiMaximize, FiDollarSign, FiHome, FiLayers, FiDroplet } from 'react-icons/fi';
 import { toast } from 'sonner';
+import { formatPrice } from '../utils';
 
 export default function PropertyDetail() {
   const { id } = useParams();
@@ -435,9 +436,7 @@ export default function PropertyDetail() {
               
               <div className="mt-4 md:mt-0 flex flex-col md:items-end">
                 <div className="text-2xl sm:text-3xl font-bold text-blue-600 mb-2">
-                  {typeof property.price === 'number' 
-                    ? new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(property.price)
-                    : property.price}
+                  {formatPrice(property.price)}
                 </div>
                 <span className="inline-block bg-indigo-100 text-indigo-800 text-xs font-semibold px-2.5 py-0.5 rounded">
                   {property.status || 'En venta'}

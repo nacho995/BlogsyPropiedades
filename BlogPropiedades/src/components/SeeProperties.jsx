@@ -5,6 +5,7 @@ import { deletePropertyPost, getProperties } from '../services/api';
 import { FiHome, FiMapPin, FiDollarSign, FiMaximize, FiEye, FiEdit, FiTrash2 } from 'react-icons/fi';
 import { UserContext } from '../context/UserContext';
 import { toast } from 'sonner';
+import { formatPrice } from '../utils';
 
 export default function SeeProperties() {
     const [property, setProperty] = useState([]);
@@ -219,7 +220,7 @@ export default function SeeProperties() {
                                         </div>
                                         <div className="flex items-center">
                                             <FiDollarSign className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                                            <span>{prop.price}</span>
+                                            <span>{formatPrice(prop.price)}</span>
                                         </div>
                                     </div>
 
