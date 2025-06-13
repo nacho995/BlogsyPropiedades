@@ -6,7 +6,6 @@ import { getPropertyById, updatePropertyPost, uploadFile } from "../services/api
 import { useUser } from "../context/UserContext";
 import { FiMapPin, FiMaximize, FiDollarSign, FiHome, FiLayers, FiDroplet } from 'react-icons/fi';
 import { toast } from 'sonner';
-import { formatPrice } from '../utils';
 
 export default function PropertyDetail() {
   const { id } = useParams();
@@ -33,67 +32,36 @@ export default function PropertyDetail() {
         // Normalizar el formato de las imágenes
         let propertyImages = [];
         
-        // Primero verificar si ya viene con imágenes en el formato correcto
-        if (data.images && Array.isArray(data.images) && data.images.length > 0) {
-          console.log("Procesando imágenes del array principal:", data.images.length, "imágenes");
-          
-          propertyImages = data.images.map((img, index) => {
-            // Si ya es un objeto con src
-            if (typeof img === 'object' && img.src) {
-              return {
-                src: img.src,
-                alt: img.alt || `Imagen ${index + 1} de ${data.title || 'la propiedad'}`
-              };
-            }
-            // Si es solo una URL string
-            else if (typeof img === 'string') {
-              return {
-                src: img,
-                alt: `Imagen ${index + 1} de ${data.title || 'la propiedad'}`
-              };
-            }
-            return null;
-          }).filter(img => img !== null && img.src);
+        // Manejar imagen principal
+        if (data.image && typeof data.image === 'object' && data.image.src) {
+          propertyImages.push(data.image);
+          console.log("Imagen principal añadida:", data.image);
+        } else if (data.image && typeof data.image === 'string') {
+          propertyImages.push({ src: data.image, alt: "Imagen principal" });
         }
         
-        // Si no hay imágenes aún, intentar con imagen principal
-        if (propertyImages.length === 0 && data.image) {
-          console.log("No hay imágenes en array, intentando con imagen principal");
-          if (typeof data.image === 'object' && data.image.src) {
-            propertyImages.push({
-              src: data.image.src,
-              alt: data.image.alt || `Imagen principal de ${data.title || 'la propiedad'}`
-            });
-          } else if (typeof data.image === 'string') {
-            propertyImages.push({
-              src: data.image,
-              alt: `Imagen principal de ${data.title || 'la propiedad'}`
-            });
-          }
+        // Manejar imágenes adicionales
+        if (data.images && Array.isArray(data.images)) {
+          console.log("Imágenes adicionales encontradas:", data.images);
+          const additionalImages = data.images.map(img => {
+            if (typeof img === 'string') {
+              return { src: img, alt: "Imagen de la propiedad" };
+            } else if (typeof img === 'object' && img.src) {
+              return img;
+            }
+            return null;
+          }).filter(img => img !== null);
+          
+          console.log("Imágenes adicionales procesadas:", additionalImages);
+          propertyImages = [...propertyImages, ...additionalImages];
         }
         
         const formattedData = {
           ...data,
-          images: propertyImages,
-          // Asegurar que los campos numéricos se muestren correctamente
-          price: data.price || 0,
-          bedrooms: data.bedrooms || data.rooms || 0,
-          bathrooms: data.bathrooms || data.wc || 0,
-          area: data.area || data.m2 || 0,
-          m2: data.m2 || data.area || 0,
-          // Asegurar que la ubicación esté disponible
-          address: data.address || data.location || 'Ubicación no especificada',
-          location: data.location || data.address || 'Ubicación no especificada'
+          images: propertyImages
         };
         
-        console.log("Propiedad formateada:", {
-          title: formattedData.title,
-          imagesCount: formattedData.images.length,
-          featuresCount: formattedData.features?.length || 0,
-          price: formattedData.price,
-          description: formattedData.description ? 'Presente' : 'Faltante'
-        });
-        
+        console.log("Propiedad formateada con todas las imágenes:", formattedData);
         setProperty(formattedData);
         setEditedProperty(formattedData);
       } catch (error) {
@@ -436,7 +404,9 @@ export default function PropertyDetail() {
               
               <div className="mt-4 md:mt-0 flex flex-col md:items-end">
                 <div className="text-2xl sm:text-3xl font-bold text-blue-600 mb-2">
-                  {formatPrice(property.price)}
+                  {typeof property.price === 'number' 
+                    ? new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(property.price)
+                    : property.price}
                 </div>
                 <span className="inline-block bg-indigo-100 text-indigo-800 text-xs font-semibold px-2.5 py-0.5 rounded">
                   {property.status || 'En venta'}
@@ -484,58 +454,6 @@ export default function PropertyDetail() {
                 dangerouslySetInnerHTML={{ __html: property.description }}
               ></div>
             </div>
-            
-            {/* Características/Features */}
-            {property.features && property.features.length > 0 && (
-              <div className="mb-6">
-                <h2 className="text-xl font-bold text-gray-800 mb-3">Características</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {property.features.map((feature, index) => (
-                    <div 
-                      key={index}
-                      className="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200"
-                    >
-                      <svg 
-                        className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span className="text-sm font-medium text-gray-700">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* Información adicional */}
-            {(property.location || property.propertyType) && (
-              <div className="mb-6">
-                <h2 className="text-xl font-bold text-gray-800 mb-3">Información adicional</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {property.location && (
-                    <div className="flex items-center p-3 bg-blue-50 rounded-lg">
-                      <FiMapPin className="h-5 w-5 text-blue-500 mr-2" />
-                      <div>
-                        <span className="text-xs text-gray-500 block">Ubicación</span>
-                        <span className="font-medium text-gray-700">{property.location}</span>
-                      </div>
-                    </div>
-                  )}
-                  {property.propertyType && (
-                    <div className="flex items-center p-3 bg-green-50 rounded-lg">
-                      <FiHome className="h-5 w-5 text-green-500 mr-2" />
-                      <div>
-                        <span className="text-xs text-gray-500 block">Tipo de operación</span>
-                        <span className="font-medium text-gray-700">{property.propertyType}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
             
             {/* Acciones */}
             <div className="flex flex-wrap gap-3 mt-6">

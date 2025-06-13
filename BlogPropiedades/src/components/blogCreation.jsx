@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { createBlogPost, uploadImageBlog, getBlogById, updateBlogPost, getCloudinarySignature, uploadImageFallback } from '../services/api';
+import { createBlogPost, uploadImageBlog, getBlogById, updateBlogPost, getCloudinarySignature } from '../services/api';
 import { useUser } from '../context/UserContext';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
@@ -1487,18 +1487,18 @@ export default function BlogCreation() {
     const maxFileSize = 5 * 1024 * 1024; // 5MB
     const uploadedUrls = [];
 
-    // Obtener configuración una vez para todo el lote
-    console.log('Obteniendo configuración de Cloudinary UNA VEZ para todo el lote...');
+    // Obtener firma una vez para todo el lote
+    console.log('Obteniendo firma de Cloudinary UNA VEZ para todo el lote...');
     let signatureData;
     try {
       signatureData = await getCloudinarySignature();
       if (!signatureData || !signatureData.success) {
-        const msg = signatureData?.message || 'No se pudo obtener la configuración para la subida';
+        const msg = signatureData?.message || 'No se pudo obtener la firma para la subida';
         throw new Error(msg);
       }
-      console.log('Configuración obtenida con éxito para el lote.');
+      console.log('Firma obtenida con éxito para el lote.');
     } catch (sigError) {
-      console.error('Error al obtener configuración de Cloudinary:', sigError);
+      console.error('Error al obtener firma de Cloudinary:', sigError);
       toast.error(`Error al configurar subida: ${sigError.message}`);
       setUploadingImage(false);
       return;
@@ -1517,64 +1517,20 @@ export default function BlogCreation() {
       try {
         const formDataCloudinary = new FormData();
         formDataCloudinary.append('file', file);
-        
-        // Intentar upload con el preset principal primero
-        let uploadSuccessful = false;
-        let result = null;
-        const presetsToTry = [signatureData.uploadPreset, ...(signatureData.fallbackPresets || [])];
-        
-        for (const preset of presetsToTry) {
-          try {
-            // Limpiar FormData y volver a crear para cada intento
-            const formData = new FormData();
-            formData.append('file', file);
-            if (preset) {
-              formData.append('upload_preset', preset);
-              console.log(`Subiendo a Cloudinary (unsigned) con preset "${preset}": ${file.name}`);
-            } else {
-              // Sin preset - upload directo (requiere que la cuenta permita uploads unsigned sin preset)
-              console.log(`Subiendo a Cloudinary (unsigned) SIN PRESET: ${file.name}`);
-            }
-            formData.append('folder', signatureData.folder);
-            
-            const uploadUrl = `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/image/upload`;
-            const resp = await fetch(uploadUrl, { method: 'POST', body: formData });
-            result = await resp.json();
-            
-            if (resp.ok && !result.error) {
-              uploadSuccessful = true;
-              console.log(`Upload exitoso ${preset ? `con preset "${preset}"` : 'sin preset'}`);
-              break;
-            } else {
-              console.warn(`${preset ? `Preset "${preset}"` : 'Upload sin preset'} falló:`, result.error?.message || 'Error desconocido');
-            }
-          } catch (presetError) {
-            console.warn(`Error ${preset ? `con preset "${preset}"` : 'sin preset'}:`, presetError.message);
-            continue;
-          }
+        formDataCloudinary.append('api_key', signatureData.apiKey);
+        formDataCloudinary.append('timestamp', signatureData.timestamp);
+        formDataCloudinary.append('signature', signatureData.signature);
+        formDataCloudinary.append('folder', signatureData.folder);
+        if (signatureData.transformation) {
+          formDataCloudinary.append('transformation', signatureData.transformation);
         }
-        
-        if (!uploadSuccessful || !result) {
-          console.warn(`⚠️ Todos los presets de Cloudinary fallaron para ${file.name}`);
-          
-          // Intentar fallback con el backend
-          try {
-            console.log(`🔄 Intentando fallback del backend para ${file.name}`);
-            const { uploadImageFallback } = await import('../services/api');
-            const fallbackResult = await uploadImageFallback(file, 'blog');
-            
-            if (fallbackResult && fallbackResult.src) {
-              uploadedUrls.push(fallbackResult);
-              toast.success(`${file.name} subido correctamente (usando backend).`);
-              continue;
-            }
-          } catch (fallbackError) {
-            console.error(`Error en fallback del backend para ${file.name}:`, fallbackError);
-          }
-          
-          throw new Error(`Error al subir ${file.name} - todos los métodos fallaron`);
+        console.log(`Subiendo a Cloudinary: ${file.name}`);
+        const uploadUrl = `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/image/upload`;
+        const resp = await fetch(uploadUrl, { method: 'POST', body: formDataCloudinary });
+        const result = await resp.json();
+        if (!resp.ok || result.error) {
+          throw new Error(result.error?.message || `Error al subir ${file.name}`);
         }
-        
         uploadedUrls.push({ src: result.secure_url, alt: file.name, publicId: result.public_id });
         toast.success(`${file.name} subido correctamente.`);
       } catch (upErr) {
