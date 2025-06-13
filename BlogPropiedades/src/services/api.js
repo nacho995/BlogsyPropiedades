@@ -70,10 +70,10 @@ const isLocalDevelopment = typeof window !== 'undefined' && (
   window.location.hostname === '127.0.0.1'
 );
 
-// SOLUCIÓN DEFINITIVA: Usar la URL directa del backend en Render
+// SOLUCIÓN DEFINITIVA: Usar el dominio correcto para cada entorno
 const API_DOMAIN = isLocalDevelopment 
   ? 'localhost:5173'  // Servidor de desarrollo local
-  : 'nextjs-gozamadrid-qrfk.onrender.com';  // Backend en Render
+  : 'blogs.realestategozamadrid.com';  // Dominio de producción
 
 // Usar HTTP para localhost, HTTPS para producción
 export const BASE_URL = isLocalDevelopment 
