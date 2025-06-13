@@ -3,17 +3,42 @@
 
 const OLD_DOMAIN = 'nextjs-gozamadrid-qrfk.onrender.com';
 const NEW_DOMAIN = 'blogs.realestategozamadrid.com';
+const VERSION = '1.0.2'; // Versión para control de actualizaciones
+
+// Almacenamos la versión para evitar múltiples recargas
+const CACHE_NAME = 'api-fix-cache-v2';
 
 // Activar el service worker tan pronto como se instale
 self.addEventListener('install', (event) => {
-  console.log('🚀 [SW-FINAL] Service Worker instalado');
-  self.skipWaiting(); // No esperar, activarse inmediatamente
+  console.log(`🚀 [SW-FINAL] Service Worker instalado (${VERSION})`);
+  
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => {
+      // Guardar versión en cache para control de actualizaciones
+      return cache.put('version', new Response(VERSION));
+    })
+  );
+  
+  // No forzar activación - permitir que el navegador lo controle
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('✅ [SW-FINAL] Service Worker activado');
-  // Tomar control de todas las pestañas abiertas sin recargar
-  event.waitUntil(clients.claim());
+  console.log(`✅ [SW-FINAL] Service Worker activado (${VERSION})`);
+  
+  // Limpiar cachés antiguas
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.filter(cacheName => {
+          return cacheName.startsWith('api-fix-cache-') && cacheName !== CACHE_NAME;
+        }).map(cacheName => {
+          return caches.delete(cacheName);
+        })
+      );
+    })
+  );
+  
+  // No forzamos claims() para evitar recargas en bucle
 });
 
 // Interceptar TODAS las solicitudes de red

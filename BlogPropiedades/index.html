@@ -1,21 +1,105 @@
 <!DOCTYPE html>
 <html lang="es">
   <head>
+    <!-- ANTI-CICLO: Debe ser el primer script -->
+    <script>
+      // Detectar y romper ciclo de recargas
+      var reloadLoopDetected = false;
+      var lastReloadTime = localStorage.getItem('lastReloadTime');
+      var now = Date.now();
+      
+      // Si hay muchas recargas en poco tiempo, es un ciclo
+      if (lastReloadTime && (now - parseInt(lastReloadTime) < 3000)) {
+        var cycleCounter = parseInt(localStorage.getItem('reloadCycleCounter') || '0') + 1;
+        localStorage.setItem('reloadCycleCounter', cycleCounter);
+        
+        if (cycleCounter > 2) {
+          reloadLoopDetected = true;
+          console.warn('⚠️ [EMERGENCY] Ciclo de recargas detectado! Desactivando Service Worker...');
+          
+          // Detener inmediatamente las recargas
+          if ('serviceWorker' in navigator) {
+            // Bloquear actualizaciones de Service Worker
+            localStorage.setItem('swDisabled', 'true');
+            // Unregister para romper el ciclo
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              for(let reg of regs) { reg.unregister(); }
+              console.log('🚫 [EMERGENCY] Service Workers desregistrados para romper el ciclo');
+            });
+          }
+          
+          // Mostrar mensaje solo una vez
+          if (!localStorage.getItem('notificationShown')) {
+            localStorage.setItem('notificationShown', 'true');
+            alert('Se ha detectado un bucle de recargas. Se han desactivado los Service Workers para resolver el problema.');
+          }
+        }
+      } else {
+        // Reiniciar contador si no está en un ciclo
+        localStorage.setItem('reloadCycleCounter', '0');
+      }
+      
+      // Actualizar timestamp para la próxima comparación
+      localStorage.setItem('lastReloadTime', now);
+      
+      // Si estamos en un ciclo, cancelar registro de SW
+      if (reloadLoopDetected || localStorage.getItem('swDisabled') === 'true') {
+        // Deshabilitar todo el código relacionado con Service Workers
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register = function() {
+            console.log('🚫 [EMERGENCY] Registro de Service Worker bloqueado por ciclo detectado');
+            return Promise.resolve({scope: '/'});
+          };
+        }
+      }
+      
+      // Prevenir diálogos de actualización
+      addEventListener('beforeunload', function() {
+        localStorage.setItem('notificationShown', 'true');
+      });
+    </script>
     <!-- REGISTRAR SERVICE WORKER INMEDIATAMENTE -->
     <script>
-      // Registrar Service Worker antes que cualquier otra cosa
+      // Variable para controlar si ya hemos mostrado la notificación
+      var notificationShown = false;
+      
+      // Registrar Service Worker sin forzar actualizaciones
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw-final.js', {scope: '/'}).then(function(reg) {
-          console.log('🔥 [ULTRA-FIX] Service Worker registrado inmediatamente', reg.scope);
-          // Forzar actualización y activación
-          reg.update();
-          if (reg.waiting) reg.waiting.postMessage({type: 'SKIP_WAITING'});
-        }).catch(function(error) {
-          console.error('❌ [ULTRA-FIX] Error registrando Service Worker:', error);
+        // Primero intentamos desregistrar cualquier Service Worker previo
+        navigator.serviceWorker.getRegistration().then(function(registration) {
+          if (registration) {
+            console.log('📢 [ULTRA-FIX] Service Worker previo encontrado, intentando actualizar sin recargas...');
+            // Continuar con el registro del nuevo SW
+            registerServiceWorker();
+          } else {
+            console.log('📢 [ULTRA-FIX] No hay Service Worker previo, registrando uno nuevo...');
+            registerServiceWorker();
+          }
         });
+        
+        function registerServiceWorker() {
+          navigator.serviceWorker.register('/sw-final.js', {scope: '/', updateViaCache: 'none'}).then(function(reg) {
+            console.log('🔥 [ULTRA-FIX] Service Worker registrado correctamente', reg.scope);
+            
+            // No forzamos actualización ni SKIP_WAITING para evitar ciclos
+            
+            // Mostrar alerta solo una vez cuando hay una actualización disponible
+            if (reg.waiting && !notificationShown) {
+              notificationShown = true;
+              // La notificación la manejará el navegador automáticamente
+            }
+          }).catch(function(error) {
+            console.error('❌ [ULTRA-FIX] Error registrando Service Worker:', error);
+          });
+        }
       } else {
         console.warn('⚠️ [ULTRA-FIX] Service Workers no soportados');
       }
+      
+      // Evitar ciclos de actualización
+      window.addEventListener('beforeunload', function() {
+        notificationShown = true; // Recordar que ya mostramos una notificación
+      });
     </script>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
