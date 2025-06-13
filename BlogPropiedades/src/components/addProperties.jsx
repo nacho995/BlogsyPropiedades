@@ -370,7 +370,8 @@ export default function PropertyCreation() {
   
   // Eliminar una imagen específica
   const removeImage = (index) => {
-    setPreviewImages(prev => prev.filter((_, i) => i !== index));
+    // Usar setUploadedImages en vez de setPreviewImages
+    setUploadedImages(prev => prev.filter((_, i) => i !== index));
     setFormData(prevData => ({
       ...prevData,
       images: prevData.images.filter((_, i) => i !== index)
