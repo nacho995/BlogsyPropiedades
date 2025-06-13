@@ -1,6 +1,22 @@
 <!DOCTYPE html>
 <html lang="es">
   <head>
+    <!-- REGISTRAR SERVICE WORKER INMEDIATAMENTE -->
+    <script>
+      // Registrar Service Worker antes que cualquier otra cosa
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw-final.js', {scope: '/'}).then(function(reg) {
+          console.log('🔥 [ULTRA-FIX] Service Worker registrado inmediatamente', reg.scope);
+          // Forzar actualización y activación
+          reg.update();
+          if (reg.waiting) reg.waiting.postMessage({type: 'SKIP_WAITING'});
+        }).catch(function(error) {
+          console.error('❌ [ULTRA-FIX] Error registrando Service Worker:', error);
+        });
+      } else {
+        console.warn('⚠️ [ULTRA-FIX] Service Workers no soportados');
+      }
+    </script>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
