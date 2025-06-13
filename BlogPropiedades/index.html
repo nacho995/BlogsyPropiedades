@@ -7,6 +7,97 @@
     <title>Blog y Propiedades - GozaMadrid</title>
     <meta name="description" content="Portal para la publicación de blogs y propiedades de Madrid">
     
+    <!-- PARCHE DE EMERGENCIA DIRECTAMENTE EN EL HTML -->
+    <script>
+      // Este script se ejecuta inmediatamente, antes que cualquier otro recurso o JS
+      (function() {
+        console.log('🚨 [EMERGENCY-FIX] Activando parcheo directo de emergencia');
+        
+        // Variables de configuración
+        const OLD_DOMAIN = 'nextjs-gozamadrid-qrfk.onrender.com';
+        const NEW_DOMAIN = 'blogs.realestategozamadrid.com';
+        
+        // Interceptor de XMLHttpRequest (afecta a código compilado)
+        const originalXHROpen = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function(method, url, ...args) {
+          // Solo procesamos strings y URLs que contengan el dominio antiguo
+          if (typeof url === 'string') {
+            if (url.includes(OLD_DOMAIN)) {
+              // Reemplazar cualquier URL al dominio antiguo
+              let newUrl = url.replace(OLD_DOMAIN, NEW_DOMAIN);
+              
+              // Corregir rutas específicas
+              if (newUrl.includes('/blogs') && !newUrl.includes('/api/blogs')) {
+                newUrl = newUrl.replace('/blogs', '/api/blogs');
+              }
+              if (newUrl.includes('/properties') && !newUrl.includes('/api/properties')) {
+                newUrl = newUrl.replace('/properties', '/api/properties');
+              }
+              if (newUrl.includes('/user/profile-image') && !newUrl.includes('/api/user/profile-image')) {
+                newUrl = newUrl.replace('/user/profile-image', '/api/user/profile-image');
+              }
+              if (newUrl.includes('/auth/me')) {
+                newUrl = newUrl.replace('/auth/me', '/api/user/me');
+              }
+              
+              console.log(`🔧 [EMERGENCY-FIX] XHR: ${url} → ${newUrl}`);
+              return originalXHROpen.call(this, method, newUrl, ...args);
+            }
+          }
+          return originalXHROpen.apply(this, arguments);
+        };
+        
+        // Interceptor de fetch (afecta a código más moderno)
+        const originalFetch = window.fetch;
+        window.fetch = function(url, options = {}) {
+          if (typeof url === 'string') {
+            if (url.includes(OLD_DOMAIN)) {
+              // Reemplazar cualquier URL al dominio antiguo
+              let newUrl = url.replace(OLD_DOMAIN, NEW_DOMAIN);
+              
+              // Corregir rutas específicas
+              if (newUrl.includes('/blogs') && !newUrl.includes('/api/blogs')) {
+                newUrl = newUrl.replace('/blogs', '/api/blogs');
+              }
+              if (newUrl.includes('/properties') && !newUrl.includes('/api/properties')) {
+                newUrl = newUrl.replace('/properties', '/api/properties');
+              }
+              if (newUrl.includes('/user/profile-image') && !newUrl.includes('/api/user/profile-image')) {
+                newUrl = newUrl.replace('/user/profile-image', '/api/user/profile-image');
+              }
+              if (newUrl.includes('/auth/me')) {
+                newUrl = newUrl.replace('/auth/me', '/api/user/me');
+              }
+              
+              console.log(`🔧 [EMERGENCY-FIX] Fetch: ${url} → ${newUrl}`);
+              return originalFetch.call(this, newUrl, options);
+            }
+          }
+          return originalFetch.apply(this, arguments);
+        };
+        
+        // Interceptar también la carga de scripts
+        const observer = new MutationObserver(function(mutations) {
+          mutations.forEach(function(mutation) {
+            if (mutation.addedNodes) {
+              mutation.addedNodes.forEach(function(node) {
+                // Si es un script que contiene la URL problemática
+                if (node.tagName === 'SCRIPT' && node.src && node.src.includes('App-b821f139')) {
+                  console.log(`🔧 [EMERGENCY-FIX] Detectado script problemático: ${node.src}`);
+                  // No hacemos nada más porque ya tenemos los interceptores activos
+                }
+              });
+            }
+          });
+        });
+        
+        // Iniciar observación de cambios en el DOM
+        observer.observe(document, { childList: true, subtree: true });
+        
+        console.log('✅ [EMERGENCY-FIX] Parcheo de emergencia activado con éxito');
+      })();
+    </script>
+    
     <!-- Script de corrección temprana de URLs de API incorrectas (debe cargar antes que cualquier otro script) -->
     <script src="/fix-api.js"></script>
     

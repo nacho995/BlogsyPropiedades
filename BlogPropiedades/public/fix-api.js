@@ -1,6 +1,6 @@
 // Script ULTRA AGRESIVO para corregir URLs de API antes de que cargue la aplicación
 (function() {
-  console.log('🔥 [fix-api] Iniciando script de corrección ultra-agresiva');
+  console.log('🔥 [fix-api] Iniciando corrección ultra-agresiva para App-b821f139-1748584807959-v3-FINAL.js');
   
   // Configuración básica
   const OLD_DOMAIN = 'nextjs-gozamadrid-qrfk.onrender.com';
