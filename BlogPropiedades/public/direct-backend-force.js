@@ -5,11 +5,12 @@
   // Servidor backend (actualiza según tu infraestructura)
   // Intenta todos los posibles endpoints del servidor para encontrar el que funciona
   const POSSIBLE_BACKEND_URLS = [
-    'https://gozamadrid-backend-778f.onrender.com',       // Render (directo)
+    'https://nextjs-gozamadrid-qrfk.onrender.com',        // URL CORRECTA (Render)
     'https://blogs.realestategozamadrid.com',             // Dominio principal 
     'https://api.realestategozamadrid.com',               // Subdominio API
     'https://backend.realestategozamadrid.com',           // Subdominio Backend
-    'https://realestategozamadrid.com'                    // Dominio raíz
+    'https://realestategozamadrid.com',                   // Dominio raíz
+    'https://gozamadrid-backend-778f.onrender.com'        // URL antigua (Render)
   ];
   
   // Rutas API para verificar cada servidor
