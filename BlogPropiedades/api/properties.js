@@ -2,11 +2,20 @@
 export default async function handler(req, res) {
   // Configurar CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
+  
+  // Configurar el origen permitido
+  const origin = req.headers.origin;
+  // Permitir todos los orígenes o especificar los dominios permitidos
   res.setHeader('Access-Control-Allow-Origin', '*');
+  // Alternativa: permitir dominios específicos
+  // if (origin && (origin.includes('blogs.realestategozamadrid.com') || origin.includes('realestategozamadrid.com'))) {
+  //   res.setHeader('Access-Control-Allow-Origin', origin);
+  // }
+  
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, Cache-Control'
   );
 
   if (req.method === 'OPTIONS') {

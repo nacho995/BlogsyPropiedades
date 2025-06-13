@@ -1,8 +1,13 @@
 module.exports = async function handler(req, res) {
   // Configurar headers CORS
+  // Obtener el origen de la petición
+  const origin = req.headers.origin;
+  
+  // Permitir todos los orígenes (puedes restringirlo si lo prefieres)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control');
+  res.setHeader('Access-Control-Allow-Credentials', true);
 
   // Manejar preflight OPTIONS request
   if (req.method === 'OPTIONS') {
