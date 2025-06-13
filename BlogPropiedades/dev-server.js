@@ -6,7 +6,7 @@ const app = express();
 const PORT = 3001;
 
 // URL del backend real en Render
-const BACKEND_URL = 'https://nextjs-gozamadrid-qrfk.onrender.com';
+const BACKEND_URL = 'https://blogs.realestategozamadrid.com';
 
 // Middleware
 app.use(cors());

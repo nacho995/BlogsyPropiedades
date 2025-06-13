@@ -515,7 +515,7 @@ function ProtectedRoute({ children }) {
 }
 
 function App() {
-  console.log('🔗 Backend URL:', import.meta.env.VITE_BACKEND_URL || 'https://nextjs-gozamadrid-qrfk.onrender.com');
+  console.log('🔗 Backend URL:', import.meta.env.VITE_BACKEND_URL || 'https://blogs.realestategozamadrid.com');
   
   // Verificar si hay un ciclo al renderizar App
   checkRenderCycle();

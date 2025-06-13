@@ -73,10 +73,10 @@ Si sigues experimentando problemas:
 ## Variables de Entorno Principales
 
 ```bash
-VITE_BACKEND_URL=https://nextjs-gozamadrid-qrfk.onrender.com
-VITE_API_URL=https://nextjs-gozamadrid-qrfk.onrender.com
-VITE_API_PUBLIC_API_URL=https://nextjs-gozamadrid-qrfk.onrender.com
-VITE_FALLBACK_API=https://nextjs-gozamadrid-qrfk.onrender.com
+VITE_BACKEND_URL=https://blogs.realestategozamadrid.com
+VITE_API_URL=https://blogs.realestategozamadrid.com
+VITE_API_PUBLIC_API_URL=https://blogs.realestategozamadrid.com
+VITE_FALLBACK_API=https://blogs.realestategozamadrid.com
 VITE_MAIN_DOMAIN=realestategozamadrid.com
 ```
 

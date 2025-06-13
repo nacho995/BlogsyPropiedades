@@ -2,7 +2,7 @@
 // y evitar problemas de CORS
 export default async function handler(req, res) {
   // Configuración de la URL de la API
-  const apiUrl = process.env.API_BASE_URL || 'https://nextjs-gozamadrid-qrfk.onrender.com';
+  const apiUrl = process.env.API_BASE_URL || 'https://blogs.realestategozamadrid.com';
   
   // Obtener la ruta específica desde la URL
   const path = req.url.split('/api/proxy')[1] || '';

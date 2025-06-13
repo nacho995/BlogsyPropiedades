@@ -2,7 +2,7 @@
 // y evitar problemas de CORS
 export default async function handler(req, res) {
   // Leer la URL base del backend desde las variables de entorno
-  const apiUrl = process.env.API_BASE_URL || 'https://nextjs-gozamadrid-qrfk.onrender.com';
+  const apiUrl = process.env.API_BASE_URL || 'https://blogs.realestategozamadrid.com';
   
   // Obtener la ruta específica desde la URL
   const endpoint = req.url.replace('/api/proxy', '');
