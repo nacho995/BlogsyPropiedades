@@ -48,13 +48,15 @@
       if (url.includes('/auth/me')) {
         if (url.includes(OLD_DOMAIN)) {
           newUrl = `https://${NEW_DOMAIN}/api/user/me`;
-          console.log(`🔧 [fix-api] /auth/me con dominio antiguo corregido: ${url} -> ${newUrl}`);
+          console.log(` [fix-api] /auth/me con dominio antiguo corregido: ${url} -> ${newUrl}`);
           fixCount++;
           return newUrl;
         } else if (url === '/auth/me') {
-          newUrl = `/api/user/me`;
-          console.log(`🔧 [fix-api] /auth/me relativo corregido: ${url} -> ${newUrl}`);
-          fixCount++;
+          if (shouldRewriteUrl(url)) {
+            newUrl = `/api/user/me`;
+            console.log(` [fix-api] /auth/me relativo corregido: ${url} -> ${newUrl}`);
+            fixCount++;
+          }
           return newUrl;
         }
       }
@@ -76,7 +78,7 @@
           
           // Construir nueva URL
           newUrl = `https://${NEW_DOMAIN}${correctedPath}`;
-          console.log(`🔧 [fix-api] URL con dominio antiguo corregida: ${url} -> ${newUrl}`);
+          console.log(` [fix-api] URL con dominio antiguo corregida: ${url} -> ${newUrl}`);
           fixCount++;
           return newUrl;
         }
