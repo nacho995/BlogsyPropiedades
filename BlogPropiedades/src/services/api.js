@@ -1315,9 +1315,33 @@ export const createPropertyPost = async (data) => {
 export const getPropertyById = async (id) => {
   console.log(`Obteniendo propiedad por ID: ${id}`);
   try {
+    // Verificar si está disponible el conector directo
+    if (typeof window !== 'undefined' && window.DirectBackend && window.DirectBackend.properties) {
+      console.log('🔌 [API] Usando conector directo al backend para getPropertyById');
+      const data = await window.DirectBackend.properties.getById(id);
+      if (data && !data.error) {
+        return data;
+      } else {
+        console.warn('⚠️ [API] Error con conector directo, fallback a fetchAPI', data);
+        // Continuar con fetchAPI como fallback
+      }
+    }
+    
+    // Método tradicional con fetchAPI
     return await fetchAPI(`/api/properties/${id}`);
   } catch (error) {
     console.error(`Error al obtener propiedad ${id}:`, error);
+    
+    // Si hay un error y tenemos el conector de respaldo, intentar una vez más
+    if (typeof window !== 'undefined' && window.DirectBackend && !error.isDirectBackendError) {
+      try {
+        console.log('🛟 [API] Intentando recuperar propiedad con conector directo como último recurso');
+        return await window.DirectBackend.properties.getById(id);
+      } catch (backupError) {
+        console.error('❌ [API] También falló el intento de respaldo:', backupError);
+      }
+    }
+    
     throw error;
   }
 };
