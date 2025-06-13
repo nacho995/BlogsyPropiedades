@@ -113,11 +113,23 @@ const fetchAPI = async (endpoint, options = {}) => {
   const { body, headers: customHeaders, ...restOptions } = options;
   const token = localStorage.getItem('token');
   
-  // HOTFIX: Interceptar llamadas incorrectas a /auth/me y corregirlas
+  // HOTFIX: Interceptar llamadas incorrectas a /auth/me y corregirlas (tanto relativas como absolutas)
   let correctedEndpoint = endpoint;
+  
+  // Caso 1: endpoint relativo simple
   if (endpoint === '/auth/me') {
     console.warn('🚨 HOTFIX: Interceptando llamada incorrecta a /auth/me - corrigiendo a /user/me');
     correctedEndpoint = '/user/me';
+  } 
+  // Caso 2: URL absoluta antigua de Render
+  else if (endpoint.includes('nextjs-gozamadrid-qrfk.onrender.com/auth/me')) {
+    console.warn('🚨 HOTFIX: Interceptando URL absoluta incorrecta a Render - corrigiendo dominio y ruta');
+    correctedEndpoint = `${BASE_URL}/user/me`;
+  }
+  // Caso 3: URL nueva pero con ruta incorrecta
+  else if (endpoint.includes('blogs.realestategozamadrid.com/auth/me')) {
+    console.warn('🚨 HOTFIX: Interceptando URL con dominio correcto pero ruta incorrecta');
+    correctedEndpoint = `${BASE_URL}/user/me`;
   }
   
   console.log(`[fetchAPI Debug] Endpoint: ${correctedEndpoint}`);

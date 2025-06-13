@@ -3,6 +3,9 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 
+// Importamos el interceptor para corregir URLs de API incorrectas
+import "./interceptors/fetchInterceptor";
+
 // Solución para errores TDZ (Temporal Dead Zone)
 const y = {};
 const wi = {};
