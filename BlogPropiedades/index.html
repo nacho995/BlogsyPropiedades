@@ -58,6 +58,60 @@
         localStorage.setItem('notificationShown', 'true');
       });
     </script>
+    
+    <!-- FIX PARA ERRORES HTML/JSON EN RESPUESTAS API -->
+    <script>
+      // Definiciones y funciones para manejar errores JSON
+      var BACKEND_URL = 'https://blogs.realestategozamadrid.com';
+      var API_PREFIX = '/api';
+      
+      // Solución para el error "Unexpected token '<'"
+      function wrapFetchWithJsonErrorHandling() {
+        var originalFetch = window.fetch;
+        
+        window.fetch = async function(input, init) {
+          // Preparar URL correctamente formateada
+          var url = input;
+          if (input instanceof Request) url = input.url;
+          
+          try {
+            // Llamar a fetch original
+            var response = await originalFetch.apply(this, arguments);
+            
+            // Clonar respuesta para no consumirla
+            var clonedResponse = response.clone();
+            
+            // Verificar si espera JSON pero recibe HTML
+            var contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('html') && 
+                (url.includes('/api/') || url.includes('/properties') || url.includes('/blogs'))) {
+              
+              console.error('❌ [JSON-FIX] Error: La API devolvió HTML en lugar de JSON para:', url);
+              
+              // Intento de recuperación: crear respuesta JSON de error
+              return new Response(JSON.stringify({
+                error: true,
+                message: 'Error de routing en Vercel - La API devolvió HTML',
+                status: response.status,
+                originalUrl: url
+              }), {
+                headers: {'Content-Type': 'application/json'},
+                status: response.status
+              });
+            }
+            
+            return response;
+          } catch(error) {
+            console.error('❌ [JSON-FIX] Error en fetch:', error, 'URL:', url);
+            throw error;
+          }
+        };
+      }
+      
+      // Instalar el interceptor
+      wrapFetchWithJsonErrorHandling();
+      console.log('✅ [JSON-FIX] Instalado corrector de respuestas HTML/JSON');
+    </script>
     <!-- REGISTRAR SERVICE WORKER INMEDIATAMENTE -->
     <script>
       // Variable para controlar si ya hemos mostrado la notificación

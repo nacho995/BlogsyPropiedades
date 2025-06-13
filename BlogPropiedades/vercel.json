@@ -17,7 +17,27 @@
   "trailingSlash": false,
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/api/(.*)",
+      "destination": "https://blogs.realestategozamadrid.com/api/$1"
+    },
+    {
+      "source": "/blogs",
+      "destination": "https://blogs.realestategozamadrid.com/api/blogs"
+    },
+    {
+      "source": "/properties",
+      "destination": "https://blogs.realestategozamadrid.com/api/properties"
+    },
+    {
+      "source": "/auth/(.*)",
+      "destination": "https://blogs.realestategozamadrid.com/api/user/$1"
+    },
+    {
+      "source": "/user/(.*)",
+      "destination": "https://blogs.realestategozamadrid.com/api/user/$1"
+    },
+    {
+      "source": "/((?!api|blogs|properties|auth|user|assets|_next/static|favicon.ico).+)",
       "destination": "/index.html"
     }
   ],
