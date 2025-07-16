@@ -71,20 +71,17 @@ const isLocalDevelopment = typeof window !== 'undefined' && (
 );
 
 // SOLUCIÓN DEFINITIVA: Usar el dominio correcto para cada entorno
-const API_DOMAIN = isLocalDevelopment 
-  ? 'localhost:5173'  // Servidor de desarrollo local
-  : 'blogs.realestategozamadrid.com';  // Dominio de producción
-
-// Usar HTTP para localhost, HTTPS para producción
-export const BASE_URL = isLocalDevelopment 
-  ? `http://${API_DOMAIN}/api`  // Desarrollo local: HTTP con proxy
-  : `https://${API_DOMAIN}/api`;  // Producción: HTTPS directo a Render con prefijo /api
+// En desarrollo, usamos una ruta relativa para que el proxy de Vite funcione.
+// En producción, usamos la URL absoluta del backend.
+export const BASE_URL = isLocalDevelopment
+  ? '' // Las llamadas serán relativas, ej: /api/user/login
+  : 'https://blogs.realestategozamadrid.com'; // URL base de producción
 
 // Determinar si estamos usando HTTPS
 const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
 // Usar la API directamente sin proxies
-const API_BASE_URL = BASE_URL;
+const API_BASE_URL = isLocalDevelopment ? '' : `${BASE_URL}/api`;
 
 // Registrar la URL de la API usada con mensaje más claro sobre el entorno
 console.log(
@@ -158,24 +155,17 @@ const fetchAPI = async (endpoint, options = {}) => {
     // Determinar si estamos en modo desarrollo o producción
     const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     
-    if (isDevelopment) {
-      console.log(`🔄 Enviando solicitud en desarrollo a: ${BASE_URL}${correctedEndpoint}`);
-      response = await fetch(`${BASE_URL}${correctedEndpoint}`, {
+    const requestUrl = isLocalDevelopment ? correctedEndpoint : `${BASE_URL}${correctedEndpoint}`;
+    console.log(`🔄 Enviando solicitud a: ${requestUrl}`);
+    response = await fetch(requestUrl, {
         ...restOptions,
         headers,
         body: body ? body : undefined,
-      });
-    } else {
-      console.log(`🔄 Enviando solicitud directa a: ${BASE_URL}${correctedEndpoint}`);
-      response = await fetch(`${BASE_URL}${correctedEndpoint}`, {
-        ...restOptions,
-        headers,
-        body: body ? body : undefined,
-      });
-    }
+    });
 
     if (!response.ok) {
-      console.error(`❌ Error HTTP: ${response.status} en ${BASE_URL}${correctedEndpoint}`);
+      const requestUrl = isLocalDevelopment ? correctedEndpoint : `${BASE_URL}${correctedEndpoint}`;
+      console.error(`❌ Error HTTP: ${response.status} en ${requestUrl}`);
       
       // Intentar parsear la respuesta como JSON para obtener el mensaje de error
       let errorData;
@@ -318,7 +308,7 @@ export const createBlogPost = async (data) => {
 export const getBlogPosts = async () => {
   console.log('Obteniendo blogs del servidor...');
   try {
-    const response = await fetchAPI('/api/blogs');
+    const response = await fetchAPI('/api/blogs', {});
     console.log('Blogs recibidos del servidor:', response);
     console.log(`Se obtuvieron ${response?.length || 0} blogs`);
     return response || [];
@@ -423,7 +413,7 @@ export const loginUser = async (credentials) => {
     console.log('Enviando solicitud de login:', JSON.parse(JSON.stringify(loginData))); // Clonar para evitar problemas de log
     
     // Construir la URL de login
-    const loginUrl = '/user/login';
+    const loginUrl = '/api/user/login';
     
     // Enviar las credenciales
     const result = await fetchAPI(loginUrl, {
@@ -494,7 +484,7 @@ export const loginUser = async (credentials) => {
 export const registerUser = async (userData) => {
   console.log("Datos recibidos para registro:", userData);
   try {
-    return await fetchAPI('/user/register', {
+    return await fetchAPI('/api/user/register', {
       method: 'POST',
       body: JSON.stringify(userData)
     });
