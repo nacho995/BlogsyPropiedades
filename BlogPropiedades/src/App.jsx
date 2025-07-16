@@ -471,8 +471,7 @@ function HomeRoute() {
 // Redefinir ProtectedRoute como una función dentro de App.jsx
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useUser();
-  
-  // Si está cargando, mostrar un spinner
+
   if (loading) {
     return (
       <div className="min-h-screen flex justify-center items-center bg-gray-100">
@@ -480,37 +479,11 @@ function ProtectedRoute({ children }) {
       </div>
     );
   }
-  
-  // Si no está autenticado, redirigir a login
+
   if (!isAuthenticated) {
-    // Para evitar bucles, verificar si hay demasiados redireccionamientos
-    try {
-      const redirects = localStorage.getItem('authRedirects') || '0';
-      const redirectCount = parseInt(redirects, 10) + 1;
-      localStorage.setItem('authRedirects', redirectCount.toString());
-      
-      if (redirectCount > 3) {
-        console.warn(`⚠️ Demasiados redireccionamientos (${redirectCount}), mostrando página de login directamente`);
-        localStorage.setItem('redirectLoop', 'true');
-        localStorage.removeItem('authRedirects');
-        return <SignIn />;
-      }
-      
-      // Después de 5 segundos, resetear el contador para permitir futuros intentos
-      setTimeout(() => {
-        localStorage.removeItem('authRedirects');
-      }, 5000);
-    } catch (e) {
-      console.error("Error al manejar redireccionamiento:", e);
-    }
-    
-    return <Navigate to="/login" />;
+    return <Navigate to="/login" replace />;
   }
-  
-  // Resetear contador de redirecciones 
-  localStorage.removeItem('authRedirects');
-  
-  // Si está autenticado, mostrar el componente hijo
+
   return children;
 }
 

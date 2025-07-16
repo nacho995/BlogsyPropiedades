@@ -7,8 +7,8 @@ import "./index.css";
 // import "./interceptors/fetchInterceptor"; // Desactivado para evitar reescritura de URLs
 
 // Importamos y registramos el Service Worker para interceptar peticiones fetch a nivel del navegador
-import * as serviceWorkerRegistration from './serviceWorkerRegistration';
-serviceWorkerRegistration.register();
+// import * as serviceWorkerRegistration from './serviceWorkerRegistration'; // Desactivado para eliminar interceptores
+// serviceWorkerRegistration.register();
 
 // Solución para errores TDZ (Temporal Dead Zone)
 const y = {};
