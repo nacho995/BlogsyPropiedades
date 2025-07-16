@@ -10,7 +10,7 @@
     "clean": "rm -rf ./.vercel/output dist build",
     "prebuild": "npm run clean && node scripts/generate-build-info.js",
     "build": "GENERATE_SOURCEMAP=true VITE_FORCE_REBUILD=true vite build --emptyOutDir",
-    "postbuild": "cp -r public/sw-final.js dist/ && cp -r public/fix-api.js dist/ && cp -r dist build && echo 'Build completado con timestamp: '$(date)",
+
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "node server.js"
