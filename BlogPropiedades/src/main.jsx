@@ -4,7 +4,7 @@ import App from "./App";
 import "./index.css";
 
 // Importamos el interceptor para corregir URLs de API incorrectas
-import "./interceptors/fetchInterceptor";
+// import "./interceptors/fetchInterceptor"; // Desactivado para evitar reescritura de URLs
 
 // Importamos y registramos el Service Worker para interceptar peticiones fetch a nivel del navegador
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
