@@ -1,9 +1,5 @@
 {
   "version": 2,
-  "buildCommand": "cd BlogPropiedades && npm run build",
-  "outputDirectory": "BlogPropiedades/build",
-  "installCommand": "cd BlogPropiedades && npm install --include=dev",
-  "framework": null,
   "rewrites": [
     {
       "source": "/(.*)",
