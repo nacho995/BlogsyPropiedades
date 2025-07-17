@@ -1,7 +1,7 @@
 {
   "version": 2,
   "framework": "vite",
-  "installCommand": "cd BlogPropiedades && npm install",
+  "installCommand": "cd BlogPropiedades && npm install --include=dev",
   "buildCommand": "cd BlogPropiedades && npm run build",
   "outputDirectory": "BlogPropiedades/dist",
   "rewrites": [
