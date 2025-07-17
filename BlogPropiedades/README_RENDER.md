@@ -5,10 +5,10 @@ Este documento contiene las instrucciones para configurar correctamente la aplic
 ## Variables de Producción
 
 ```env
-VITE_BACKEND_URL=https://api.realestategozamadrid.com
-VITE_API_URL=https://api.realestategozamadrid.com
-VITE_API_PUBLIC_API_URL=https://api.realestategozamadrid.com
-VITE_FALLBACK_API=https://api.realestategozamadrid.com
+VITE_BACKEND_URL=https://nextjs-gozamadrid-qrfk.onrender.com 
+VITE_API_URL=https://nextjs-gozamadrid-qrfk.onrender.com 
+VITE_API_PUBLIC_API_URL=https://nextjs-gozamadrid-qrfk.onrender.com 
+VITE_FALLBACK_API=https://nextjs-gozamadrid-qrfk.onrender.com 
 VITE_MAIN_DOMAIN=realestategozamadrid.com
 ```
 

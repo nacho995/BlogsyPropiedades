@@ -809,7 +809,7 @@ const checkImageAccessibility = (url) => {
       'res.cloudinary.com',
       'images.unsplash.com',
       'www.realestategozamadrid.com',
-      'api.realestategozamadrid.com',
+      'nextjs-gozamadrid-qrfk.onrender.com ',
       'gozamadrid-api-prod.eba-adypnjgx.eu-west-3.elasticbeanstalk.com'
     ];
     
