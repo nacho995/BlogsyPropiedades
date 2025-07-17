@@ -75,7 +75,7 @@ const isLocalDevelopment = typeof window !== 'undefined' && (
 // En producción, usamos la URL absoluta del backend.
 export const BASE_URL = isLocalDevelopment
   ? '' // En desarrollo, usamos rutas relativas para que el proxy de Vite funcione
-  : 'https://api.realestategozamadrid.com'; // En producción, esta es la URL de nuestro backend
+  : 'https://nextjs-gozamadrid-qrfk.onrender.com'; // En producción, esta es la URL de nuestro backend
 
 // Determinar si estamos usando HTTPS
 const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
