@@ -1,9 +1,65 @@
 {
   "version": 2,
+  "framework": "vite",
+  "installCommand": "cd BlogPropiedades && npm install",
+  "buildCommand": "cd BlogPropiedades && npm run build",
+  "outputDirectory": "BlogPropiedades/dist",
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/api/(.*)",
+      "destination": "https://blogs.realestategozamadrid.com/api/$1"
+    },
+    {
+      "source": "/blogs",
+      "destination": "https://blogs.realestategozamadrid.com/api/blogs"
+    },
+    {
+      "source": "/properties",
+      "destination": "https://blogs.realestategozamadrid.com/api/properties"
+    },
+    {
+      "source": "/auth/(.*)",
+      "destination": "https://blogs.realestategozamadrid.com/api/user/$1"
+    },
+    {
+      "source": "/user/(.*)",
+      "destination": "https://blogs.realestategozamadrid.com/api/user/$1"
+    },
+    {
+      "source": "/((?!api|blogs|properties|auth|user|assets|_next/static|favicon.ico).+)",
       "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
     }
   ]
 } 
