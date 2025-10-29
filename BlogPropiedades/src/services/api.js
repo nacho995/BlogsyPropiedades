@@ -1440,7 +1440,8 @@ export const requestPasswordRecovery = async (email) => {
   try {
     console.log(`📧 Solicitando recuperación de contraseña para: ${email}`);
     
-    const result = await fetchAPI('/user/request-password-reset', {
+    // Usar el backend centralizado de Render
+    const result = await fetchAPI('/auth/recover-password', {
       method: 'POST',
       body: JSON.stringify({ email })
     });
@@ -1464,12 +1465,16 @@ export const resetPassword = async (token, password, passwordConfirm) => {
   try {
     console.log(`🔒 Restableciendo contraseña con token: ${token.substring(0, 10)}...`);
     
-    const result = await fetchAPI('/user/reset-password', {
-      method: 'POST',
+    // Validar que las contraseñas coincidan antes de enviar al backend
+    if (password !== passwordConfirm) {
+      throw new Error('Las contraseñas no coinciden');
+    }
+    
+    // Usar el backend centralizado de Render con PATCH
+    const result = await fetchAPI(`/auth/${token}`, {
+      method: 'PATCH',
       body: JSON.stringify({ 
-        token, 
-        password, 
-        passwordConfirm 
+        password
       })
     });
 
