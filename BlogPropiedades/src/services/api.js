@@ -1430,3 +1430,53 @@ export const uploadImageFallback = async (file, type = 'blog') => {
     throw error;
   }
 };
+
+/**
+ * Solicita la recuperación de contraseña enviando un email con el token
+ * @param {string} email - Email del usuario
+ * @returns {Promise<Object>}
+ */
+export const requestPasswordRecovery = async (email) => {
+  try {
+    console.log(`📧 Solicitando recuperación de contraseña para: ${email}`);
+    
+    const result = await fetchAPI('/user/request-password-reset', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    });
+
+    console.log('✅ Solicitud de recuperación enviada:', result);
+    return result;
+  } catch (error) {
+    console.error('❌ Error al solicitar recuperación de contraseña:', error);
+    throw error;
+  }
+};
+
+/**
+ * Restablece la contraseña del usuario usando el token recibido por email
+ * @param {string} token - Token de recuperación
+ * @param {string} password - Nueva contraseña
+ * @param {string} passwordConfirm - Confirmación de la nueva contraseña
+ * @returns {Promise<Object>}
+ */
+export const resetPassword = async (token, password, passwordConfirm) => {
+  try {
+    console.log(`🔒 Restableciendo contraseña con token: ${token.substring(0, 10)}...`);
+    
+    const result = await fetchAPI('/user/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        token, 
+        password, 
+        passwordConfirm 
+      })
+    });
+
+    console.log('✅ Contraseña restablecida exitosamente:', result);
+    return result;
+  } catch (error) {
+    console.error('❌ Error al restablecer contraseña:', error);
+    throw error;
+  }
+};
