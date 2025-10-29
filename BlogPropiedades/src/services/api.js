@@ -78,7 +78,7 @@ const API_DOMAIN = isLocalDevelopment
 // Usar HTTP para localhost, HTTPS para producción
 export const BASE_URL = isLocalDevelopment 
   ? `http://${API_DOMAIN}/api`  // Desarrollo local: HTTP con proxy
-  : `https://${API_DOMAIN}`;  // Producción: HTTPS directo a Render
+  : `https://${API_DOMAIN}/api`;  // Producción: HTTPS directo a Render con /api
 
 // Determinar si estamos usando HTTPS
 const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
