@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createUser } from '../services/api';
 
@@ -20,7 +20,7 @@ export default function Register() {
         }
         try {
             await createUser({ name, email, password });
-            navigate('/signin');
+            navigate('/login');
         } catch (err) {
             setDisplayError(err.message);
         }
@@ -94,7 +94,7 @@ export default function Register() {
                     </button>
                 </form>
                 <div className="text-center mt-4">
-                    <Link to="/signin" className="text-blue-600 hover:underline">¿Ya tienes una cuenta? Inicia sesión</Link>
+                    <Link to="/login" className="text-blue-600 hover:underline">¿Ya tienes una cuenta? Inicia sesión</Link>
                 </div>
             </div>
         </div>

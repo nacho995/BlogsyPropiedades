@@ -1,8 +1,7 @@
-import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { UserProvider, useUser } from './context/UserContext';
-import { Toaster } from 'sonner';
-import { ToastContainer } from 'react-toastify';
+import { Toaster, toast } from 'sonner';
 import 'react-toastify/dist/ReactToastify.css';
 
 // Primero cargar componentes básicos y utilidades
@@ -24,6 +23,9 @@ import SubirPage from './components/SubirPage';
 import DiagnosticPage from './components/DiagnosticPage';
 import NotFound from './components/NotFound';
 import TestImagePage from './pages/testImagePage';
+import RecoverPassword from './components/RecoverPassword';
+import ResetPassword from './components/ResetPassword';
+import Register from './components/Register';
 
 // Detección de ciclos de renderizado
 const RENDER_CYCLE_THRESHOLD = 10; // Número máximo de renderizados en un corto período de tiempo
@@ -713,6 +715,9 @@ function App() {
               <Routes>
                 <Route path="/" element={<SafeRender><HomeRoute /></SafeRender>} />
                 <Route path="/login" element={<SafeRender><SignIn /></SafeRender>} />
+                <Route path="/register" element={<SafeRender><Register /></SafeRender>} />
+                <Route path="/recover-password" element={<SafeRender><RecoverPassword /></SafeRender>} />
+                <Route path="/reset-password/:token" element={<SafeRender><ResetPassword /></SafeRender>} />
                 <Route path="/crear-blog" element={<ProtectedRoute><SafeRender><BlogCreation /></SafeRender></ProtectedRoute>} />
                 <Route path="/ver-blogs" element={<SafeRender><SeeBlogs /></SafeRender>} />
                 <Route path="/blog/:id" element={<SafeRender><BlogDetail /></SafeRender>} />

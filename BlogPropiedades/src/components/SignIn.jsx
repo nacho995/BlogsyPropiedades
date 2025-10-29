@@ -1,51 +1,10 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef, useContext } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { loginUser, createUser, fetchProfileImageFromServer } from "../services/api";
-import { useUser } from "../context/UserContext";
-import { toast } from "sonner";
 import { UserContext } from '../context/UserContext';
+import { toast } from 'sonner';
 import PropTypes from 'prop-types';
-
-// Función que estaba en utils
-const detectAndPreventLoopError = (actionName, timeWindow = 5000, maxAttempts = 3) => {
-  try {
-    // Obtener o crear el registro de acciones
-    const actionsKey = `actionLog_${actionName}`;
-    const storedActions = JSON.parse(localStorage.getItem(actionsKey) || '[]');
-    
-    // Añadir la acción actual
-    const now = new Date().getTime();
-    storedActions.unshift(now);
-    
-    // Mantener solo las últimas 10 acciones para no ocupar mucho espacio
-    if (storedActions.length > 10) {
-      storedActions.length = 10;
-    }
-    
-    // Guardar el registro actualizado
-    localStorage.setItem(actionsKey, JSON.stringify(storedActions));
-    
-    // Verificar si hay demasiadas acciones en la ventana de tiempo
-    const recentActions = storedActions.filter(timestamp => 
-      (now - timestamp) < timeWindow
-    );
-    
-    // Si hay demasiadas acciones recientes, es posible que estemos en un bucle
-    if (recentActions.length >= maxAttempts) {
-      console.warn(`⚠️ Posible bucle detectado en "${actionName}": ${recentActions.length} acciones en ${timeWindow}ms`);
-      
-      // Registrar la detección del bucle
-      localStorage.setItem(`${actionName}_bucleDetectado`, 'true');
-      
-      return true; // Hay un bucle
-    }
-    
-    return false; // No hay bucle
-  } catch (error) {
-    console.error('Error al detectar bucle:', error);
-    return false; // En caso de error, asumimos que no hay bucle
-  }
-};
+import { detectAndPreventLoopError } from "../utils";
 
 const SignIn = ({ isRegistering = false }) => {
     const [email, setEmail] = useState("");
@@ -414,7 +373,7 @@ const SignIn = ({ isRegistering = false }) => {
                                     <div className="flex items-center justify-between pt-2">
                                         {!isRegistering && (
                                             <div className="text-sm">
-                                                <Link to="/recuperar" className="font-medium text-blue-600 hover:text-blue-500">
+                                                <Link to="/recover-password" className="font-medium text-blue-600 hover:text-blue-500">
                                                     ¿Olvidaste tu contraseña?
                                                 </Link>
                                             </div>
