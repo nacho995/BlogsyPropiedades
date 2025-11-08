@@ -1,53 +1,16 @@
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
-
-// Schema del usuario
-const userSchema = new mongoose.Schema({
-  name: String,
-  email: { type: String, unique: true, required: true },
-  password: { type: String, required: true },
-  role: { type: String, default: 'user' },
-  profilePic: String,
-  resetPasswordToken: String,
-  resetPasswordExpires: Date
-}, { timestamps: true });
-
-const User = mongoose.models.User || mongoose.model('User', userSchema);
-
-// Conectar a MongoDB
-const connectDB = async () => {
-  if (mongoose.connections[0].readyState) return;
-  
-  const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://ignaciodalesio1995:Porsche987@cluster0.dcvt5dd.mongodb.net/goza-madrid?retryWrites=true&w=majority';
-  
-  try {
-    await mongoose.connect(MONGODB_URI);
-    console.log('✅ MongoDB conectado');
-  } catch (error) {
-    console.error('❌ Error conectando a MongoDB:', error);
-    throw error;
-  }
-};
-
-/**
- * Endpoint para restablecer contraseña con token
- */
 module.exports = async function handler(req, res) {
-  // Configurar CORS
+  // Configurar headers CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
-  );
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
+  // Manejar preflight OPTIONS request
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return res.status(200).end();
   }
 
+  // Solo permitir métodos POST
   if (req.method !== 'POST') {
     return res.status(405).json({ 
       error: true, 
@@ -56,6 +19,38 @@ module.exports = async function handler(req, res) {
   }
 
   try {
+    const mongoose = require('mongoose');
+    const bcrypt = require('bcryptjs');
+    const crypto = require('crypto');
+
+    // Schema del usuario
+    const userSchema = new mongoose.Schema({
+      name: String,
+      email: { type: String, unique: true, required: true },
+      password: { type: String, required: true },
+      role: { type: String, default: 'user' },
+      profilePic: String,
+      resetPasswordToken: String,
+      resetPasswordExpires: Date
+    }, { timestamps: true });
+
+    const User = mongoose.models.User || mongoose.model('User', userSchema);
+
+    // Conectar a MongoDB
+    const connectDB = async () => {
+      if (mongoose.connections[0].readyState) return;
+      
+      const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://ignaciodalesio1995:Porsche987@cluster0.dcvt5dd.mongodb.net/goza-madrid?retryWrites=true&w=majority';
+      
+      try {
+        await mongoose.connect(MONGODB_URI);
+        console.log('✅ MongoDB conectado');
+      } catch (error) {
+        console.error('❌ Error conectando a MongoDB:', error);
+        throw error;
+      }
+    };
+
     await connectDB();
 
     const { token, password, passwordConfirm } = req.body;
