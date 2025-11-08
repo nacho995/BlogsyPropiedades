@@ -120,6 +120,24 @@ const fetchAPI = async (endpoint, options = {}) => {
     correctedEndpoint = '/user/me';
   }
   
+  // Normalizar endpoints para evitar doble /api cuando BASE_URL ya termina en /api
+  const baseEndsWithApi = BASE_URL.endsWith('/api');
+  if (typeof correctedEndpoint === 'string') {
+    // Asegurar que empiece con '/'
+    if (!correctedEndpoint.startsWith('/')) {
+      correctedEndpoint = '/' + correctedEndpoint;
+    }
+    // Si base termina en /api y el endpoint empieza con /api, remover el prefijo duplicado
+    if (baseEndsWithApi && correctedEndpoint.startsWith('/api/')) {
+      const original = correctedEndpoint;
+      correctedEndpoint = correctedEndpoint.replace(/^\/api\//, '/');
+      console.log(`[fetchAPI Debug] Normalizando endpoint: ${original} -> ${correctedEndpoint}`);
+    } else if (baseEndsWithApi && correctedEndpoint === '/api') {
+      correctedEndpoint = '/';
+      console.log(`[fetchAPI Debug] Normalizando endpoint: /api -> /`);
+    }
+  }
+  
   console.log(`[fetchAPI Debug] Endpoint: ${correctedEndpoint}`);
   console.log(`[fetchAPI Debug] Token from localStorage: ${token ? token.substring(0, 20) + '...' : 'NULL'}`);
   
@@ -164,22 +182,25 @@ const fetchAPI = async (endpoint, options = {}) => {
 
     if (!response.ok) {
       console.error(`❌ Error HTTP: ${response.status} en ${BASE_URL}${correctedEndpoint}`);
-      
-      // Intentar parsear la respuesta como JSON para obtener el mensaje de error
-      let errorData;
+      // Leer el cuerpo UNA sola vez y tratar de parsearlo
+      let message = `HTTP Error ${response.status}`;
       try {
-        errorData = await response.json();
-      } catch (parseError) {
-        // Si no es JSON, usar el texto de la respuesta
-        const errorText = await response.text();
-        errorData = { 
-          error: true, 
-          status: response.status, 
-          message: errorText 
-        };
+        // Clonar la respuesta para poder leer el body sin consumirlo
+        const clonedResponse = response.clone();
+        const rawText = await clonedResponse.text();
+        if (rawText) {
+          try {
+            const asJson = JSON.parse(rawText);
+            message = asJson.message || message;
+          } catch {
+            message = rawText || message;
+          }
+        }
+      } catch (readError) {
+        // Si falla al leer, usar el mensaje por defecto
+        console.warn('No se pudo leer el cuerpo de la respuesta de error:', readError);
       }
-      
-      throw new Error(errorData.message || `HTTP Error ${response.status}`);
+      throw new Error(message);
     }
 
     const data = await response.json();
@@ -861,10 +882,10 @@ export const uploadImageProperty = async (formData) => {
     };
     
     console.log("Token de autorización:", token);
-    console.log("Subiendo imagen de propiedad a:", `${BASE_URL}/api/properties/upload-image`);
+    console.log("Subiendo imagen de propiedad a:", `${BASE_URL}/properties/upload-image`);
     console.log("FormData contenido:", Array.from(formData.entries()));
     
-    const response = await fetch(`${BASE_URL}/api/properties/upload-image`, {
+    const response = await fetch(`${BASE_URL}/properties/upload-image`, {
       method: 'POST',
       headers: headers,
       body: formData,
@@ -919,7 +940,7 @@ export const testApiConnection = async () => {
     console.log('📊 Respuesta de conexión a API: Status', basicResponse.status);
     
     // Prueba de endpoint de blogs
-    const blogTestResponse = await fetch(`${BASE_URL}/api/blogs`, {
+    const blogTestResponse = await fetch(`${BASE_URL}/blogs`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json'
@@ -928,7 +949,7 @@ export const testApiConnection = async () => {
     console.log('📚 Prueba de ruta de blogs: Status', blogTestResponse.status);
     
     // Prueba de endpoint de propiedades  
-    const propertyTestResponse = await fetch(`${BASE_URL}/api/properties`, {
+    const propertyTestResponse = await fetch(`${BASE_URL}/properties`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json'
@@ -1127,7 +1148,7 @@ export const fetchProfileImageFromServer = async () => {
 
     console.log("🔍 Obteniendo imagen de perfil desde el servidor...");
 
-    const response = await fetch(`${BASE_URL}/api/user/profile-image`, {
+    const response = await fetch(`${BASE_URL}/user/profile-image`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -1162,7 +1183,7 @@ export const uploadImageBlog = async (formData) => {
       'Authorization': `Bearer ${token}`
     };
 
-    const response = await fetch(`${BASE_URL}/api/blogs/upload`, {
+    const response = await fetch(`${BASE_URL}/blogs/upload`, {
       method: 'POST',
       headers: headers,
       body: formData
@@ -1210,7 +1231,7 @@ export const uploadProfileImageAndUpdate = async (userId, imageFile) => {
 
     console.log(`Subiendo imagen de perfil para usuario ${userId}...`);
 
-    const response = await fetch(`${BASE_URL}/api/user/update-profile`, {
+    const response = await fetch(`${BASE_URL}/user/update-profile`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -1346,7 +1367,7 @@ export const uploadFile = async (formData) => {
       'Authorization': `Bearer ${token}`
     };
 
-    const response = await fetch(`${BASE_URL}/api/upload`, {
+    const response = await fetch(`${BASE_URL}/upload`, {
       method: 'POST',
       headers: headers,
       body: formData
@@ -1395,9 +1416,9 @@ export const uploadImageFallback = async (file, type = 'blog') => {
     // Elegir la ruta correcta según el tipo
     let uploadUrl;
     if (type === 'property') {
-      uploadUrl = `${BASE_URL}/api/properties/upload-image`;
+      uploadUrl = `${BASE_URL}/properties/upload-image`;
     } else {
-      uploadUrl = `${BASE_URL}/api/blogs/upload`;
+      uploadUrl = `${BASE_URL}/blogs/upload`;
     }
     
     // Intentar subir al backend
@@ -1440,8 +1461,8 @@ export const requestPasswordRecovery = async (email) => {
   try {
     console.log(`📧 Solicitando recuperación de contraseña para: ${email}`);
     
-    // Usar el backend centralizado de Render
-    const result = await fetchAPI('/auth/recover-password', {
+    // Usar el endpoint correcto del backend: POST a /user/request-password-reset
+    const result = await fetchAPI('/user/request-password-reset', {
       method: 'POST',
       body: JSON.stringify({ email })
     });
@@ -1470,11 +1491,19 @@ export const resetPassword = async (token, password, passwordConfirm) => {
       throw new Error('Las contraseñas no coinciden');
     }
     
-    // Usar el backend centralizado de Render con PATCH
-    const result = await fetchAPI(`/auth/${token}`, {
-      method: 'PATCH',
+    // Validar longitud mínima
+    if (password.length < 8) {
+      throw new Error('La contraseña debe tener al menos 8 caracteres');
+    }
+    
+    // Usar el endpoint correcto del backend: POST a /user/reset-password
+    // El backend espera: token, password, passwordConfirm en el body
+    const result = await fetchAPI('/user/reset-password', {
+      method: 'POST',
       body: JSON.stringify({ 
-        password
+        token,
+        password,
+        passwordConfirm
       })
     });
 
